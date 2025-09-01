@@ -71,12 +71,122 @@ def logout_view(request):
 @login_required
 def dashboard_view(request):
     """メインダッシュボード（役割に応じて振り分け）"""
-    if request.user.is_teacher:
+    if request.user.role == 'admin':
+        return admin_dashboard(request)
+    elif request.user.is_teacher:
         return teacher_dashboard(request)
     elif request.user.is_student:
         return student_dashboard(request)
     else:
         return redirect('school_management:login')
+
+
+@login_required
+def admin_dashboard(request):
+    """管理者ダッシュボード"""
+    if request.user.role != 'admin':
+        messages.error(request, '管理者権限が必要です。')
+        return redirect('school_management:dashboard')
+    
+    # 統計情報を取得
+    total_teachers = CustomUser.objects.filter(role='teacher').count()
+    total_students = CustomUser.objects.filter(role='student').count()
+    total_classes = ClassRoom.objects.count()
+    total_admins = CustomUser.objects.filter(role='admin').count()
+    
+    # 全ユーザー情報
+    all_teachers = CustomUser.objects.filter(role='teacher').order_by('-date_joined')
+    all_students = CustomUser.objects.filter(role='student').order_by('-date_joined')
+    all_admins = CustomUser.objects.filter(role='admin').order_by('-date_joined')
+    
+    # 最近追加された教員（最新5名）
+    recent_teachers = all_teachers[:5]
+    
+    # 最近追加された学生（最新10名）
+    recent_students = all_students[:10]
+    
+    # 最近作成されたクラス（最新5個）
+    recent_classes = ClassRoom.objects.order_by('-created_at')[:5]
+    
+    context = {
+        'user': request.user,
+        'total_teachers': total_teachers,
+        'total_students': total_students,
+        'total_classes': total_classes,
+        'total_admins': total_admins,
+        'all_teachers': all_teachers,
+        'all_students': all_students,
+        'all_admins': all_admins,
+        'recent_teachers': recent_teachers,
+        'recent_students': recent_students,
+        'recent_classes': recent_classes,
+    }
+    
+    return render(request, 'school_management/admin_dashboard.html', context)
+
+
+@login_required
+def teacher_list_view(request):
+    """教員一覧（管理者専用）"""
+    if request.user.role != 'admin':
+        messages.error(request, '管理者権限が必要です。')
+        return redirect('school_management:dashboard')
+    
+    teachers = CustomUser.objects.filter(role='teacher').order_by('full_name')
+    
+    context = {
+        'teachers': teachers,
+    }
+    return render(request, 'school_management/teacher_list.html', context)
+
+
+@login_required
+def teacher_create_view(request):
+    """教員作成（管理者専用）"""
+    if request.user.role != 'admin':
+        messages.error(request, '管理者権限が必要です。')
+        return redirect('school_management:dashboard')
+    
+    if request.method == 'POST':
+        try:
+            # フォームデータを取得
+            teacher_id = request.POST.get('teacher_id')
+            full_name = request.POST.get('full_name')
+            email = request.POST.get('email')
+            password = request.POST.get('password')
+            
+            # バリデーション
+            if not all([email, full_name, password]):
+                messages.error(request, 'メールアドレス、氏名、パスワードは必須です。')
+                return render(request, 'school_management/teacher_create.html')
+            
+            # メールアドレスの重複チェック
+            if CustomUser.objects.filter(email=email).exists():
+                messages.error(request, 'このメールアドレスは既に使用されています。')
+                return render(request, 'school_management/teacher_create.html')
+            
+            # 教員IDの重複チェック（入力されている場合）
+            if teacher_id and CustomUser.objects.filter(teacher_id=teacher_id).exists():
+                messages.error(request, 'この教員IDは既に使用されています。')
+                return render(request, 'school_management/teacher_create.html')
+            
+            # 教員を作成（CustomUserManagerのcreate_userを使用）
+            teacher = CustomUser.objects.create_user(
+                email=email,
+                full_name=full_name,
+                password=password,
+                role='teacher',
+                teacher_id=teacher_id or ''
+            )
+            
+            messages.success(request, f'教員「{teacher.full_name}」を追加しました。')
+            return redirect('school_management:teacher_list')
+            
+        except Exception as e:
+            messages.error(request, f'教員の作成に失敗しました: {str(e)}')
+            return render(request, 'school_management/teacher_create.html')
+    
+    return render(request, 'school_management/teacher_create.html')
 
 
 @login_required
@@ -149,13 +259,24 @@ def student_dashboard(request):
 @login_required
 def class_list_view(request):
     """クラス一覧"""
-    classes = ClassRoom.objects.filter(teachers=request.user)
+    # 管理者の場合は全てのクラスを表示
+    if request.user.role == 'admin':
+        classes = ClassRoom.objects.all()
+    else:
+        # 教員の場合は担当クラスのみ表示
+        classes = ClassRoom.objects.filter(teachers=request.user)
     return render(request, 'school_management/class_list.html', {'classes': classes})
 
 @login_required
 def class_detail_view(request, class_id):
     """クラス詳細"""
-    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+    # 管理者の場合は全てのクラスにアクセス可能
+    if request.user.role == 'admin':
+        classroom = get_object_or_404(ClassRoom, id=class_id)
+    else:
+        # 教員の場合は担当クラスのみアクセス可能
+        classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+    
     students = classroom.students.all()
     lessons = LessonSession.objects.filter(classroom=classroom).order_by('-date')[:5]  # 最近の5件
     sessions = LessonSession.objects.filter(classroom=classroom)  # 全ての授業回（カウント用）
@@ -300,7 +421,13 @@ def student_detail_view(request, student_number):
 @login_required
 def class_student_detail_view(request, class_id, student_number):
     """クラス内の学生詳細"""
-    classroom = get_object_or_404(ClassRoom, id=class_id)
+    # 管理者の場合は全てのクラスにアクセス可能
+    if request.user.role == 'admin':
+        classroom = get_object_or_404(ClassRoom, id=class_id)
+    else:
+        # 教員の場合は担当クラスのみアクセス可能
+        classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+    
     student = get_object_or_404(CustomUser, student_number=student_number, role='student')
     
     # 学生がこのクラスに所属しているかチェック

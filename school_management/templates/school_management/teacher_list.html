@@ -1,0 +1,95 @@
+{% extends 'school_management/base.html' %}
+{% load static %}
+
+{% block title %}教員一覧 - 学校管理システム{% endblock %}
+{% block page_title %}教員一覧{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-chalkboard-teacher me-2"></i>教員一覧 ({{ teachers.count }}名)</h5>
+                <a href="{% url 'school_management:teacher_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>新規教員追加
+                </a>
+            </div>
+            <div class="card-body">
+                {% if teachers %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>氏名</th>
+                                    <th>ユーザー名</th>
+                                    <th>メールアドレス</th>
+                                    <th>担当クラス数</th>
+                                    <th>登録日</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for teacher in teachers %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-chalkboard-teacher me-2 text-primary"></i>
+                                            <strong>{{ teacher.full_name }}</strong>
+                                        </div>
+                                    </td>
+                                    <td>{{ teacher.username }}</td>
+                                    <td>{{ teacher.email|default:"-" }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ teacher.classroom_set.count }}クラス</span>
+                                    </td>
+                                    <td>{{ teacher.date_joined|date:"Y/m/d" }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" title="詳細">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-outline-warning" title="編集">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" title="削除" onclick="deleteTeacher('{{ teacher.id }}', '{{ teacher.full_name }}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-chalkboard-teacher fa-4x text-muted mb-3"></i>
+                        <h4 class="text-muted">教員が登録されていません</h4>
+                        <p class="text-muted">新規教員を追加してください。</p>
+                        <a href="{% url 'school_management:teacher_create' %}" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>新規教員追加
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-12">
+        <a href="{% url 'school_management:admin_dashboard' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>管理者ダッシュボードに戻る
+        </a>
+    </div>
+</div>
+
+<script>
+function deleteTeacher(teacherId, teacherName) {
+    if (confirm(`教員「${teacherName}」を削除しますか？\n\n注意: この操作は取り消せません。`)) {
+        // TODO: 削除機能の実装
+        alert('削除機能は準備中です');
+    }
+}
+</script>
+{% endblock %}

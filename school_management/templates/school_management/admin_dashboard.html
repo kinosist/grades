@@ -1,0 +1,403 @@
+{% extends 'school_management/base.html' %}
+{% load static %}
+
+{% block title %}管理者ダッシュボード - 学校管理システム{% endblock %}
+{% block page_title %}管理者ダッシュボード{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 統計カード -->
+    <div class="col-md-3 mb-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>教員数</h5>
+                        <h2>{{ total_teachers }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-chalkboard-teacher fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'school_management:teacher_list' %}" class="text-white">
+                    詳細を見る <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>学生数</h5>
+                        <h2>{{ total_students }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-user-graduate fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'school_management:student_list' %}" class="text-white">
+                    詳細を見る <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>クラス数</h5>
+                        <h2>{{ total_classes }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-school fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'school_management:class_list' %}" class="text-white">
+                    詳細を見る <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>管理者数</h5>
+                        <h2>{{ total_admins }}</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-crown fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <span class="text-white">
+                    システム管理者 <i class="fas fa-shield-alt"></i>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- クイックアクション -->
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-bolt me-2"></i>クイックアクション</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'school_management:teacher_create' %}" class="btn btn-primary btn-block w-100">
+                            <i class="fas fa-user-plus me-2"></i>新規教員追加
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'school_management:student_create' %}" class="btn btn-success btn-block w-100">
+                            <i class="fas fa-user-graduate me-2"></i>新規学生追加
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'school_management:class_create' %}" class="btn btn-info btn-block w-100">
+                            <i class="fas fa-plus me-2"></i>新規クラス作成
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="/admin/" class="btn btn-warning btn-block w-100" target="_blank">
+                            <i class="fas fa-tools me-2"></i>システム設定
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 最近追加された教員 -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chalkboard-teacher me-2"></i>最近追加された教員</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_teachers %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>氏名</th>
+                                    <th>ユーザー名</th>
+                                    <th>追加日</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for teacher in recent_teachers %}
+                                <tr>
+                                    <td>{{ teacher.full_name }}</td>
+                                    <td>{{ teacher.username }}</td>
+                                    <td>{{ teacher.date_joined|date:"Y/m/d" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-end">
+                        <a href="{% url 'school_management:teacher_list' %}" class="btn btn-sm btn-outline-primary">
+                            すべて表示 <i class="fas fa-arrow-right"></i>
+                        </a>
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center py-3">まだ教員が登録されていません</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近追加された学生 -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-user-graduate me-2"></i>最近追加された学生</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_students %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>氏名</th>
+                                    <th>学籍番号</th>
+                                    <th>追加日</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in recent_students %}
+                                <tr>
+                                    <td>{{ student.full_name }}</td>
+                                    <td>{{ student.student_number|default:"-" }}</td>
+                                    <td>{{ student.date_joined|date:"Y/m/d" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-end">
+                        <a href="{% url 'school_management:student_list' %}" class="btn btn-sm btn-outline-success">
+                            すべて表示 <i class="fas fa-arrow-right"></i>
+                        </a>
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center py-3">まだ学生が登録されていません</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 全ユーザー管理 -->
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-users me-2"></i>ユーザー管理</h5>
+            </div>
+            <div class="card-body">
+                <!-- タブナビゲーション -->
+                <ul class="nav nav-tabs" id="userTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="admin-tab" data-bs-toggle="tab" data-bs-target="#admin" type="button" role="tab">
+                            <i class="fas fa-crown me-1"></i>管理者 ({{ all_admins.count }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="teacher-tab" data-bs-toggle="tab" data-bs-target="#teacher" type="button" role="tab">
+                            <i class="fas fa-chalkboard-teacher me-1"></i>教員 ({{ all_teachers.count }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="student-tab" data-bs-toggle="tab" data-bs-target="#student" type="button" role="tab">
+                            <i class="fas fa-user-graduate me-1"></i>学生 ({{ all_students.count }})
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="userTabsContent">
+                    <!-- 管理者タブ -->
+                    <div class="tab-pane fade show active" id="admin" role="tabpanel">
+                        <div class="table-responsive mt-3">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>氏名</th>
+                                        <th>メールアドレス</th>
+                                        <th>教員ID</th>
+                                        <th>登録日</th>
+                                        <th>最終ログイン</th>
+                                        <th>状態</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for admin in all_admins %}
+                                    <tr>
+                                        <td><strong>{{ admin.full_name }}</strong></td>
+                                        <td>{{ admin.email }}</td>
+                                        <td>{{ admin.teacher_id|default:'-' }}</td>
+                                        <td>{{ admin.date_joined|date:"Y/m/d" }}</td>
+                                        <td>{{ admin.last_login|date:"Y/m/d H:i"|default:'未ログイン' }}</td>
+                                        <td>
+                                            <span class="badge bg-danger">管理者</span>
+                                            {% if admin.is_superuser %}<span class="badge bg-warning">スーパーユーザー</span>{% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-3">管理者が登録されていません</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- 教員タブ -->
+                    <div class="tab-pane fade" id="teacher" role="tabpanel">
+                        <div class="table-responsive mt-3">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>氏名</th>
+                                        <th>メールアドレス</th>
+                                        <th>教員ID</th>
+                                        <th>担当クラス数</th>
+                                        <th>登録日</th>
+                                        <th>最終ログイン</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for teacher in all_teachers %}
+                                    <tr>
+                                        <td><strong>{{ teacher.full_name }}</strong></td>
+                                        <td>{{ teacher.email }}</td>
+                                        <td>{{ teacher.teacher_id|default:'-' }}</td>
+                                        <td>{{ teacher.classrooms.count }}クラス</td>
+                                        <td>{{ teacher.date_joined|date:"Y/m/d" }}</td>
+                                        <td>{{ teacher.last_login|date:"Y/m/d H:i"|default:'未ログイン' }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-3">教員が登録されていません</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- 学生タブ -->
+                    <div class="tab-pane fade" id="student" role="tabpanel">
+                        <div class="table-responsive mt-3">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>氏名</th>
+                                        <th>メールアドレス</th>
+                                        <th>学籍番号</th>
+                                        <th>ポイント</th>
+                                        <th>所属クラス</th>
+                                        <th>登録日</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for student in all_students %}
+                                    <tr>
+                                        <td><strong>{{ student.full_name }}</strong></td>
+                                        <td>{{ student.email }}</td>
+                                        <td>{{ student.student_number|default:'-' }}</td>
+                                        <td>{{ student.points }}pt</td>
+                                        <td>{{ student.classroom.class_name|default:'未所属' }}</td>
+                                        <td>{{ student.date_joined|date:"Y/m/d" }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-3">学生が登録されていません</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 最近作成されたクラス -->
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-school me-2"></i>最近作成されたクラス</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_classes %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>クラス名</th>
+                                    <th>年度</th>
+                                    <th>学期</th>
+                                    <th>担当教員数</th>
+                                    <th>学生数</th>
+                                    <th>作成日</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for class in recent_classes %}
+                                <tr>
+                                    <td><strong>{{ class.class_name }}</strong></td>
+                                    <td>{{ class.year }}年度</td>
+                                    <td>{{ class.get_semester_display }}</td>
+                                    <td>{{ class.teachers.count }}名</td>
+                                    <td>{{ class.students.count }}名</td>
+                                    <td>{{ class.created_at|date:"Y/m/d" }}</td>
+                                    <td>
+                                        <a href="{% url 'school_management:class_detail' class.id %}" class="btn btn-sm btn-outline-primary">
+                                            詳細
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-end">
+                        <a href="{% url 'school_management:class_list' %}" class="btn btn-sm btn-outline-info">
+                            すべて表示 <i class="fas fa-arrow-right"></i>
+                        </a>
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center py-3">まだクラスが作成されていません</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

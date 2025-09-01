@@ -9,7 +9,12 @@ urlpatterns = [
     path('debug-login/', views.debug_login_view, name='debug_login'),  # デバッグ用
     path('logout/', views.logout_view, name='logout'),
     path('dashboard/', views.dashboard_view, name='dashboard'),
+    path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('student-dashboard/', views.student_dashboard, name='student_dashboard'),
+    
+    # 管理者専用機能
+    path('teachers/', views.teacher_list_view, name='teacher_list'),
+    path('teachers/create/', views.teacher_create_view, name='teacher_create'),
     
     # クラス管理
     path('classes/', views.class_list_view, name='class_list'),

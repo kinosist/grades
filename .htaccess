@@ -1,0 +1,39 @@
+RewriteEngine On
+RewriteBase /grades/
+
+# 静的ファイルへのアクセスは直接許可
+RewriteCond %{REQUEST_URI} ^/grades/static/ [OR]
+RewriteCond %{REQUEST_URI} ^/grades/staticfiles/
+RewriteRule ^(.*)$ - [L]
+
+# index.cgiが存在する場合はスキップ
+RewriteCond %{REQUEST_URI} ^/grades/index\.cgi$
+RewriteRule ^(.*)$ - [L]
+
+# すべてのリクエストをindex.cgiに転送
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.cgi/$1 [QSA,L]
+
+# CGIスクリプトとして実行
+AddHandler cgi-script .cgi
+Options +ExecCGI
+
+# セキュリティ設定
+<Files "db.sqlite3">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "*.py">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "index.cgi">
+    Order allow,deny
+    Allow from all
+</Files>
+
+# 環境変数
+SetEnv DJANGO_SETTINGS_MODULE school_project.settings_prod

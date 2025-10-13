@@ -1,0 +1,171 @@
+{% extends 'school_management/base.html' %}
+
+{% block title %}グループ一覧 - 第{{ lesson_session.session_number }}回{% endblock %}
+{% block page_title %}グループ一覧{% endblock %}
+
+{% block content %}
+<!-- アラートメッセージの表示 -->
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+            <i class="fas fa-{% if message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'success' %}check-circle{% else %}info-circle{% endif %} me-2"></i>
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-users me-2"></i>グループ一覧</h5>
+                <div>
+                    <a href="{% url 'school_management:group_management' lesson_session.id %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>グループを作成
+                    </a>
+                    <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>授業回に戻る
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- 授業情報 -->
+                <div class="mb-4 p-3 bg-light rounded">
+                    <h6 class="text-primary mb-2"><i class="fas fa-info-circle me-2"></i>授業情報</h6>
+                    <strong>{{ lesson_session.classroom.class_name }}</strong> - 第{{ lesson_session.session_number }}回
+                    ({{ lesson_session.date|date:"Y年m月d日" }})
+                    {% if lesson_session.topic %}
+                        <br><small class="text-muted">{{ lesson_session.topic }}</small>
+                    {% endif %}
+                </div>
+
+                <!-- 統計情報 -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h4 class="text-primary">{{ group_stats|length }}</h4>
+                                <small class="text-muted">グループ数</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h4 class="text-success">{{ assigned_students }}</h4>
+                                <small class="text-muted">配置済み学生</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h4 class="text-info">{{ total_students }}</h4>
+                                <small class="text-muted">総学生数</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h4 class="text-warning">{{ total_students|add:"-"|add:assigned_students|add:"0" }}</h4>
+                                <small class="text-muted">未配置学生</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if group_stats %}
+                    <div class="row">
+                        {% for stat in group_stats %}
+                        <div class="col-lg-4 col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-users me-2"></i>{{ stat.group.display_name }}
+                                    </h6>
+                                    <span class="badge bg-primary">{{ stat.member_count }}名</span>
+                                </div>
+                                <div class="card-body">
+                                    {% if stat.members %}
+                                        <div class="mb-3">
+                                            <h6 class="text-muted mb-2">メンバー</h6>
+                                            {% for member in stat.members %}
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <div>
+                                                    <strong>{{ member.student.full_name }}</strong>
+                                                    <br><small class="text-muted">{{ member.student.student_number }}</small>
+                                                </div>
+                                                {% if member.role %}
+                                                <span class="badge bg-secondary">{{ member.role }}</span>
+                                                {% endif %}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center text-muted py-3">
+                                            <i class="fas fa-user-plus fa-2x mb-2"></i>
+                                            <p class="mb-0">メンバーがいません</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="card-footer">
+                                    <div class="btn-group w-100" role="group">
+                                        <a href="{% url 'school_management:group_detail' lesson_session.id stat.group.id %}" 
+                                           class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-eye me-1"></i>詳細
+                                        </a>
+                                        <a href="{% url 'school_management:group_edit' lesson_session.id stat.group.id %}" 
+                                           class="btn btn-outline-warning btn-sm">
+                                            <i class="fas fa-edit me-1"></i>編集
+                                        </a>
+                                        <a href="{% url 'school_management:group_delete' lesson_session.id stat.group.id %}" 
+                                           class="btn btn-outline-danger btn-sm"
+                                           onclick="return confirm('グループ「{{ stat.group.display_name }}」を削除しますか？')">
+                                            <i class="fas fa-trash me-1"></i>削除
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">グループがありません</h5>
+                        <p class="text-muted">まだグループが作成されていません。最初のグループを作成してください。</p>
+                        <a href="{% url 'school_management:group_management' lesson_session.id %}" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>グループを作成する
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 未配置学生の表示 -->
+{% if total_students > assigned_students %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-exclamation-triangle me-2"></i>未配置学生</h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle me-2"></i>
+                    {{ total_students|add:"-"|add:assigned_students|add:"0" }}名の学生がまだグループに配置されていません。
+                    <a href="{% url 'school_management:group_management' lesson_session.id %}" class="alert-link">
+                        グループ編成ページで配置してください。
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

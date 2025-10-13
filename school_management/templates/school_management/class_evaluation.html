@@ -1,0 +1,355 @@
+{% extends 'school_management/base.html' %}
+{% load static %}
+{% load evaluation_filters %}
+
+{% block title %}{{ classroom.class_name }} - 評価一覧{% endblock %}
+
+{% block extra_css %}
+<style>
+    .evaluation-table {
+        font-size: 14px;
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 20px;
+    }
+    
+    .evaluation-table th,
+    .evaluation-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+        vertical-align: middle;
+    }
+    
+    .evaluation-table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .evaluation-table .student-info {
+        text-align: left;
+        min-width: 120px;
+    }
+    
+    .evaluation-table .number-col {
+        width: 50px;
+    }
+    
+    .evaluation-table .name-col {
+        width: 100px;
+    }
+    
+    .evaluation-table .furigana-col {
+        width: 100px;
+    }
+    
+    .evaluation-table .total-col {
+        width: 80px;
+        background-color: #e3f2fd;
+        font-weight: bold;
+    }
+    
+    .evaluation-table .attendance-col {
+        width: 80px;
+        background-color: #f3e5f5;
+    }
+    
+    .evaluation-table .multiplier-col {
+        width: 60px;
+        background-color: #e8f5e8;
+    }
+    
+    .evaluation-table .session-col {
+        width: 60px;
+        background-color: #fff3e0;
+    }
+    
+    .evaluation-table .score-col {
+        width: 80px;
+        background-color: #e1f5fe;
+        font-weight: bold;
+    }
+    
+    .evaluation-table .multiplier-value {
+        background-color: #e8f5e8;
+        font-weight: bold;
+    }
+    
+    .evaluation-table .attendance-rate {
+        font-size: 12px;
+        color: #666;
+    }
+    
+    .evaluation-table .attendance-multiplier {
+        font-size: 12px;
+        color: #666;
+    }
+    
+    .evaluation-table .session-points {
+        font-weight: bold;
+        color: #1976d2;
+    }
+    
+    .evaluation-table .qr-points-main {
+        font-weight: bold;
+        color: #1976d2;
+        font-size: 16px;
+        text-align: center;
+    }
+    
+    .evaluation-table .peer-score-main {
+        font-weight: bold;
+        color: #ff9800;
+        font-size: 16px;
+        text-align: center;
+    }
+    
+    .evaluation-table .qr-points-small {
+        font-size: 10px;
+        color: #1976d2;
+        text-align: center;
+        margin-top: 2px;
+    }
+    
+    .evaluation-table .peer-score {
+        font-size: 11px;
+        color: #ff9800;
+        font-weight: bold;
+    }
+    
+    .evaluation-table .total-score {
+        font-size: 12px;
+        color: #4caf50;
+        font-weight: bold;
+        border-top: 1px solid #ddd;
+        margin-top: 2px;
+        padding-top: 2px;
+    }
+    
+    .evaluation-table .empty-session {
+        color: #ccc;
+    }
+    
+    .evaluation-table .peer-avg {
+        color: #ff9800;
+        font-weight: bold;
+        font-size: 10px;
+    }
+    
+    .table-container {
+        overflow-x: auto;
+        max-height: 80vh;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+    }
+    
+    .header-info {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .class-title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #1976d2;
+        margin-bottom: 10px;
+    }
+    
+    .class-stats {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .stat-item {
+        background-color: white;
+        padding: 10px 15px;
+        border-radius: 6px;
+        border: 1px solid #e0e0e0;
+        min-width: 120px;
+    }
+    
+    .stat-label {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 5px;
+    }
+    
+    .stat-value {
+        font-size: 18px;
+        font-weight: bold;
+        color: #1976d2;
+    }
+    
+    .export-buttons {
+        margin-bottom: 20px;
+    }
+    
+    .btn-export {
+        margin-right: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- ヘッダー情報 -->
+            <div class="header-info">
+                <div class="class-title">
+                    <i class="fas fa-chalkboard me-2"></i>{{ classroom.class_name }} - 評価一覧
+                </div>
+                <div class="class-stats">
+                    <div class="stat-item">
+                        <div class="stat-label">学生数</div>
+                        <div class="stat-value">{{ student_evaluations|length }}名</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">授業回数</div>
+                        <div class="stat-value">{{ total_sessions }}回</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">平均ポイント</div>
+                        <div class="stat-value">
+                            {% if student_evaluations %}
+                                {{ student_evaluations|length|floatformat:1 }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <!-- デバッグ情報 -->
+                <div class="mt-3">
+                    <small class="text-muted">
+                        デバッグ: グループ内評価平均値 = {{ session_peer_averages }}<br>
+                        {% for session in sessions %}
+                            セッション{{ session.session_number }} (ID:{{ session.id }}): 
+                            {% if session_peer_averages|lookup:session.id is not None %}
+                                グループ内: {{ session_peer_averages|lookup:session.id }}
+                            {% else %}
+                                なし
+                            {% endif %}<br>
+                        {% endfor %}
+                    </small>
+                </div>
+            </div>
+
+            <!-- エクスポートボタン -->
+            <div class="export-buttons">
+                <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-secondary btn-export">
+                    <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
+                </a>
+                <button class="btn btn-success btn-export" onclick="window.print()">
+                    <i class="fas fa-print me-1"></i>印刷
+                </button>
+            </div>
+
+            <!-- 評価テーブル -->
+            <div class="table-container">
+                <table class="evaluation-table">
+                    <thead>
+                        <tr>
+                            <th class="number-col">No</th>
+                            <th class="name-col">氏名</th>
+                            <th class="furigana-col">シメイ</th>
+                            <th class="total-col">合計点</th>
+                            <th class="attendance-col">
+                                出席点<br>
+                                <small class="attendance-multiplier">20%</small>
+                            </th>
+                            <th class="attendance-col">
+                                出席率<br>
+                                <small class="attendance-multiplier">0.00%</small>
+                            </th>
+                            <th class="score-col">点数</th>
+                            <th class="multiplier-col">
+                                倍率<br>
+                                <small class="attendance-multiplier">2</small>
+                            </th>
+                            {% for session in sessions %}
+                            <th class="session-col">
+                                {{ session.session_number }}回<br>
+                                <small class="text-muted">{{ session.date|date:"m/d" }}</small>
+                                {% if session_peer_averages|lookup:session.id is not None %}
+                                    <br><small class="peer-avg">グループ内: {{ session_peer_averages|lookup:session.id }}</small>
+                                {% endif %}
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for evaluation in student_evaluations %}
+                        <tr>
+                            <td class="number-col">{{ forloop.counter }}</td>
+                            <td class="student-info name-col">{{ evaluation.student.full_name }}</td>
+                            <td class="student-info furigana-col">{{ evaluation.student.furigana|default:"" }}</td>
+                            <td class="total-col">{{ evaluation.total_points }}</td>
+                            <td class="attendance-col">
+                                {{ evaluation.attendance_points }}<br>
+                                <small class="attendance-rate">{{ evaluation.attendance_rate|floatformat:2 }}%</small>
+                            </td>
+                            <td class="attendance-col">
+                                {{ evaluation.attendance_rate|floatformat:2 }}%
+                            </td>
+                            <td class="score-col">{{ evaluation.multiplied_points }}</td>
+                            <td class="multiplier-col multiplier-value">{{ evaluation.multiplier }}</td>
+                            {% for session in sessions %}
+                            <td class="session-col">
+                                {% with session_key="第"|add:session.session_number|add:"回" %}
+                                    {% if session_key in evaluation.session_data %}
+                                        {% with data=evaluation.session_data|lookup:session_key %}
+                                            <div class="session-points">
+                                                {% if data.has_peer_evaluation and data.peer_score > 0 %}
+                                                    <!-- ピア評価がある場合はピア評価スコアをメイン表示 -->
+                                                    <div class="peer-score-main">{{ data.peer_score }}</div>
+                                                    {% if data.qr_points > 0 %}
+                                                        <div class="qr-points-small">+{{ data.qr_points }}</div>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <!-- ピア評価がない場合はQRポイントをメイン表示 -->
+                                                    <div class="qr-points-main">{{ data.qr_points }}</div>
+                                                {% endif %}
+                                            </div>
+                                        {% endwith %}
+                                    {% else %}
+                                        <span class="empty-session">-</span>
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{% widthratio sessions|length 1 1 %}" class="text-center py-4">
+                                <i class="fas fa-user-slash fa-2x text-muted mb-2"></i>
+                                <p class="text-muted">このクラスに学生がいません</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 印刷時のスタイル調整
+window.addEventListener('beforeprint', function() {
+    document.querySelector('.table-container').style.maxHeight = 'none';
+    document.querySelector('.table-container').style.overflow = 'visible';
+});
+
+window.addEventListener('afterprint', function() {
+    document.querySelector('.table-container').style.maxHeight = '80vh';
+    document.querySelector('.table-container').style.overflow = 'auto';
+});
+</script>
+{% endblock %}

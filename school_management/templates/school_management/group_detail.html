@@ -1,0 +1,162 @@
+{% extends 'school_management/base.html' %}
+
+{% block title %}{{ group.display_name }}の詳細 - 第{{ lesson_session.session_number }}回{% endblock %}
+{% block page_title %}グループ詳細{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-users me-2"></i>{{ group.display_name }}の詳細</h5>
+                <div>
+                    <a href="{% url 'school_management:group_edit' lesson_session.id group.id %}" class="btn btn-outline-warning btn-sm">
+                        <i class="fas fa-edit me-1"></i>編集
+                    </a>
+                    <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i>グループ一覧に戻る
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- グループ基本情報 -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">グループ番号</h6>
+                        <p class="h5">{{ group.group_number }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted">メンバー数</h6>
+                        <p class="h5">{{ members.count }}名</p>
+                    </div>
+                </div>
+
+                <!-- メンバー一覧 -->
+                <h6 class="text-muted mb-3">メンバー一覧</h6>
+                {% if members %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>氏名</th>
+                                    <th>学籍番号</th>
+                                    <th>役割</th>
+                                    <th>メールアドレス</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for member in members %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ member.student.full_name }}</strong>
+                                        {% if member.student.furigana %}
+                                        <br><small class="text-muted">{{ member.student.furigana }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ member.student.student_number }}</td>
+                                    <td>
+                                        {% if member.role %}
+                                            <span class="badge bg-primary">{{ member.role }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if member.student.email %}
+                                            <a href="mailto:{{ member.student.email }}" class="text-decoration-none">
+                                                {{ member.student.email }}
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">未設定</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-user-plus fa-2x text-muted mb-3"></i>
+                        <p class="text-muted">メンバーがいません</p>
+                        <a href="{% url 'school_management:group_edit' lesson_session.id group.id %}" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>メンバーを追加
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- グループ情報 -->
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-info-circle me-2"></i>グループ情報</h6>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-5">グループ番号:</dt>
+                    <dd class="col-sm-7">{{ group.group_number }}</dd>
+                    
+                    <dt class="col-sm-5">グループ名:</dt>
+                    <dd class="col-sm-7">{{ group.group_name|default:"未設定" }}</dd>
+                    
+                    <dt class="col-sm-5">メンバー数:</dt>
+                    <dd class="col-sm-7">{{ members.count }}名</dd>
+                    
+                    <dt class="col-sm-5">作成日時:</dt>
+                    <dd class="col-sm-7">{{ group.created_at|date:"Y年m月d日 H:i" }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        <!-- 授業情報 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-chalkboard me-2"></i>授業情報</h6>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-5">クラス:</dt>
+                    <dd class="col-sm-7">{{ lesson_session.classroom.class_name }}</dd>
+                    
+                    <dt class="col-sm-5">回数:</dt>
+                    <dd class="col-sm-7">第{{ lesson_session.session_number }}回</dd>
+                    
+                    <dt class="col-sm-5">日付:</dt>
+                    <dd class="col-sm-7">{{ lesson_session.date|date:"Y年m月d日" }}</dd>
+                    
+                    {% if lesson_session.topic %}
+                    <dt class="col-sm-5">テーマ:</dt>
+                    <dd class="col-sm-7">{{ lesson_session.topic }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <!-- アクション -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-cogs me-2"></i>アクション</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'school_management:group_edit' lesson_session.id group.id %}" class="btn btn-warning">
+                        <i class="fas fa-edit me-2"></i>グループを編集
+                    </a>
+                    <a href="{% url 'school_management:group_delete' lesson_session.id group.id %}" 
+                       class="btn btn-outline-danger"
+                       onclick="return confirm('グループ「{{ group.display_name }}」を削除しますか？')">
+                        <i class="fas fa-trash me-2"></i>グループを削除
+                    </a>
+                    <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-2"></i>グループ一覧に戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

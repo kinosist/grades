@@ -1,0 +1,10 @@
+[project]
+name = "school-system"
+version = "0.1.0"
+description = "School Management System with Django"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "django>=5.2.5",
+    "qrcode[pil]>=8.2",
+]

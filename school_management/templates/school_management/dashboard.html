@@ -1,0 +1,210 @@
+{% extends 'school_management/base.html' %}
+{% load static %}
+
+{% block title %}ダッシュボード - 学校管理システム{% endblock %}
+{% block page_title %}ダッシュボード{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<!-- 統計カード -->
+<div class="row mb-4 g-2">
+    <div class="col-md-3">
+        <div class="card stats-card text-center border-primary">
+            <div class="card-body">
+                <div class="card-icon text-primary mb-2">
+                    <i class="fas fa-chalkboard fa-2x"></i>
+                </div>
+                <h2 class="card-title">{{ total_classes }}</h2>
+                <p class="card-text text-muted">担当クラス数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card text-center border-success">
+            <div class="card-body">
+                <div class="card-icon text-success mb-2">
+                    <i class="fas fa-users fa-2x"></i>
+                </div>
+                <h2 class="card-title">{{ total_students }}</h2>
+                <p class="card-text text-muted">総学生数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card text-center border-warning">
+            <div class="card-body">
+                <div class="card-icon text-warning mb-2">
+                    <i class="fas fa-calendar-week fa-2x"></i>
+                </div>
+                <h2 class="card-title">{{ this_week_sessions }}</h2>
+                <p class="card-text text-muted">今週の授業回数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card text-center border-info">
+            <div class="card-body">
+                <div class="card-icon text-info mb-2">
+                    <i class="fas fa-chart-line fa-2x"></i>
+                </div>
+                <h2 class="card-title">-</h2>
+                <p class="card-text text-muted">評価完了率</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- メインコンテンツエリア -->
+
+<!-- クイックアクション -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bolt text-warning"></i> クイックアクション
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <a href="{% url 'school_management:class_create' %}" class="btn btn-primary w-100 h-100 d-flex align-items-center justify-content-center">
+                            <i class="fas fa-plus me-2"></i>新しいクラス
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{% url 'school_management:student_create' %}" class="btn btn-success w-100 h-100 d-flex align-items-center justify-content-center">
+                            <i class="fas fa-user-plus me-2"></i>学生を追加
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="/admin/" class="btn btn-info w-100 h-100 d-flex align-items-center justify-content-center">
+                            <i class="fas fa-cog me-2"></i>管理画面
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{% url 'school_management:qr_code_list' %}" class="btn btn-warning w-100 h-100 d-flex align-items-center justify-content-center">
+                            <i class="fas fa-qrcode me-2"></i>QRコード管理
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- メインコンテンツエリア -->
+
+<div class="row">
+    <!-- 担当クラス一覧 -->
+    <div class="col-md-8 mt-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-list me-2"></i>担当クラス一覧</h5>
+                <a href="{% url 'school_management:class_create' %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i>新しいクラス
+                </a>
+            </div>
+            <div class="card-body">
+                {% if classes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>クラス名</th>
+                                    <th>年度</th>
+                                    <th>学期</th>
+                                    <th>学生数</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for classroom in classes %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ classroom.class_name }}</strong>
+                                    </td>
+                                    <td>{{ classroom.year }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if classroom.semester == 'first' %}primary{% else %}secondary{% endif %}">
+                                            {{ classroom.get_semester_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ classroom.students.count }}名</td>
+                                    <td>
+                                        <a href="{% url 'school_management:class_detail' classroom.id %}" 
+                                           class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-eye me-1"></i>詳細
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">まだクラスが作成されていません。</p>
+                        <a href="{% url 'school_management:class_create' %}" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>最初のクラスを作成する
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近の活動 -->
+    <div class="col-md-4 mt-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-clock me-2"></i>最近の授業回</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_sessions %}
+                    <div class="list-group list-group-flush">
+                        {% for session in recent_sessions %}
+                        <div class="list-group-item border-0 px-0">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">第{{ session.session_number }}回</h6>
+                                    <p class="mb-1 text-truncate">{{ session.topic|default:"授業" }}</p>
+                                    <small class="text-muted">{{ session.classroom.class_name }} - {{ session.date|date:"m/d" }}</small>
+                                </div>
+                                <div class="flex-shrink-0">
+                                    {% if session.has_quiz %}
+                                        <span class="badge bg-warning me-1" title="小テストあり">Quiz</span>
+                                    {% endif %}
+                                    {% if session.has_peer_evaluation %}
+                                        <span class="badge bg-info" title="ピア評価あり">評価</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">まだ授業回がありません。</p>
+                        <small class="text-muted">クラス詳細から授業回を作成してください。</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- フッター用の余白 -->
+<div class="row">
+    <div class="col-12">
+        <div class="py-4 text-center text-muted">
+            <small>学校管理システム - ダッシュボード</small>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

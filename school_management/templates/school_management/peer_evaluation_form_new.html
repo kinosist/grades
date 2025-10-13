@@ -1,0 +1,278 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>グループワーク ピア評価フォーム</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="{% static 'school_management/css/peer-evaluation.css' %}" rel="stylesheet">
+</head>
+<body>
+    <div class="container my-4 peer-evaluation-form">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0"><i class="fas fa-users me-2"></i>グループワーク ピア評価</h4>
+                        <small>{{ session.classroom.class_name }} - {{ session.topic }}</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <strong>評価について</strong><br>
+                            このフォームは、グループワークにおけるメンバーの貢献や他グループの発表内容について、匿名で評価するためのものです。
+                            あなたの率直な意見が、今後の授業改善やメンバーへのフィードバックに活用されます。
+                            <br><strong>※評価は匿名です。名前は記録されません。</strong>
+                        </div>
+
+                        <form method="post">
+                            {% csrf_token %}
+                            
+                            <!-- 自分のグループ -->
+                            <div class="form-section">
+                                <h5>1. 自分のグループ名 <span class="required">*</span></h5>
+                                <select name="evaluator_group" class="form-select" required>
+                                    <option value="">グループを選択してください</option>
+                                    {% for group in groups %}
+                                    <option value="グループ{{ group.group_number }}">グループ{{ group.group_number }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- メンバー評価 -->
+                            <div class="form-section">
+                                <h5>グループメンバーの貢献度評価</h5>
+                                <p class="text-muted">自分以外のメンバーについて評価してください（最大7名まで）</p>
+                                
+                                {% for i in "1234567"|make_list %}
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">メンバー{{ i }}の名前</label>
+                                        <input type="text" name="member_{{ i }}_name" class="form-control" placeholder="名前を入力">
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label">貢献度評価</label>
+                                        <div class="evaluation-scale">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="member_{{ i }}_score" value="5" id="member{{ i }}_5">
+                                                <label class="form-check-label" for="member{{ i }}_5">5：非常に積極的だった</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="member_{{ i }}_score" value="4" id="member{{ i }}_4">
+                                                <label class="form-check-label" for="member{{ i }}_4">4：よく貢献していた</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="member_{{ i }}_score" value="3" id="member{{ i }}_3">
+                                                <label class="form-check-label" for="member{{ i }}_3">3：普通</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="member_{{ i }}_score" value="2" id="member{{ i }}_2">
+                                                <label class="form-check-label" for="member{{ i }}_2">2：あまり貢献していなかった</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="member_{{ i }}_score" value="1" id="member{{ i }}_1">
+                                                <label class="form-check-label" for="member{{ i }}_1">1：全く貢献していなかった</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% if not forloop.last %}<hr>{% endif %}
+                                {% endfor %}
+                            </div>
+
+                            <!-- 他グループ評価 -->
+                            <div class="form-section">
+                                <h5>他グループの評価</h5>
+                                <p class="text-muted">【評価基準】プロジェクトの完成度、技術点、創造性、プレゼン、おもろさ</p>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">1番よいと思った自分以外のグループ名 <span class="required">*</span></label>
+                                    <select name="first_place_group" id="first_place_group" class="form-select" required onchange="updateSecondPlaceOptions()">
+                                        <option value="">グループを選択してください</option>
+                                        {% for group in groups %}
+                                        <option value="グループ{{ group.group_number }}">グループ{{ group.group_number }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">そのグループを選んだ理由 <span class="required">*</span></label>
+                                    <textarea name="first_place_reason" class="form-control" rows="3" required placeholder="選択理由を入力してください"></textarea>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">2番目によいと思った自分以外のグループ名 <span class="required">*</span></label>
+                                    <select name="second_place_group" id="second_place_group" class="form-select" required onchange="updateFirstPlaceOptions()">
+                                        <option value="">グループを選択してください</option>
+                                        {% for group in groups %}
+                                        <option value="グループ{{ group.group_number }}">グループ{{ group.group_number }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">そのグループを選んだ理由 <span class="required">*</span></label>
+                                    <textarea name="second_place_reason" class="form-control" rows="3" required placeholder="選択理由を入力してください"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- 授業コメント -->
+                            <div class="form-section">
+                                <h5>授業へのコメント</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">改善案、感想、ご意見等</label>
+                                    <textarea name="general_comment" class="form-control" rows="4" placeholder="授業についてのコメントがあれば入力してください（任意）"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="text-center">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-paper-plane me-2"></i>送信
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // フォーム送信前の確認
+        document.querySelector('form').addEventListener('submit', function(e) {
+            if (!confirm('評価を送信しますか？送信後は変更できません。')) {
+                e.preventDefault();
+            }
+        });
+        
+        // メンバー名が入力された場合のみ評価を必須にする
+        for (let i = 1; i <= 7; i++) {
+            const nameInput = document.querySelector(`input[name="member_${i}_name"]`);
+            const scoreInputs = document.querySelectorAll(`input[name="member_${i}_score"]`);
+            
+            if (nameInput) {
+                nameInput.addEventListener('input', function() {
+                    const hasName = this.value.trim() !== '';
+                    scoreInputs.forEach(input => {
+                        input.required = hasName;
+                    });
+                });
+            }
+        }
+
+        // 1位選択時に2位の選択肢を更新
+        function updateSecondPlaceOptions() {
+            const firstSelect = document.getElementById('first_place_group');
+            const secondSelect = document.getElementById('second_place_group');
+            const selectedFirst = firstSelect.value;
+            const currentSecond = secondSelect.value;
+            
+            // 2位の選択肢をリセット
+            secondSelect.innerHTML = '<option value="">グループを選択してください</option>';
+            
+            if (selectedFirst) {
+                // 1位で選択されたグループ以外を2位の選択肢に追加
+                const groups = [
+                    {% for group in groups %}
+                    { value: "グループ{{ group.group_number }}", text: "グループ{{ group.group_number }}" }{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ];
+                
+                groups.forEach(group => {
+                    if (group.value !== selectedFirst) {
+                        const option = document.createElement('option');
+                        option.value = group.value;
+                        option.textContent = group.text;
+                        secondSelect.appendChild(option);
+                    }
+                });
+                
+                // 2位が既に選択されていて、1位と同じグループだった場合はリセット
+                if (currentSecond === selectedFirst) {
+                    secondSelect.value = '';
+                } else if (currentSecond && currentSecond !== selectedFirst) {
+                    // 2位が既に選択されていて、1位と異なる場合は保持
+                    secondSelect.value = currentSecond;
+                }
+            } else {
+                // 1位が選択されていない場合は全てのグループを表示
+                const groups = [
+                    {% for group in groups %}
+                    { value: "グループ{{ group.group_number }}", text: "グループ{{ group.group_number }}" }{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ];
+                
+                groups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.value;
+                    option.textContent = group.text;
+                    secondSelect.appendChild(option);
+                });
+                
+                // 2位の選択を保持
+                if (currentSecond) {
+                    secondSelect.value = currentSecond;
+                }
+            }
+        }
+
+        // 2位選択時に1位の選択肢を更新
+        function updateFirstPlaceOptions() {
+            const firstSelect = document.getElementById('first_place_group');
+            const secondSelect = document.getElementById('second_place_group');
+            const selectedSecond = secondSelect.value;
+            const currentFirst = firstSelect.value;
+            
+            // 1位の選択肢をリセット
+            firstSelect.innerHTML = '<option value="">グループを選択してください</option>';
+            
+            if (selectedSecond) {
+                // 2位で選択されたグループ以外を1位の選択肢に追加
+                const groups = [
+                    {% for group in groups %}
+                    { value: "グループ{{ group.group_number }}", text: "グループ{{ group.group_number }}" }{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ];
+                
+                groups.forEach(group => {
+                    if (group.value !== selectedSecond) {
+                        const option = document.createElement('option');
+                        option.value = group.value;
+                        option.textContent = group.text;
+                        firstSelect.appendChild(option);
+                    }
+                });
+                
+                // 1位が既に選択されていて、2位と同じグループだった場合はリセット
+                if (currentFirst === selectedSecond) {
+                    firstSelect.value = '';
+                } else if (currentFirst && currentFirst !== selectedSecond) {
+                    // 1位が既に選択されていて、2位と異なる場合は保持
+                    firstSelect.value = currentFirst;
+                }
+            } else {
+                // 2位が選択されていない場合は全てのグループを表示
+                const groups = [
+                    {% for group in groups %}
+                    { value: "グループ{{ group.group_number }}", text: "グループ{{ group.group_number }}" }{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ];
+                
+                groups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.value;
+                    option.textContent = group.text;
+                    firstSelect.appendChild(option);
+                });
+                
+                // 1位の選択を保持
+                if (currentFirst) {
+                    firstSelect.value = currentFirst;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,315 @@
+{% extends 'school_management/base.html' %}
+{% load static %}
+
+{% block title %}学生ダッシュボード - 学校管理システム{% endblock %}
+{% block page_title %}学生ダッシュボード{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'school_management/css/dashboard.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="fas fa-user-graduate me-2"></i>
+            ようこそ、{{ user.full_name }}さん！
+        </div>
+    </div>
+</div>
+
+<!-- 統計カード -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stats-card text-center border-primary">
+            <div class="card-body">
+                <div class="card-icon text-primary mb-2">
+                    <i class="fas fa-chalkboard fa-2x"></i>
+                </div>
+                <h2 class="card-title">{{ total_classes }}</h2>
+                <p class="card-text text-muted">受講クラス数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card text-center border-success">
+            <div class="card-body">
+                <div class="card-icon text-success mb-2">
+                    <i class="fas fa-calendar-week fa-2x"></i>
+                </div>
+                <h2 class="card-title">{{ recent_sessions|length }}</h2>
+                <p class="card-text text-muted">最近の授業数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card text-center border-warning">
+            <div class="card-body">
+                <div class="card-icon text-warning mb-2">
+                    <i class="fas fa-users fa-2x"></i>
+                </div>
+                <h2 class="card-title">{{ pending_evaluations|length }}</h2>
+                <p class="card-text text-muted">評価待ち</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card text-center border-info">
+            <div class="card-body">
+                <div class="card-icon text-info mb-2">
+                    <i class="fas fa-trophy fa-2x"></i>
+                </div>
+                <h2 class="card-title">{{ class_points_list|length }}</h2>
+                <p class="card-text text-muted">ポイント取得クラス</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- クラスごとのポイント表示 -->
+{% if class_points_list %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-graduation-cap me-2"></i>クラス別成績</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for class_data in class_points_list %}
+                    <div class="col-md-6 mb-4">
+                        <div class="card border-primary h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-chalkboard me-2"></i>{{ class_data.classroom.class_name }}
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <!-- クラスポイント表示 -->
+                                <div class="text-center mb-3">
+                                    <div class="mb-2">
+                                        <span class="badge bg-{% if class_data.points >= 50 %}success{% elif class_data.points >= 30 %}warning{% else %}secondary{% endif %}" style="font-size: 2rem; padding: 1rem 2rem;">
+                                            {{ class_data.points }} pt
+                                        </span>
+                                    </div>
+                                    <small class="text-muted">クラス累計ポイント</small>
+                                </div>
+                                
+                                <!-- クラス情報 -->
+                                <div class="mt-3">
+                                    <p class="mb-1"><strong>年度:</strong> {{ class_data.classroom.year }}</p>
+                                    <p class="mb-1"><strong>学期:</strong> {{ class_data.classroom.get_semester_display }}</p>
+                                    <p class="mb-1">
+                                        <strong>担当:</strong> 
+                                        {% for teacher in class_data.classroom.teachers.all %}
+                                            {{ teacher.full_name }}{% if not forloop.last %}, {% endif %}
+                                        {% endfor %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12">
+                        <div class="text-center py-4">
+                            <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                            <h6 class="text-muted">まだ成績がありません</h6>
+                            <p class="text-muted">QRコードスキャンでポイントを獲得してください。</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- クイックアクション -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bolt text-warning"></i> クイックアクション
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <a href="{% url 'school_management:student_qr_code' %}" class="btn btn-primary w-100 h-100 d-flex align-items-center justify-content-center">
+                            <i class="fas fa-qrcode me-2"></i>マイQRコード
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-info text-center">
+                            <i class="fas fa-info-circle fa-2x mb-2"></i>
+                            <h6>QRコードスキャン</h6>
+                            <p class="mb-0 small">先生があなたのQRコードをスキャンすると、ポイントが1点増加します。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 受講クラス一覧 -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chalkboard me-2"></i>受講クラス
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if student_classrooms %}
+                    <div class="list-group list-group-flush">
+                        {% for classroom in student_classrooms %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">{{ classroom.class_name }}</h6>
+                                <small class="text-muted">{{ classroom.year }}年度 {{ classroom.get_semester_display }}</small>
+                            </div>
+                            <span class="badge bg-secondary rounded-pill">
+                                {{ classroom.students.count }}名
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">受講中のクラスがありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近の授業 -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history me-2"></i>最近の授業
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_sessions %}
+                    <div class="list-group list-group-flush">
+                        {% for session in recent_sessions %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ session.classroom.class_name }} 第{{ session.session_number }}回</h6>
+                                <small>{{ session.date }}</small>
+                            </div>
+                            <p class="mb-1">{{ session.topic|default:"授業内容未設定" }}</p>
+                            {% if session.has_peer_evaluation %}
+                                <small class="text-warning">
+                                    <i class="fas fa-star me-1"></i>ピア評価あり
+                                </small>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">最近の授業がありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ピア評価待ち -->
+{% if pending_evaluations %}
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>ピア評価が必要な授業
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    {% for session in pending_evaluations %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ session.classroom.class_name }} 第{{ session.session_number }}回</h6>
+                            <small class="text-muted">{{ session.date }} - {{ session.topic|default:"授業内容未設定" }}</small>
+                        </div>
+                        <a href="#" class="btn btn-warning btn-sm">
+                            <i class="fas fa-star me-1"></i>評価する
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- 授業ポイント履歴 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-star me-2"></i>授業ポイント履歴
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if lesson_points %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>授業名</th>
+                                    <th>日付</th>
+                                    <th>獲得ポイント</th>
+                                    <th>累計ポイント</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for point in lesson_points %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ point.lesson_session.lesson.title }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ point.lesson_session.classroom.name }}</small>
+                                    </td>
+                                    <td>{{ point.lesson_session.session_date|date:"Y年m月d日" }}</td>
+                                    <td>
+                                        <span class="badge bg-success fs-6">{{ point.points }}pt</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary fs-6">{{ point.cumulative_points }}pt</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-star fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">まだ授業ポイントがありません。</p>
+                        <p class="text-muted">QRコードをスキャンしてポイントを獲得しましょう！</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('学生ダッシュボードが読み込まれました');
+});
+
+
+</script>
+{% endblock %}

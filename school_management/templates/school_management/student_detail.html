@@ -1,0 +1,183 @@
+{% extends 'school_management/base.html' %}
+{% load static %}
+
+{% block title %}{{ student.full_name }}の詳細 - 学校管理システム{% endblock %}
+{% block page_title %}学生詳細{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-user me-2"></i>{{ student.full_name }}の詳細情報</h5>
+                    <div>
+                        <a href="{% url 'school_management:student_edit' student.student_number %}" class="btn btn-outline-warning btn-sm">
+                            <i class="fas fa-edit me-1"></i>編集
+                        </a>
+                        <a href="{% url 'school_management:student_list' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left me-1"></i>戻る
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <dl class="row info-list">
+                    <dt class="col-sm-4 text-end">学籍番号:</dt>
+                    <dd class="col-sm-8">{{ student.student_number }}</dd>
+                    
+                    <dt class="col-sm-4 text-end">氏名:</dt>
+                    <dd class="col-sm-8">{{ student.full_name }}</dd>
+                    
+                    <dt class="col-sm-4 text-end">フリガナ:</dt>
+                    <dd class="col-sm-8">{{ student.furigana|default:"-" }}</dd>
+                    
+                    <dt class="col-sm-4 text-end">メールアドレス:</dt>
+                    <dd class="col-sm-8">{{ student.email|default:"未設定" }}</dd>
+                    
+                    <dt class="col-sm-4 text-end">ポイント:</dt>
+                    <dd class="col-sm-8">
+                        <small class="text-muted">※クラスごとに独立管理（下記の所属クラス欄で確認）</small>
+                    </dd>
+                    
+                    {% if student.memo %}
+                    <dt class="col-sm-4 text-end">備考:</dt>
+                    <dd class="col-sm-8">{{ student.memo }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+        
+        <!-- 所属クラス -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6><i class="fas fa-chalkboard me-2"></i>所属クラス</h6>
+            </div>
+            <div class="card-body">
+                {% if classes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>クラス名</th>
+                                    <th>年度</th>
+                                    <th>学期</th>
+                                    <th>担当教師</th>
+                                    <th>ポイント</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for data in class_data %}
+                                <tr>
+                                    <td><strong>{{ data.classroom.class_name }}</strong></td>
+                                    <td>{{ data.classroom.year }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if data.classroom.semester == 'first' %}primary{% else %}secondary{% endif %}">
+                                            {{ data.classroom.get_semester_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% for teacher in data.classroom.teachers.all %}
+                                            {{ teacher.full_name }}{% if not forloop.last %}, {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if data.points >= 50 %}success{% elif data.points >= 30 %}warning{% else %}secondary{% endif %} fs-6">
+                                            {{ data.points }}pt
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'school_management:class_detail' data.classroom.id %}" 
+                                           class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-eye me-1"></i>詳細
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-exclamation-circle fa-2x text-muted mb-3"></i>
+                        <p class="text-muted">まだクラスに所属していません。</p>
+                        <button class="btn btn-primary" onclick="alert('クラス追加機能は準備中です')">
+                            <i class="fas fa-plus me-1"></i>クラスに追加
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- 学習統計 -->
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-chart-bar me-2"></i>学習統計</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <h4 class="text-primary">{{ classes.count }}</h4>
+                            <small class="text-muted">所属クラス数</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">0</h4>
+                        <small class="text-muted">小テスト回数</small>
+                    </div>
+                </div>
+                <hr>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <h4 class="text-warning">0</h4>
+                            <small class="text-muted">ピア評価回数</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-info">-</h4>
+                        <small class="text-muted">平均点</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 最近の活動 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-clock me-2"></i>最近の活動</h6>
+            </div>
+            <div class="card-body">
+                <div class="text-center py-3">
+                    <i class="fas fa-history fa-2x text-muted mb-2"></i>
+                    <p class="text-muted small">活動履歴はまだありません</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- アクション -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-cogs me-2"></i>アクション</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="alert('成績確認機能は準備中です')">
+                        <i class="fas fa-chart-line me-2"></i>成績を確認
+                    </button>
+                    <button class="btn btn-outline-success" onclick="alert('レポート機能は準備中です')">
+                        <i class="fas fa-file-export me-2"></i>レポート出力
+                    </button>
+                    <button class="btn btn-outline-warning" onclick="alert('通知機能は準備中です')">
+                        <i class="fas fa-envelope me-2"></i>通知を送信
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

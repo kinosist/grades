@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教員管理 - 学校管理システム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 0;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .admin-info {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .admin-info h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .teacher-form {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .teacher-form h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+        }
+        
+        .teachers-list {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .teachers-list h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .teacher-card {
+            background: #f8f9fa;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .teacher-info h3 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .teacher-info p {
+            color: #666;
+            margin: 2px 0;
+        }
+        
+        .teacher-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        
+        .messages {
+            margin-bottom: 20px;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .success {
+            background-color: #d1edff;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #bee5eb;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            color: #ddd;
+        }
+        
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 20px;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+            color: white;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            justify-content: flex-end;
+        }
+        
+        .nav-btn {
+            background: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.3s;
+            display: inline-block;
+        }
+        
+        .nav-btn:hover {
+            background: #5a6268;
+            color: white;
+        }
+        
+        .nav-btn.primary {
+            background: #007bff;
+        }
+        
+        .nav-btn.primary:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="{% url 'school_management:logout' %}" class="logout-btn">ログアウト</a>
+            <h1>教員管理システム</h1>
+            <p>管理者: {{ user.full_name }}さん</p>
+        </div>
+        
+        <div class="nav-buttons">
+            <a href="{% url 'school_management:logout' %}" class="nav-btn">ログアウト</a>
+        </div>
+        
+        <div class="admin-info">
+            <h2>管理者機能</h2>
+            <p>このページでは教員の追加・削除ができます。教員が追加されると、教員は学生やクラス、グループを作成できるようになります。</p>
+        </div>
+        
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="{% if message.tags == 'error' %}error{% else %}success{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        
+        <div class="teacher-form">
+            <h2>新しい教員を追加</h2>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_teacher">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="email">メールアドレス *</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="full_name">氏名 *</label>
+                        <input type="text" id="full_name" name="full_name" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="furigana">ふりがな</label>
+                        <input type="text" id="furigana" name="furigana">
+                    </div>
+                    <div class="form-group">
+                        <label for="teacher_id">教員ID</label>
+                        <input type="text" id="teacher_id" name="teacher_id">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">パスワード *</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <button type="submit" class="btn">教員を追加</button>
+            </form>
+        </div>
+        
+        <div class="teachers-list">
+            <h2>登録済み教員一覧</h2>
+            
+            {% if teachers %}
+                {% for teacher in teachers %}
+                    <div class="teacher-card">
+                        <div class="teacher-info">
+                            <h3>{{ teacher.full_name }}</h3>
+                            <p><strong>メール:</strong> {{ teacher.email }}</p>
+                            {% if teacher.teacher_id %}
+                                <p><strong>教員ID:</strong> {{ teacher.teacher_id }}</p>
+                            {% endif %}
+                            {% if teacher.furigana %}
+                                <p><strong>ふりがな:</strong> {{ teacher.furigana }}</p>
+                            {% endif %}
+                            <p><strong>登録日:</strong> {{ teacher.created_at|date:"Y年m月d日" }}</p>
+                        </div>
+                        <div class="teacher-actions">
+                            <form method="post" style="display: inline;" onsubmit="return confirm('{{ teacher.full_name }}さんを削除しますか？')">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_teacher">
+                                <input type="hidden" name="teacher_id" value="{{ teacher.id }}">
+                                <button type="submit" class="btn btn-danger btn-small">削除</button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i>👨‍🏫</i>
+                    <h3>教員が登録されていません</h3>
+                    <p>上のフォームから教員を追加してください。</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="nav-buttons" style="margin-top: 30px; justify-content: center;">
+            <a href="{% url 'school_management:dashboard' %}" class="nav-btn primary">ダッシュボードに戻る</a>
+            <a href="{% url 'school_management:logout' %}" class="nav-btn">ログアウト</a>
+        </div>
+    </div>
+</body>
+</html>

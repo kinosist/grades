@@ -172,14 +172,35 @@ uv run python manage.py shell
    - "New" → "Database" → "Add PostgreSQL"
 
 4. **環境変数を設定**
+
+   Appサービスの「Variables」タブで以下を設定：
+
+   **必須の環境変数:**
    ```
+   DATABASE_URL=<PostgreSQLサービスから参照で追加>
    SECRET_KEY=<ランダムな50文字以上の文字列>
    DEBUG=False
-   ALLOWED_HOSTS=*.railway.app
+   ```
+
+   **管理者アカウント用（推奨）:**
+   ```
    ADMIN_EMAIL=admin@example.com
    ADMIN_PASSWORD=<安全なパスワード>
    ADMIN_NAME=管理者
    ```
+
+   **DATABASE_URLの設定方法:**
+   - 「+ New Variable」→「Add Reference」をクリック
+   - Variable Name: `DATABASE_URL`
+   - Service: `postgres` (PostgreSQLサービスを選択)
+   - Variable: `DATABASE_URL`
+
+   **SECRET_KEYの生成方法:**
+   ```powershell
+   uv run python generate_secret_key.py
+   ```
+
+   **注意:** `ALLOWED_HOSTS`は自動設定されるため不要です
 
 5. **自動デプロイ**
    - GitHubへのプッシュで自動的にデプロイされます
@@ -196,9 +217,18 @@ Railway環境変数で設定した以下の情報でログインできます：
 
 ### トラブルシューティング
 
-- **CSSが表示されない**: WhiteNoiseが正しく設定されているか確認
-- **ログインできない**: 環境変数（ADMIN_EMAIL、ADMIN_PASSWORD）が設定されているか確認
-- **CSRF検証エラー**: `CSRF_TRUSTED_ORIGINS`が正しく設定されているか確認
+#### データが再デプロイ後に消える
+- **原因**: `DATABASE_URL`が設定されていない（SQLiteを使用している）
+- **解決**: PostgreSQLサービスを追加し、`DATABASE_URL`を参照で設定
+
+#### CSSが表示されない
+- **解決**: WhiteNoiseが正しく設定されているか確認
+
+#### ログインできない
+- **解決**: 環境変数（ADMIN_EMAIL、ADMIN_PASSWORD）が設定されているか確認
+
+#### CSRF検証エラー
+- **解決**: `CSRF_TRUSTED_ORIGINS`が正しく設定されているか確認（通常は自動設定）
 
 詳細は[DEPLOYMENT.md](DEPLOYMENT.md)のトラブルシューティングセクションを参照してください。
 

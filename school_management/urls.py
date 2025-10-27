@@ -19,6 +19,7 @@ urlpatterns = [
     path('classes/<int:class_id>/', views.class_detail_view, name='class_detail'),
     path('classes/<int:class_id>/points/', views.class_points_view, name='class_points'),
     path('classes/<int:class_id>/evaluation/', views.class_evaluation_view, name='class_evaluation'),
+    path('classes/<int:class_id>/attendance-rate/', views.update_attendance_rate, name='update_attendance_rate'),
     path('classes/create/', views.class_create_view, name='class_create'),
     
     # 学生追加（新方式） - より具体的なパターンを先に配置

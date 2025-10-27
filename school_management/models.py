@@ -425,6 +425,8 @@ class StudentClassPoints(models.Model):
     student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, verbose_name='学生', related_name='class_points')
     classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス', related_name='student_class_points')
     points = models.IntegerField(default=0, verbose_name='ポイント')
+    attendance_rate = models.FloatField(default=0.0, verbose_name='出席率', help_text='0-100の範囲')
+    attendance_points = models.FloatField(default=0.0, verbose_name='出席点', help_text='出席率から計算される点数')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='作成日時')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
 

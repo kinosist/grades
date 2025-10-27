@@ -2152,32 +2152,24 @@ def class_evaluation_view(request, class_id):
     student_evaluations = []
     
     for student in students:
-        # このクラスの授業回でのポイントを取得
-        lesson_points = StudentLessonPoints.objects.filter(
-            student=student,
-            lesson_session__classroom=classroom
-        ).select_related('lesson_session').order_by('lesson_session__session_number')
-        
-        # 基本統計
-        total_points = sum(point.points for point in lesson_points)
-        session_count = lesson_points.count()
-        average_points = round(total_points / session_count, 1) if session_count > 0 else 0
-        
-        # 出席率（仮の計算 - 実際の出席データに基づいて調整可能）
-        attendance_rate = 100.0 if session_count > 0 else 0.0
-        
         # 各授業回のデータ（ポイント + ピア評価スコア）
         session_data = {}
+        session_count = 0
+        total_qr_points = 0
+        
         for session in sessions:
             session_key = f"第{session.session_number}回"
             
             # QRコードポイントを取得
             qr_points = 0
-            try:
-                lesson_point = lesson_points.get(lesson_session=session)
+            lesson_point = StudentLessonPoints.objects.filter(
+                lesson_session=session,
+                student=student
+            ).first()
+            if lesson_point:
                 qr_points = lesson_point.points
-            except StudentLessonPoints.DoesNotExist:
-                pass
+                session_count += 1
+                total_qr_points += qr_points
             
             # ピア評価スコアを取得
             peer_evaluation_score = 0
@@ -2214,22 +2206,58 @@ def class_evaluation_view(request, class_id):
                 'has_peer_evaluation': session.has_peer_evaluation
             }
         
+        # 出席率と平均ポイントを計算
+        total_sessions = sessions.count()
+        # データベースから保存された出席率、出席点、ポイントを取得
+        saved_multiplied_points = 0
+        attendance_rate = 0
+        saved_attendance_points = 0
+        try:
+            student_class_points = StudentClassPoints.objects.get(student=student, classroom=classroom)
+            attendance_rate = student_class_points.attendance_rate
+            saved_multiplied_points = student_class_points.points
+            saved_attendance_points = student_class_points.attendance_points
+        except StudentClassPoints.DoesNotExist:
+            # 保存されていない場合は自動計算
+            attendance_rate = (session_count / total_sessions * 100) if total_sessions > 0 else 0
+        
         # ピア評価スコアの合計を計算
         total_peer_score = sum(data['peer_score'] for data in session_data.values())
         total_combined_score = sum(data['total_score'] for data in session_data.values())
         
+        # 保存されたポイントがある場合はそれを使う、なければ新規計算
+        if saved_multiplied_points > 0:
+            multiplied_points = saved_multiplied_points
+        else:
+            # 点数（合計スコア × 倍率）
+            multiplied_points = total_combined_score * 2  # 倍率2倍
+        
+        # クラスポイントは保存されている値、なければ計算値
+        class_points_display = saved_multiplied_points if saved_multiplied_points > 0 else multiplied_points
+        
+        average_points = round(total_qr_points / session_count, 1) if session_count > 0 else 0
+        
+        # 出席点を使用（保存されたものがあればそれを使う）
+        attendance_points_value = saved_attendance_points if saved_attendance_points > 0 else 0
+        
+        # 合計点は出席点 + クラスポイント × 2
+        total_points_calculated = attendance_points_value + (class_points_display * 2)
+        
         student_evaluations.append({
             'student': student,
-            'total_points': total_points,
+            'total_points': total_points_calculated,  # 合計点は出席点 + 点数
             'total_peer_score': total_peer_score,
             'total_combined_score': total_combined_score,
-            'attendance_points': 0,  # 出席点（現在は0）
+            'attendance_points': attendance_points_value,  # 出席点（保存された値または0）
             'attendance_rate': attendance_rate,
-            'multiplied_points': total_combined_score * 2,  # 倍率2倍
+            'multiplied_points': multiplied_points,  # 倍率2倍
             'multiplier': 2,
             'session_data': session_data,
             'session_count': session_count,
             'average_points': average_points,
+            'class_points': class_points_display,  # クラスのポイント（保存されている値または計算値）
+            'student_points': student.points,  # 学生の全体ポイント
+            'qr_points': total_qr_points,  # クラスのQRコードポイントの合計
         })
     
     session_list = [f"第{session.session_number}回" for session in sessions]
@@ -2261,6 +2289,51 @@ def class_evaluation_view(request, class_id):
         'total_sessions': len(session_list),
     }
     return render(request, 'school_management/class_evaluation.html', context)
+
+@login_required
+@require_POST
+def update_attendance_rate(request, class_id):
+    """出席率を更新するAPI"""
+    import json
+    from django.views.decorators.csrf import csrf_exempt
+    
+    # JSONリクエストを受け取る
+    data = json.loads(request.body)
+    student_id = data.get('student_id')
+    attendance_rate = data.get('attendance_rate')
+    total_points = data.get('total_points', 0)
+    attendance_points = data.get('attendance_points', 0)
+    
+    # バリデーション
+    if not student_id or attendance_rate is None:
+        return JsonResponse({'success': False, 'error': 'パラメータが不足しています'})
+    
+    if not (0 <= attendance_rate <= 100):
+        return JsonResponse({'success': False, 'error': '出席率は0〜100の範囲で入力してください'})
+    
+    # クラスと学生を取得
+    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+    student = get_object_or_404(CustomUser, id=student_id)
+    
+    # 学生がクラスに所属しているか確認
+    if not classroom.students.filter(id=student_id).exists():
+        return JsonResponse({'success': False, 'error': 'この学生はクラスに所属していません'})
+    
+    # 出席率、出席点、合計点をデータベースに保存
+    student_class_points, created = StudentClassPoints.objects.get_or_create(
+        student=student,
+        classroom=classroom,
+        defaults={'points': total_points, 'attendance_rate': attendance_rate, 'attendance_points': attendance_points}
+    )
+    
+    if not created:
+        # 既存のレコードのpoints、出席率、出席点を更新
+        student_class_points.points = total_points
+        student_class_points.attendance_rate = attendance_rate
+        student_class_points.attendance_points = attendance_points
+        student_class_points.save()
+    
+    return JsonResponse({'success': True, 'message': '出席率を保存しました'})
 
 @login_required
 def class_points_view(request, class_id):

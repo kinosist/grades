@@ -291,14 +291,24 @@
                             <td class="student-info name-col">{{ evaluation.student.full_name }}</td>
                             <td class="student-info furigana-col">{{ evaluation.student.furigana|default:"" }}</td>
                             <td class="total-col">{{ evaluation.total_points }}</td>
-                            <td class="attendance-col">
+                            <td class="attendance-col attendance-points">
                                 {{ evaluation.attendance_points }}<br>
                                 <small class="attendance-rate">{{ evaluation.attendance_rate|floatformat:2 }}%</small>
                             </td>
                             <td class="attendance-col">
-                                {{ evaluation.attendance_rate|floatformat:2 }}%
+                                <input type="number" 
+                                       name="attendance_rate_{{ evaluation.student.id }}" 
+                                       value="{{ evaluation.attendance_rate }}" 
+                                       min="0" 
+                                       max="100" 
+                                       step="0.1"
+                                       data-student-id="{{ evaluation.student.id }}"
+                                       data-class-id="{{ classroom.id }}"
+                                       onchange="saveAttendanceRate(this)"
+                                       style="width: 70px; padding: 2px; text-align: center; border: 1px solid #ccc; border-radius: 3px;">
+                                %
                             </td>
-                            <td class="score-col">{{ evaluation.multiplied_points }}</td>
+                            <td class="score-col">{{ evaluation.class_points }}</td>
                             <td class="multiplier-col multiplier-value">{{ evaluation.multiplier }}</td>
                             {% for session in sessions %}
                             <td class="session-col">
@@ -351,5 +361,87 @@ window.addEventListener('afterprint', function() {
     document.querySelector('.table-container').style.maxHeight = '80vh';
     document.querySelector('.table-container').style.overflow = 'auto';
 });
+
+// 出席率の自動保存
+function saveAttendanceRate(input) {
+    const attendanceRate = parseFloat(input.value);
+    const studentId = input.dataset.studentId;
+    const classId = input.dataset.classId;
+    
+    // バリデーション
+    if (isNaN(attendanceRate) || attendanceRate < 0 || attendanceRate > 100) {
+        alert('出席率は0〜100の範囲で入力してください。');
+        input.value = 0;
+        return;
+    }
+    
+    // 出席点を計算（最大20点）
+    const ATTENDANCE_MAX_POINTS = 20;
+    const newAttendancePoints = (attendanceRate / 100) * ATTENDANCE_MAX_POINTS;
+    
+    // 行全体のデータを取得
+    const row = input.closest('tr');
+    
+    // 現在の合計点と点数（クラスポイント）を取得
+    const totalPointsCell = row.querySelector('.total-col');
+    const scoreCell = row.querySelector('.score-col');
+    const currentTotalPoints = parseFloat(totalPointsCell.textContent) || 0;
+    const classPoints = parseFloat(scoreCell.textContent) || 0;
+    
+    // 新しい合計点を計算（出席点 + クラスポイント × 2）
+    const newTotalPoints = newAttendancePoints + (classPoints * 2);
+    
+    // 出席点のセルを更新
+    const attendancePointsCell = row.querySelector('.attendance-points');
+    if (attendancePointsCell) {
+        attendancePointsCell.innerHTML = newAttendancePoints.toFixed(1) + '<br><small class="attendance-rate">' + attendanceRate.toFixed(2) + '%</small>';
+    }
+    
+    // 合計点のセルを更新
+    totalPointsCell.textContent = newTotalPoints.toFixed(1);
+    
+    // サーバーに送信
+    fetch(`/classes/${classId}/attendance-rate/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            student_id: studentId,
+            attendance_rate: attendanceRate,
+            total_points: newTotalPoints,
+            attendance_points: newAttendancePoints
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('出席率を保存しました:', attendanceRate);
+        } else {
+            alert('保存に失敗しました: ' + (data.error || '不明なエラー'));
+        }
+    })
+    .catch(error => {
+        console.error('エラー:', error);
+        alert('保存に失敗しました');
+    });
+}
+
+// CSRFトークンを取得する関数
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
 </script>
 {% endblock %}

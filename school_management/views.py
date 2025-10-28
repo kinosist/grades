@@ -1887,34 +1887,35 @@ def remove_student_from_class(request, student_id):
 # QRコード関連のビュー
 @login_required
 def qr_code_list(request):
-    """QRコード一覧表示（教員用）"""
+    """QRコード管理 - クラス選択（教員用）"""
     if not request.user.is_teacher:
         messages.error(request, '教員のみアクセス可能です。')
         return redirect('school_management:dashboard')
     
-    # 担当クラスの学生を取得
-    classrooms = ClassRoom.objects.filter(teachers=request.user)
-    students = Student.objects.filter(classroom__in=classrooms).distinct()
+    # 担当クラスを取得
+    classrooms = ClassRoom.objects.filter(teachers=request.user).order_by('-year', '-semester', 'class_name')
     
-    # 各学生のQRコード情報を取得
-    qr_codes = []
-    for student in students:
-        qr_code, created = StudentQRCode.objects.get_or_create(
-            student=student,
-            defaults={'is_active': True}
-        )
-        scan_url = request.build_absolute_uri(
-            reverse('school_management:qr_code_scan', kwargs={'qr_code_id': qr_code.qr_code_id})
-        )
-        qr_codes.append({
-            'student': student,
-            'qr_code': qr_code,
-            'scan_count': qr_code.scans.count(),
-            'qr_image': generate_qr_code_image(scan_url)
+    # 各クラスの学生数とポイント情報を取得
+    class_data = []
+    for classroom in classrooms:
+        student_count = classroom.students.count()
+        
+        # このクラスの学生のQRコードスキャン数を集計
+        students = classroom.students.all()
+        total_scans = 0
+        for student in students:
+            qr_code = StudentQRCode.objects.filter(student=student).first()
+            if qr_code:
+                total_scans += qr_code.scans.count()
+        
+        class_data.append({
+            'classroom': classroom,
+            'student_count': student_count,
+            'total_scans': total_scans,
         })
     
     context = {
-        'qr_codes': qr_codes,
+        'classes': class_data,
     }
     return render(request, 'school_management/qr_code_list.html', context)
 

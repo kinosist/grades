@@ -103,8 +103,9 @@
     .evaluation-table .peer-score-main {
         font-weight: bold;
         color: #ff9800;
-        font-size: 16px;
+        font-size: 12px;
         text-align: center;
+        margin-top: 2px;
     }
     
     .evaluation-table .qr-points-small {
@@ -112,6 +113,14 @@
         color: #1976d2;
         text-align: center;
         margin-top: 2px;
+    }
+    
+    .evaluation-table .quiz-score {
+        color: #4caf50;
+        font-weight: bold;
+        font-size: 11px;
+        text-align: center;
+        margin-bottom: 2px;
     }
     
     .evaluation-table .peer-score {
@@ -127,6 +136,10 @@
         border-top: 1px solid #ddd;
         margin-top: 2px;
         padding-top: 2px;
+    }
+    
+    .evaluation-table .spacer-div {
+        height: 11px;
     }
     
     .evaluation-table .empty-session {
@@ -225,20 +238,6 @@
                         </div>
                     </div>
                 </div>
-                <!-- デバッグ情報 -->
-                <div class="mt-3">
-                    <small class="text-muted">
-                        デバッグ: グループ内評価平均値 = {{ session_peer_averages }}<br>
-                        {% for session in sessions %}
-                            セッション{{ session.session_number }} (ID:{{ session.id }}): 
-                            {% if session_peer_averages|lookup:session.id is not None %}
-                                グループ内: {{ session_peer_averages|lookup:session.id }}
-                            {% else %}
-                                なし
-                            {% endif %}<br>
-                        {% endfor %}
-                    </small>
-                </div>
             </div>
 
             <!-- エクスポートボタン -->
@@ -278,7 +277,7 @@
                                 {{ session.session_number }}回<br>
                                 <small class="text-muted">{{ session.date|date:"m/d" }}</small>
                                 {% if session_peer_averages|lookup:session.id is not None %}
-                                    <br><small class="peer-avg">グループ内: {{ session_peer_averages|lookup:session.id }}</small>
+                                    <br><small class="peer-avg">貢献度: {{ session_peer_averages|lookup:session.id }}</small>
                                 {% endif %}
                             </th>
                             {% endfor %}
@@ -316,15 +315,26 @@
                                     {% if session_key in evaluation.session_data %}
                                         {% with data=evaluation.session_data|lookup:session_key %}
                                             <div class="session-points">
-                                                {% if data.has_peer_evaluation and data.peer_score > 0 %}
-                                                    <!-- ピア評価がある場合はピア評価スコアをメイン表示 -->
-                                                    <div class="peer-score-main">{{ data.peer_score }}</div>
+                                                {% if data.has_quiz %}
+                                                    <!-- 小テストスコアが存在する場合は常に表示 -->
+                                                    {% if data.quiz_score > 0 %}
+                                                        <div class="quiz-score">小テスト: {{ data.quiz_score }}点</div>
+                                                    {% else %}
+                                                        <div class="quiz-score" style="color: #999;">小テスト: -</div>
+                                                    {% endif %}
+                                                {% endif %}
+                                                
+                                                {% if data.qr_points > 0 or data.peer_score > 0 or data.has_quiz %}
+                                                    <!-- ピア評価スコア -->
+                                                    {% if data.peer_score > 0 %}
+                                                        <div class="peer-score-main">ピア: {{ data.peer_score }}</div>
+                                                    {% endif %}
+                                                    <!-- QRポイント -->
                                                     {% if data.qr_points > 0 %}
-                                                        <div class="qr-points-small">+{{ data.qr_points }}</div>
+                                                        <div class="qr-points-small">QR: {{ data.qr_points }}</div>
                                                     {% endif %}
                                                 {% else %}
-                                                    <!-- ピア評価がない場合はQRポイントをメイン表示 -->
-                                                    <div class="qr-points-main">{{ data.qr_points }}</div>
+                                                    <span class="empty-session">-</span>
                                                 {% endif %}
                                             </div>
                                         {% endwith %}

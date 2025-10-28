@@ -2214,7 +2214,26 @@ def class_evaluation_view(request, class_id):
                 session_count += 1
                 total_qr_points += qr_points
             
-            # ピア評価スコアを取得
+            # 小テストスコアを取得
+            quiz_score = 0
+            has_quiz = False
+            try:
+                quiz = Quiz.objects.filter(lesson_session=session).first()
+                if quiz:
+                    has_quiz = True
+                    quiz_score_obj = QuizScore.objects.filter(
+                        quiz=quiz,
+                        student=student,
+                        is_cancelled=False
+                    ).first()
+                    if quiz_score_obj:
+                        # 小テストのスコア（0-100点）をそのまま使用
+                        quiz_score = quiz_score_obj.score
+            except Exception as e:
+                print(f"小テストスコア取得エラー: {e}")
+                pass
+            
+            # ピア評価スコアを取得（1位=5点、2位=3点）
             peer_evaluation_score = 0
             try:
                 # この学生が所属するグループを取得
@@ -2223,30 +2242,34 @@ def class_evaluation_view(request, class_id):
                     groupmember__student=student
                 )
                 
-                if student_groups.exists():
-                    # この学生に対する貢献度評価の平均を計算
-                    from .models import ContributionEvaluation
-                    contribution_evaluations = ContributionEvaluation.objects.filter(
-                        peer_evaluation__lesson_session=session,
-                        evaluatee=student
-                    )
+                if student_groups.exists() and session.has_peer_evaluation:
+                    from .models import PeerEvaluation
+                    # この学生のグループが1位に選ばれた回数
+                    first_place_count = PeerEvaluation.objects.filter(
+                        lesson_session=session,
+                        first_place_group__in=student_groups
+                    ).count()
                     
-                    if contribution_evaluations.exists():
-                        peer_evaluation_score = round(
-                            contribution_evaluations.aggregate(
-                                avg_score=models.Avg('contribution_score')
-                            )['avg_score'] or 0, 1
-                        )
+                    # この学生のグループが2位に選ばれた回数
+                    second_place_count = PeerEvaluation.objects.filter(
+                        lesson_session=session,
+                        second_place_group__in=student_groups
+                    ).count()
+                    
+                    # 1位×5点 + 2位×3点
+                    peer_evaluation_score = first_place_count * 5 + second_place_count * 3
             except Exception as e:
                 print(f"ピア評価スコア取得エラー: {e}")
                 pass
             
             session_data[session_key] = {
                 'qr_points': qr_points,
+                'quiz_score': quiz_score,
                 'peer_score': peer_evaluation_score,
-                'total_score': qr_points + peer_evaluation_score,
+                'total_score': qr_points + quiz_score + peer_evaluation_score,
                 'date': session.date,
-                'has_peer_evaluation': session.has_peer_evaluation
+                'has_peer_evaluation': session.has_peer_evaluation,
+                'has_quiz': has_quiz
             }
         
         # 出席率と平均ポイントを計算
@@ -2264,8 +2287,9 @@ def class_evaluation_view(request, class_id):
             # 保存されていない場合は自動計算
             attendance_rate = (session_count / total_sessions * 100) if total_sessions > 0 else 0
         
-        # ピア評価スコアの合計を計算
+        # 各種スコアの合計を計算
         total_peer_score = sum(data['peer_score'] for data in session_data.values())
+        total_quiz_score = sum(data.get('quiz_score', 0) for data in session_data.values())
         total_combined_score = sum(data['total_score'] for data in session_data.values())
         
         # 保存されたポイントがある場合はそれを使う、なければ新規計算
@@ -2290,6 +2314,7 @@ def class_evaluation_view(request, class_id):
             'student': student,
             'total_points': total_points_calculated,  # 合計点は出席点 + 点数
             'total_peer_score': total_peer_score,
+            'total_quiz_score': total_quiz_score,  # 小テストスコアの合計
             'total_combined_score': total_combined_score,
             'attendance_points': attendance_points_value,  # 出席点（保存された値または0）
             'attendance_rate': attendance_rate,

@@ -2257,8 +2257,13 @@ def class_evaluation_view(request, class_id):
                         second_place_group__in=student_groups
                     ).count()
                     
-                    # 1位×5点 + 2位×3点
-                    peer_evaluation_score = first_place_count * 5 + second_place_count * 3
+                    # 1位=5点、2位=3点（複数票があっても最大値のみ付与）
+                    if first_place_count > 0:
+                        peer_evaluation_score = 5
+                    elif second_place_count > 0:
+                        peer_evaluation_score = 3
+                    else:
+                        peer_evaluation_score = 0
             except Exception as e:
                 print(f"ピア評価スコア取得エラー: {e}")
                 pass
@@ -2276,14 +2281,17 @@ def class_evaluation_view(request, class_id):
         # 出席率と平均ポイントを計算
         total_sessions = sessions.count()
         # データベースから保存された出席率、出席点、ポイントを取得
-        saved_multiplied_points = 0
         attendance_rate = 0
         saved_attendance_points = 0
+        saved_class_points = 0
         try:
             student_class_points = StudentClassPoints.objects.get(student=student, classroom=classroom)
             attendance_rate = student_class_points.attendance_rate
-            saved_multiplied_points = student_class_points.points
             saved_attendance_points = student_class_points.attendance_points
+            saved_class_points = student_class_points.points
+            # 旧データ互換: total値として保存されている場合は出席点を差し引く
+            if saved_class_points and saved_attendance_points and saved_class_points >= saved_attendance_points:
+                saved_class_points -= saved_attendance_points
         except StudentClassPoints.DoesNotExist:
             # 保存されていない場合は自動計算
             attendance_rate = (session_count / total_sessions * 100) if total_sessions > 0 else 0
@@ -2293,23 +2301,18 @@ def class_evaluation_view(request, class_id):
         total_quiz_score = sum(data.get('quiz_score', 0) for data in session_data.values())
         total_combined_score = sum(data['total_score'] for data in session_data.values())
         
-        # 保存されたポイントがある場合はそれを使う、なければ新規計算
-        if saved_multiplied_points > 0:
-            multiplied_points = saved_multiplied_points
-        else:
-            # 点数（合計スコア × 倍率）
-            multiplied_points = total_combined_score * 2  # 倍率2倍
-        
-        # クラスポイントは保存されている値、なければ計算値
-        class_points_display = saved_multiplied_points if saved_multiplied_points > 0 else multiplied_points
+        # 小テスト以外のスコアに倍率を適用し、小テストは等倍で加算
+        session_base_score = max(total_combined_score - total_quiz_score, 0)
+        multiplier_value = 2
+        class_points_value = saved_class_points + (session_base_score * multiplier_value) + total_quiz_score
         
         average_points = round(total_qr_points / session_count, 1) if session_count > 0 else 0
         
         # 出席点を使用（保存されたものがあればそれを使う）
         attendance_points_value = saved_attendance_points if saved_attendance_points > 0 else 0
         
-        # 合計点は出席点 + クラスポイント × 2
-        total_points_calculated = attendance_points_value + (class_points_display * 2)
+        # 合計点は出席点 + クラスポイントの2倍
+        total_points_calculated = attendance_points_value + (class_points_value * multiplier_value)
         
         student_evaluations.append({
             'student': student,
@@ -2319,12 +2322,12 @@ def class_evaluation_view(request, class_id):
             'total_combined_score': total_combined_score,
             'attendance_points': attendance_points_value,  # 出席点（保存された値または0）
             'attendance_rate': attendance_rate,
-            'multiplied_points': multiplied_points,  # 倍率2倍
-            'multiplier': 2,
+            'multiplied_points': class_points_value,  # 倍率適用済みの点数
+            'multiplier': multiplier_value,
             'session_data': session_data,
             'session_count': session_count,
             'average_points': average_points,
-            'class_points': class_points_display,  # クラスのポイント（保存されている値または計算値）
+            'class_points': class_points_value,  # クラスのポイント（手動加算分 + 倍率適用済み + 小テスト点）
             'student_points': student.points,  # 学生の全体ポイント
             'qr_points': total_qr_points,  # クラスのQRコードポイントの合計
         })
@@ -2370,7 +2373,6 @@ def update_attendance_rate(request, class_id):
     data = json.loads(request.body)
     student_id = data.get('student_id')
     attendance_rate = data.get('attendance_rate')
-    total_points = data.get('total_points', 0)
     attendance_points = data.get('attendance_points', 0)
     
     # バリデーション
@@ -2392,15 +2394,16 @@ def update_attendance_rate(request, class_id):
     student_class_points, created = StudentClassPoints.objects.get_or_create(
         student=student,
         classroom=classroom,
-        defaults={'points': total_points, 'attendance_rate': attendance_rate, 'attendance_points': attendance_points}
+        defaults={'points': 0, 'attendance_rate': attendance_rate, 'attendance_points': attendance_points}
     )
     
     if not created:
-        # 既存のレコードのpoints、出席率、出席点を更新
-        student_class_points.points = total_points
+        # 既存のレコードの出席率、出席点を更新（ポイントは更新しない）
         student_class_points.attendance_rate = attendance_rate
         student_class_points.attendance_points = attendance_points
-        student_class_points.save()
+        student_class_points.save(update_fields=['attendance_rate', 'attendance_points'])
+    else:
+        student_class_points.save(update_fields=['attendance_rate', 'attendance_points'])
     
     return JsonResponse({'success': True, 'message': '出席率を保存しました'})
 

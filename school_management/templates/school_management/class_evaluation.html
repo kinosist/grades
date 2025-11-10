@@ -272,15 +272,6 @@
                                 倍率<br>
                                 <small class="attendance-multiplier">2</small>
                             </th>
-                            {% for session in sessions %}
-                            <th class="session-col">
-                                {{ session.session_number }}回<br>
-                                <small class="text-muted">{{ session.date|date:"m/d" }}</small>
-                                {% if session_peer_averages|lookup:session.id is not None %}
-                                    <br><small class="peer-avg">貢献度: {{ session_peer_averages|lookup:session.id }}</small>
-                                {% endif %}
-                            </th>
-                            {% endfor %}
                         </tr>
                     </thead>
                     <tbody>
@@ -309,45 +300,10 @@
                             </td>
                             <td class="score-col">{{ evaluation.class_points }}</td>
                             <td class="multiplier-col multiplier-value">{{ evaluation.multiplier }}</td>
-                            {% for session in sessions %}
-                            <td class="session-col">
-                                {% with session_key="第"|add:session.session_number|add:"回" %}
-                                    {% if session_key in evaluation.session_data %}
-                                        {% with data=evaluation.session_data|lookup:session_key %}
-                                            <div class="session-points">
-                                                {% if data.has_quiz %}
-                                                    <!-- 小テストスコアが存在する場合は常に表示 -->
-                                                    {% if data.quiz_score > 0 %}
-                                                        <div class="quiz-score">小テスト: {{ data.quiz_score }}点</div>
-                                                    {% else %}
-                                                        <div class="quiz-score" style="color: #999;">小テスト: -</div>
-                                                    {% endif %}
-                                                {% endif %}
-                                                
-                                                {% if data.qr_points > 0 or data.peer_score > 0 or data.has_quiz %}
-                                                    <!-- ピア評価スコア -->
-                                                    {% if data.peer_score > 0 %}
-                                                        <div class="peer-score-main">ピア: {{ data.peer_score }}</div>
-                                                    {% endif %}
-                                                    <!-- QRポイント -->
-                                                    {% if data.qr_points > 0 %}
-                                                        <div class="qr-points-small">QR: {{ data.qr_points }}</div>
-                                                    {% endif %}
-                                                {% else %}
-                                                    <span class="empty-session">-</span>
-                                                {% endif %}
-                                            </div>
-                                        {% endwith %}
-                                    {% else %}
-                                        <span class="empty-session">-</span>
-                                    {% endif %}
-                                {% endwith %}
-                            </td>
-                            {% endfor %}
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="{% widthratio sessions|length 1 1 %}" class="text-center py-4">
+                            <td colspan="8" class="text-center py-4">
                                 <i class="fas fa-user-slash fa-2x text-muted mb-2"></i>
                                 <p class="text-muted">このクラスに学生がいません</p>
                             </td>
@@ -398,7 +354,7 @@ function saveAttendanceRate(input) {
     const currentTotalPoints = parseFloat(totalPointsCell.textContent) || 0;
     const classPoints = parseFloat(scoreCell.textContent) || 0;
     
-    // 新しい合計点を計算（出席点 + クラスポイント × 2）
+    // 新しい合計点を計算（出席点 + 点数×2）
     const newTotalPoints = newAttendancePoints + (classPoints * 2);
     
     // 出席点のセルを更新

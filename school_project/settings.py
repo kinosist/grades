@@ -48,6 +48,8 @@ else:
         railway_static_url = os.environ.get('RAILWAY_STATIC_URL')
         if railway_static_url:
             ALLOWED_HOSTS.append(railway_static_url)
+        # Add Railway wildcard domains
+        ALLOWED_HOSTS.extend(['.railway.app', '.up.railway.app'])
 
 # CSRF trusted origins for Railway
 CSRF_TRUSTED_ORIGINS = []
@@ -61,6 +63,12 @@ if 'RAILWAY_ENVIRONMENT' in os.environ:
     railway_static_url = os.environ.get('RAILWAY_STATIC_URL')
     if railway_static_url:
         CSRF_TRUSTED_ORIGINS.append(f'https://{railway_static_url}')
+
+    # Add Railway wildcard patterns
+    CSRF_TRUSTED_ORIGINS.extend([
+        'https://*.railway.app',
+        'https://*.up.railway.app'
+    ])
 else:
     # Allow local development
     CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://127.0.0.1:8000']

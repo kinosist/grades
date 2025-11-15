@@ -15,6 +15,16 @@ import base64
 from .models import ClassRoom, Student, Teacher, LessonSession, Quiz, QuizScore, PeerEvaluation, Attendance, Group, GroupMember, ContributionEvaluation, CustomUser, StudentQRCode, QRCodeScan, StudentLessonPoints, StudentClassPoints
 from django.urls import reverse
 
+def health_check(request):
+    """Health check endpoint for Railway deployment"""
+    from django.db import connection
+    try:
+        # Check database connection
+        connection.ensure_connection()
+        return JsonResponse({'status': 'healthy', 'database': 'connected'}, status=200)
+    except Exception as e:
+        return JsonResponse({'status': 'unhealthy', 'error': str(e)}, status=503)
+
 def login_view(request):
     """ログイン画面"""
     # CSRFトークンを強制的に生成

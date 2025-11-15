@@ -4,6 +4,9 @@ from . import views
 app_name = 'school_management'
 
 urlpatterns = [
+    # Health check endpoint (must be first, no login required)
+    path('health/', views.health_check, name='health_check'),
+
     path('', views.login_view, name='login'),
     path('login/', views.login_view, name='login'),
     path('debug-login/', views.debug_login_view, name='debug_login'),  # デバッグ用

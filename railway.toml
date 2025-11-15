@@ -4,6 +4,5 @@ builder = "nixpacks"
 [deploy]
 healthcheckPath = "/health/"
 healthcheckTimeout = 300
-startCommand = "gunicorn school_project.wsgi --bind 0.0.0.0:$PORT --log-file - --timeout 120 --workers 2 --access-logfile - --error-logfile - --preload"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

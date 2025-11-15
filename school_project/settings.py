@@ -122,6 +122,13 @@ if os.environ.get('DATABASE_URL'):
             conn_health_checks=True,
         )
     }
+    # Add PostgreSQL-specific connection options for Railway
+    DATABASES['default']['OPTIONS'] = {
+        'connect_timeout': 10,
+        'options': '-c statement_timeout=30000',  # 30 seconds
+    }
+    # Ensure we're using the correct engine
+    DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
 else:
     DATABASES = {
         'default': {

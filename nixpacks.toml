@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["python311", "postgresql"]
+
+[phases.install]
+cmds = ["pip install uv", "uv sync"]
+
+[phases.build]
+cmds = ["echo 'Build phase complete'"]
+
+[start]
+cmd = "python manage.py collectstatic --noinput && python migrate_with_retry.py && python create_admin.py && gunicorn school_project.wsgi --log-file - --timeout 120 --workers 2 --bind 0.0.0.0:$PORT"

@@ -128,12 +128,17 @@ if os.environ.get('DATABASE_URL'):
             default=os.environ.get('DATABASE_URL'),
             conn_max_age=600,
             conn_health_checks=True,
+            ssl_require=False,  # Railway handles SSL automatically
         )
     }
     # Add PostgreSQL-specific connection options for Railway
     DATABASES['default']['OPTIONS'] = {
         'connect_timeout': 10,
-        'options': '-c statement_timeout=30000',  # 30 seconds
+        'options': '-c statement_timeout=60000',  # 60 seconds
+        'keepalives': 1,
+        'keepalives_idle': 30,
+        'keepalives_interval': 10,
+        'keepalives_count': 5,
     }
     # Ensure we're using the correct engine
     DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'

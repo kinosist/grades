@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["python311"]
+
+[phases.install]
+dependsOn = ["setup"]
+
+[phases.build]
+dependsOn = ["install"]
+
+[start]
+cmd = "gunicorn school_project.wsgi --bind 0.0.0.0:$PORT --log-file - --timeout 120 --workers 2 --access-logfile - --error-logfile -"

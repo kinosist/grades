@@ -1,0 +1,125 @@
+{% extends 'school_management/base.html' %}
+
+{% block title %}グループマスタからコピー - 第{{ lesson_session.session_number }}回{% endblock %}
+{% block page_title %}グループマスタからコピー{% endblock %}
+
+{% block content %}
+<!-- アラートメッセージの表示 -->
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+            <i class="fas fa-{% if message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'success' %}check-circle{% else %}info-circle{% endif %} me-2"></i>
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-copy me-2"></i>グループマスタからコピー</h5>
+                <div>
+                    <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i>グループ一覧に戻る
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-3 p-3 bg-light rounded">
+                    <h6 class="text-primary mb-2"><i class="fas fa-info-circle me-2"></i>授業情報</h6>
+                    <strong>{{ lesson_session.classroom.class_name }}</strong> - 第{{ lesson_session.session_number }}回
+                    ({{ lesson_session.date|date:"Y年m月d日" }})
+                </div>
+
+                {% if group_masters %}
+                    <div class="mb-3">
+                        <h6>コピーするグループマスタ</h6>
+                        <div class="row">
+                            {% for group_master in group_masters %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">{{ group_master.display_name }}</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="mb-1"><strong>メンバー数:</strong> {{ group_master.members.count }}名</p>
+                                        {% if group_master.members.all %}
+                                        <div class="small text-muted">
+                                            <strong>メンバー:</strong>
+                                            {% for member in group_master.members.all %}
+                                                {{ member.student.full_name }}{% if not forloop.last %}, {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {% if has_existing_groups %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>注意：</strong>この授業回には既に{{ existing_group_count }}個のグループが存在します。
+                        既存のグループを削除してからコピーする場合は、下のチェックボックスを選択してください。
+                    </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+                        {% if has_existing_groups %}
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="replace_existing" name="replace_existing">
+                                <label class="form-check-label" for="replace_existing">
+                                    <strong>既存のグループを削除してからコピーする</strong>
+                                </label>
+                            </div>
+                            <div class="form-text">チェックしない場合、既存のグループに追加されます。</div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>キャンセル
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-copy me-1"></i>グループマスタをコピー
+                            </button>
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        グループマスタが設定されていません。先にグループマスタを作成してください。
+                    </div>
+                    <a href="{% url 'school_management:group_master_management' classroom.id %}" class="btn btn-primary">
+                        <i class="fas fa-edit me-1"></i>グループマスタを作成
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- ヘルプ -->
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-lightbulb me-2"></i>グループマスタについて</h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled small">
+                    <li><i class="fas fa-check text-success me-2"></i>グループマスタはクラスごとの固定グループ編成です</li>
+                    <li><i class="fas fa-check text-success me-2"></i>授業回ごとにグループマスタからコピーできます</li>
+                    <li><i class="fas fa-check text-success me-2"></i>コピー後は個別に編集可能です</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+

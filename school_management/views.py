@@ -261,13 +261,8 @@ def class_detail_view(request, class_id):
     # すべての授業回を取得
     all_sessions = LessonSession.objects.filter(classroom=classroom).order_by('-date')
     
-    # show_allパラメータで全件表示するかどうかを判断
-    show_all = request.GET.get('show_all', 'false') == 'true'
-    
-    if show_all:
-        lessons = all_sessions  # すべて表示
-    else:
-        lessons = all_sessions[:5]  # 上位5件のみ
+    # 常にすべての授業回を表示
+    lessons = all_sessions
     
     sessions = all_sessions  # 授業回数表示用
     peer_evaluations = PeerEvaluation.objects.filter(lesson_session__classroom=classroom)
@@ -285,7 +280,6 @@ def class_detail_view(request, class_id):
         'sessions': sessions,  # 授業回数表示用
         'peer_evaluations': peer_evaluations,
         'recent_lessons': lessons,
-        'show_all': show_all,
         'total_sessions': all_sessions.count(),
     }
     return render(request, 'school_management/class_detail.html', context)

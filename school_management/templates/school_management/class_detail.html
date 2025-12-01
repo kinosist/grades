@@ -115,21 +115,6 @@
                             </tbody>
                         </table>
                     </div>
-                    
-                    <!-- もっと見る/縮小ボタン -->
-                    {% if total_sessions > 5 %}
-                        <div class="text-center mt-3">
-                            {% if show_all %}
-                                <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary">
-                                    <i class="fas fa-chevron-up me-1"></i>表示を縮小
-                                </a>
-                            {% else %}
-                                <a href="{% url 'school_management:class_detail' classroom.id %}?show_all=true" class="btn btn-outline-primary">
-                                    <i class="fas fa-chevron-down me-1"></i>すべて表示 ({{ total_sessions }}件)
-                                </a>
-                            {% endif %}
-                        </div>
-                    {% endif %}
                 {% else %}
                     <div class="text-center py-4">
                         <i class="fas fa-calendar-plus fa-2x text-muted mb-3"></i>

@@ -62,6 +62,11 @@ urlpatterns = [
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/', views.group_detail_view, name='group_detail'),
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/edit/', views.group_edit_view, name='group_edit'),
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/delete/', views.group_delete_view, name='group_delete'),
+    path('lesson-sessions/<int:session_id>/groups/copy-master/', views.group_master_copy_to_session, name='group_master_copy'),
+    
+    # グループマスタ管理
+    path('classes/<int:class_id>/group-masters/', views.group_master_list_view, name='group_master_list'),
+    path('classes/<int:class_id>/group-masters/manage/', views.group_master_management, name='group_master_management'),
     
     # 改善されたピア評価管理
     path('lesson-sessions/<int:session_id>/peer-evaluation-improved/create/', views.improved_peer_evaluation_create, name='improved_peer_evaluation_create'),

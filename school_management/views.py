@@ -1372,11 +1372,22 @@ def group_list_view(request, session_id):
             'members': group.groupmember_set.all()
         })
     
+    # 実際にグループに所属しているユニークな学生数を計算
+    assigned_student_ids = GroupMember.objects.filter(
+        group__lesson_session=lesson_session
+    ).values_list('student_id', flat=True).distinct()
+    assigned_students_count = len(assigned_student_ids)
+    
+    # 総学生数と未配置学生数を計算
+    total_students = lesson_session.classroom.students.count()
+    unassigned_students = total_students - assigned_students_count
+    
     context = {
         'lesson_session': lesson_session,
         'group_stats': group_stats,
-        'total_students': lesson_session.classroom.students.count(),
-        'assigned_students': sum(stat['member_count'] for stat in group_stats),
+        'total_students': total_students,
+        'assigned_students': assigned_students_count,
+        'unassigned_students': unassigned_students,
     }
     return render(request, 'school_management/group_list.html', context)
 
@@ -1399,7 +1410,12 @@ def group_management(request, session_id):
     """グループマスタ編集"""
     lesson_session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
     students = lesson_session.classroom.students.all()
-    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student')
+    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student').order_by('group_number')
+    
+    # 最大グループ番号を計算
+    max_group_number = 0
+    if groups.exists():
+        max_group_number = groups.aggregate(Max('group_number'))['group_number__max'] or 0
     
     if request.method == 'POST':
         # デバッグ用：送信されたPOSTデータを確認
@@ -1447,6 +1463,7 @@ def group_management(request, session_id):
         'lesson_session': lesson_session,
         'students': students,
         'groups': groups,
+        'max_group_number': max_group_number,
     }
     return render(request, 'school_management/group_management.html', context)
 
@@ -1461,15 +1478,23 @@ def group_edit_view(request, session_id, group_id):
     )
     
     if request.method == 'POST':
-        # グループ名の更新
-        group_name = request.POST.get('group_name', '').strip()
-        group.group_name = group_name if group_name else f'グループ{group.group_number}'
-        group.save()
+        # グループ名の更新（メンバー関連の操作以外の場合のみ）
+        if 'action' not in request.POST:
+            # グループ名保存フォームの場合
+            group_name = request.POST.get('group_name', '').strip()
+            if group_name:
+                group.group_name = group_name
+            else:
+                # 空の場合はデフォルト名に戻す
+                group.group_name = f'グループ{group.group_number}'
+            group.save()
+            messages.success(request, 'グループ名を保存しました。')
         
         # メンバーの更新
         if 'action' in request.POST:
             action = request.POST.get('action')
             
+            # メンバー関連の操作の場合はグループ名を更新しない
             if action == 'add_member':
                 student_id = request.POST.get('student_id')
                 role = request.POST.get('role', '')
@@ -1484,6 +1509,33 @@ def group_edit_view(request, session_id, group_id):
                         messages.success(request, f'{student.full_name}さんをグループに追加しました。')
                     except CustomUser.DoesNotExist:
                         messages.error(request, '学生が見つかりません。')
+            
+            elif action == 'add_members':
+                # 複数のメンバーを一括追加
+                selected_student_ids = request.POST.getlist('selected_students')
+                default_role = request.POST.get('default_role', '')
+                if selected_student_ids:
+                    added_count = 0
+                    for student_id in selected_student_ids:
+                        try:
+                            student = CustomUser.objects.get(id=student_id, role='student')
+                            # 既にメンバーに含まれていないかチェック
+                            if not GroupMember.objects.filter(group=group, student=student).exists():
+                                GroupMember.objects.create(
+                                    group=group,
+                                    student=student,
+                                    role=default_role
+                                )
+                                added_count += 1
+                        except CustomUser.DoesNotExist:
+                            continue
+                    
+                    if added_count > 0:
+                        messages.success(request, f'{added_count}名の学生をグループに追加しました。')
+                    else:
+                        messages.warning(request, '追加された学生はいませんでした。')
+                else:
+                    messages.warning(request, '追加する学生を選択してください。')
             
             elif action == 'remove_member':
                 member_id = request.POST.get('member_id')
@@ -1517,6 +1569,38 @@ def group_edit_view(request, session_id, group_id):
         'available_students': available_students,
     }
     return render(request, 'school_management/group_edit.html', context)
+
+@login_required
+def group_add_view(request, session_id):
+    """グループを追加（既存のグループを保持したまま）"""
+    lesson_session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
+    
+    if request.method == 'POST':
+        # 既存のグループ番号の最大値を取得
+        existing_groups = Group.objects.filter(lesson_session=lesson_session)
+        if existing_groups.exists():
+            max_group_number = existing_groups.aggregate(Max('group_number'))['group_number__max']
+            new_group_number = max_group_number + 1
+        else:
+            new_group_number = 1
+        
+        # グループ名を取得
+        group_name = request.POST.get('group_name', '').strip()
+        
+        # 新しいグループを作成
+        new_group = Group.objects.create(
+            lesson_session=lesson_session,
+            group_number=new_group_number,
+            group_name=group_name if group_name else f'グループ{new_group_number}'
+        )
+        
+        messages.success(request, f'グループ「{new_group.display_name}」を追加しました。')
+        return redirect('school_management:group_list', session_id=session_id)
+    
+    context = {
+        'lesson_session': lesson_session,
+    }
+    return render(request, 'school_management/group_add.html', context)
 
 @login_required
 def group_delete_view(request, session_id, group_id):

@@ -21,8 +21,11 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-users me-2"></i>グループ一覧</h5>
                 <div>
+                    <a href="{% url 'school_management:group_add' lesson_session.id %}" class="btn btn-success">
+                        <i class="fas fa-plus me-1"></i>グループを追加
+                    </a>
                     <a href="{% url 'school_management:group_management' lesson_session.id %}" class="btn btn-primary">
-                        <i class="fas fa-plus me-1"></i>グループを作成
+                        <i class="fas fa-users me-1"></i>グループ編成
                     </a>
                     <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left me-1"></i>授業回に戻る
@@ -69,7 +72,7 @@
                     <div class="col-md-3">
                         <div class="card text-center">
                             <div class="card-body">
-                                <h4 class="text-warning">{{ total_students|add:"-"|add:assigned_students|add:"0" }}</h4>
+                                <h4 class="text-warning">{{ unassigned_students }}</h4>
                                 <small class="text-muted">未配置学生</small>
                             </div>
                         </div>
@@ -147,7 +150,7 @@
 </div>
 
 <!-- 未配置学生の表示 -->
-{% if total_students > assigned_students %}
+{% if unassigned_students > 0 %}
 <div class="row mt-4">
     <div class="col-12">
         <div class="card">
@@ -157,7 +160,7 @@
             <div class="card-body">
                 <div class="alert alert-warning">
                     <i class="fas fa-info-circle me-2"></i>
-                    {{ total_students|add:"-"|add:assigned_students|add:"0" }}名の学生がまだグループに配置されていません。
+                    {{ unassigned_students }}名の学生がまだグループに配置されていません。
                     <a href="{% url 'school_management:group_management' lesson_session.id %}" class="alert-link">
                         グループ編成ページで配置してください。
                     </a>

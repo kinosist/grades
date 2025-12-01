@@ -10,6 +10,12 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-users me-2"></i>グループ編成</h5>
                 <div>
+                    <a href="{% url 'school_management:group_add' lesson_session.id %}" class="btn btn-success btn-sm me-2">
+                        <i class="fas fa-plus me-1"></i>グループを追加
+                    </a>
+                    <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-info btn-sm me-2">
+                        <i class="fas fa-list me-1"></i>グループ一覧
+                    </a>
                     <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}" class="btn btn-outline-secondary btn-sm">
                         <i class="fas fa-arrow-left me-1"></i>授業回に戻る
                     </a>
@@ -22,20 +28,39 @@
                     ({{ lesson_session.date|date:"Y年m月d日" }})
                 </div>
 
+                {% if groups %}
+                <div class="alert alert-warning mb-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>注意：</strong>このページでグループ編成を保存すると、既存のグループ編成が全て削除され、新しく作成されます。
+                    既存のグループを保持したまま新しいグループを追加したい場合は、<a href="{% url 'school_management:group_add' lesson_session.id %}" class="alert-link">「グループを追加」</a>ボタンを使用してください。
+                </div>
+                {% endif %}
+
                 <form method="post" id="groupForm">
                     {% csrf_token %}
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="group_count" class="form-label">グループ数</label>
                             <select class="form-control" id="group_count" name="group_count" onchange="updateGroups()">
-                                <option value="2">2グループ</option>
-                                <option value="3">3グループ</option>
-                                <option value="4" selected>4グループ</option>
-                                <option value="5">5グループ</option>
-                                <option value="6">6グループ</option>
-                                <option value="7">7グループ</option>
-                                <option value="8">8グループ</option>
+                                {% if groups %}
+                                    {% for group in groups %}
+                                        <option value="{{ group.group_number }}" {% if forloop.last %}selected{% endif %}>{{ group.group_number }}グループ</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="2">2グループ</option>
+                                    <option value="3">3グループ</option>
+                                    <option value="4" selected>4グループ</option>
+                                    <option value="5">5グループ</option>
+                                    <option value="6">6グループ</option>
+                                    <option value="7">7グループ</option>
+                                    <option value="8">8グループ</option>
+                                {% endif %}
                             </select>
+                            {% if groups %}
+                                <div class="form-text text-info">
+                                    <i class="fas fa-info-circle me-1"></i>既存のグループ数: {{ groups|length }}グループ
+                                </div>
+                            {% endif %}
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">学生数</label>
@@ -326,25 +351,55 @@ function balanceGroups() {
 
 // 初期化
 document.addEventListener('DOMContentLoaded', function() {
+    {% if groups %}
+        // 既存のグループがある場合、グループ数を設定
+        const maxGroupNumber = {{ max_group_number|default:0 }};
+        const groupCountSelect = document.getElementById('group_count');
+        
+        // 既存のグループ数に合わせて選択肢を設定
+        if (maxGroupNumber > 0) {
+            // 既存の選択肢をクリア
+            groupCountSelect.innerHTML = '';
+            
+            // 最大グループ番号まで選択肢を追加（最低8まで）
+            for (let i = 1; i <= Math.max(maxGroupNumber, 8); i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `${i}グループ`;
+                if (i === maxGroupNumber) {
+                    option.selected = true;
+                }
+                groupCountSelect.appendChild(option);
+            }
+        }
+    {% endif %}
+    
+    // グループを更新
     updateGroups();
     
     {% if groups %}
         // 既存のグループ編成を復元
         {% for group in groups %}
             // グループ名を設定
+            const groupNameInput_{{ group.group_number }} = document.querySelector(`input[name="group_{{ group.group_number }}_name"]`);
             {% if group.group_name %}
-                const groupNameInput = document.querySelector(`input[name="group_{{ group.group_number }}_name"]`);
-                if (groupNameInput) {
-                    groupNameInput.value = "{{ group.group_name }}";
+                if (groupNameInput_{{ group.group_number }}) {
+                    groupNameInput_{{ group.group_number }}.value = "{{ group.group_name|escapejs }}";
                 }
             {% endif %}
             
+            // メンバーを追加
             {% for member in group.groupmember_set.all %}
-                addMemberToGroup({{ group.group_number }}, "{{ member.student.student_number }}", "{{ member.student.full_name }}");
-                // 役割も設定
-                {% if member.role %}
-                    document.querySelector(`input[name="group_{{ group.group_number }}_role_{{ forloop.counter0 }}"]`).value = "{{ member.role }}";
-                {% endif %}
+                addMemberToGroup({{ group.group_number }}, "{{ member.student.student_number }}", "{{ member.student.full_name|escapejs }}");
+                // 役割も設定（少し遅延させて確実に設定）
+                setTimeout(function() {
+                    const roleInput = document.querySelector(`input[name="group_{{ group.group_number }}_role_{{ forloop.counter0 }}"]`);
+                    {% if member.role %}
+                        if (roleInput) {
+                            roleInput.value = "{{ member.role|escapejs }}";
+                        }
+                    {% endif %}
+                }, 100);
             {% endfor %}
         {% endfor %}
         

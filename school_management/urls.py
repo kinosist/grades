@@ -58,6 +58,7 @@ urlpatterns = [
     # グループ管理
     path('lesson-sessions/<int:session_id>/groups/', views.group_list_view, name='group_list'),
     path('lesson-sessions/<int:session_id>/groups/create/', views.group_management, name='group_management'),
+    path('lesson-sessions/<int:session_id>/groups/add/', views.group_add_view, name='group_add'),
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/', views.group_detail_view, name='group_detail'),
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/edit/', views.group_edit_view, name='group_edit'),
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/delete/', views.group_delete_view, name='group_delete'),

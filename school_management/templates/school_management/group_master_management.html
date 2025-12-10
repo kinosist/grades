@@ -37,9 +37,11 @@
                         <div class="col-md-6">
                             <label for="group_count" class="form-label">グループ数</label>
                             <select class="form-control" id="group_count" name="group_count" onchange="updateGroups()">
-                                {% if groups %}
-                                    {% for group in groups %}
-                                        <option value="{{ group.group_number }}" {% if forloop.last %}selected{% endif %}>{{ group.group_number }}グループ</option>
+                                {% if group_masters %}
+                                    {% for i in "12345678" %}
+                                        <option value="{{ forloop.counter }}" {% if forloop.counter == max_group_number %}selected{% endif %}>
+                                            {{ forloop.counter }}グループ
+                                        </option>
                                     {% endfor %}
                                 {% else %}
                                     <option value="2">2グループ</option>
@@ -51,9 +53,9 @@
                                     <option value="8">8グループ</option>
                                 {% endif %}
                             </select>
-                            {% if groups %}
+                            {% if group_masters %}
                                 <div class="form-text text-info">
-                                    <i class="fas fa-info-circle me-1"></i>既存のグループ数: {{ groups|length }}グループ
+                                    <i class="fas fa-info-circle me-1"></i>既存のグループ数: {{ group_masters|length }}グループ（編集フォームに自動読み込み）
                                 </div>
                             {% endif %}
                         </div>
@@ -71,10 +73,13 @@
 
                     <div class="d-flex justify-content-between mt-4">
                         <div>
-                            <button type="button" class="btn btn-outline-info" onclick="shuffleMembers()">
+                            <button type="button" class="btn btn-success btn-sm" onclick="addNewGroup()">
+                                <i class="fas fa-plus me-1"></i>グループ追加
+                            </button>
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="shuffleMembers()">
                                 <i class="fas fa-random me-1"></i>ランダム配置
                             </button>
-                            <button type="button" class="btn btn-outline-warning" onclick="clearAll()">
+                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearAll()">
                                 <i class="fas fa-eraser me-1"></i>全クリア
                             </button>
                         </div>
@@ -149,8 +154,51 @@ function updateGroups() {
     const groupCount = parseInt(document.getElementById('group_count').value);
     const container = document.getElementById('groupsContainer');
     
+    // 既存のグループ情報を保存
+    const existingGroupsData = {};
+    const groupCountOld = container.querySelectorAll('.card').length || 0;
+    
+    // 既存のグループからメンバー情報を取得
+    for (let i = 1; i <= Math.max(groupCountOld, 20); i++) {
+        const membersDiv = document.getElementById(`group_${i}_members`);
+        if (membersDiv) {
+            const groupNameInput = document.querySelector(`input[name="group_${i}_name"]`);
+            const groupName = groupNameInput ? groupNameInput.value : '';
+            const members = [];
+            
+            // メンバー情報を取得
+            membersDiv.querySelectorAll('.member-item').forEach((memberItem, index) => {
+                const studentIdInput = memberItem.querySelector(`input[name="group_${i}_member_${index}"]`);
+                const roleInput = memberItem.querySelector(`input[name="group_${i}_role_${index}"]`);
+                const nameElement = memberItem.querySelector('strong');
+                
+                if (studentIdInput && nameElement) {
+                    const studentId = studentIdInput.value;
+                    const studentName = nameElement.textContent.trim();
+                    const role = roleInput ? roleInput.value : '';
+                    members.push({ studentId, studentName, role });
+                }
+            });
+            
+            if (members.length > 0 || groupName) {
+                existingGroupsData[i] = { groupName, members };
+            }
+        }
+    }
+    
+    // グループ数が減った場合、削除されるグループのメンバーを学生プールに戻す
+    for (let i = groupCount + 1; i <= groupCountOld; i++) {
+        if (existingGroupsData[i]) {
+            existingGroupsData[i].members.forEach(member => {
+                restoreStudentToPool(member.studentId, member.studentName);
+            });
+        }
+    }
+    
+    // コンテナを完全にクリア
     container.innerHTML = '';
     
+    // 新しいグループ構造を作成
     for (let i = 1; i <= groupCount; i++) {
         const groupDiv = document.createElement('div');
         groupDiv.className = 'card mb-3';
@@ -165,6 +213,9 @@ function updateGroups() {
                            placeholder="グループ名（任意）"
                            style="background-color: rgba(255,255,255,0.1) !important;">
                 </div>
+                <button type="button" class="btn btn-sm btn-outline-light ms-2" onclick="removeGroup(${i})" title="グループを削除">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             <div class="card-body group-drop-zone" 
                  ondrop="drop(event)" 
@@ -181,6 +232,28 @@ function updateGroups() {
         `;
         container.appendChild(groupDiv);
     }
+    
+    // 既存のグループ情報を復元
+    for (let i = 1; i <= groupCount; i++) {
+        if (existingGroupsData[i]) {
+            const groupData = existingGroupsData[i];
+            const groupNameInput = document.querySelector(`input[name="group_${i}_name"]`);
+            if (groupNameInput && groupData.groupName) {
+                groupNameInput.value = groupData.groupName;
+            }
+            
+            // メンバーを追加
+            groupData.members.forEach(member => {
+                addMemberToGroup(i, member.studentId, member.studentName, member.role);
+            });
+        }
+    }
+    
+    // 学生プールを更新
+    updateStudentPool();
+    
+    // グループ数選択肢を更新
+    updateGroupCountSelect();
 }
 
 function allowDrop(ev) {
@@ -198,6 +271,26 @@ function drop(ev) {
     const studentName = ev.dataTransfer.getData("studentName");
     const groupNum = ev.target.closest('.group-drop-zone').dataset.group;
     
+    // 既に他のグループに配置されている場合は削除
+    const groupCount = parseInt(document.getElementById('group_count').value) || 20;
+    for (let i = 1; i <= groupCount; i++) {
+        const membersDiv = document.getElementById(`group_${i}_members`);
+        if (membersDiv) {
+            membersDiv.querySelectorAll('.member-item').forEach(item => {
+                const hiddenInput = item.querySelector(`input[name^="group_${i}_member"]`);
+                if (hiddenInput && hiddenInput.value === studentId) {
+                    item.remove();
+                    // プレースホルダーを表示
+                    const placeholder = document.getElementById(`group_${i}_placeholder`);
+                    const remainingMembers = membersDiv.querySelectorAll('.member-item').length;
+                    if (remainingMembers === 0 && placeholder) {
+                        placeholder.style.display = 'block';
+                    }
+                }
+            });
+        }
+    }
+    
     // 学生を元の場所から削除
     const originalElement = document.querySelector(`[data-student-id="${studentId}"]`);
     if (originalElement) {
@@ -208,7 +301,7 @@ function drop(ev) {
     addMemberToGroup(groupNum, studentId, studentName);
 }
 
-function addMemberToGroup(groupNum, studentId, studentName) {
+function addMemberToGroup(groupNum, studentId, studentName, role = '') {
     const membersDiv = document.getElementById(`group_${groupNum}_members`);
     const placeholder = document.getElementById(`group_${groupNum}_placeholder`);
     
@@ -225,7 +318,8 @@ function addMemberToGroup(groupNum, studentId, studentName) {
         <div class="ms-2" style="width: 120px;">
             <input type="text" class="form-control form-control-sm" 
                    name="group_${groupNum}_role_${memberIndex}" 
-                   placeholder="役割（任意）">
+                   placeholder="役割（任意）"
+                   value="${role}">
         </div>
         <button type="button" class="btn btn-outline-danger btn-sm ms-2" onclick="removeMember(this, '${studentId}', '${studentName}')">
             <i class="fas fa-times"></i>
@@ -240,11 +334,13 @@ function addMemberToGroup(groupNum, studentId, studentName) {
     }
 }
 
-function removeMember(button, studentId, studentName) {
-    // メンバーをグループから削除
-    button.parentElement.remove();
+function restoreStudentToPool(studentId, studentName) {
+    // 既に学生プールに存在するかチェック
+    const existing = document.querySelector(`[data-student-id="${studentId}"]`);
+    if (existing) {
+        return; // 既に存在する場合は追加しない
+    }
     
-    // 学生プールに戻す
     const studentPool = document.getElementById('studentPool');
     const studentDiv = document.createElement('div');
     studentDiv.className = 'student-item';
@@ -262,6 +358,14 @@ function removeMember(button, studentId, studentName) {
         </div>
     `;
     studentPool.appendChild(studentDiv);
+}
+
+function removeMember(button, studentId, studentName) {
+    // メンバーをグループから削除
+    button.parentElement.remove();
+    
+    // 学生プールに戻す
+    restoreStudentToPool(studentId, studentName);
     
     // プレースホルダーの表示/非表示を更新
     const groupNum = button.closest('.group-drop-zone').dataset.group;
@@ -273,31 +377,43 @@ function removeMember(button, studentId, studentName) {
     }
 }
 
-function shuffleMembers() {
-    if (confirm('現在のグループ編成をクリアして、ランダムに配置しますか？')) {
-        clearAll();
-        
-        const shuffledStudents = [...students].sort(() => Math.random() - 0.5);
-        const groupCount = parseInt(document.getElementById('group_count').value);
-        
-        shuffledStudents.forEach((student, index) => {
-            const groupNum = (index % groupCount) + 1;
-            addMemberToGroup(groupNum, student.id, student.name);
-        });
-        
-        // 学生プールをクリア
-        document.getElementById('studentPool').innerHTML = '';
+function updateStudentPool() {
+    // 全てのグループに配置されている学生IDを取得
+    const assignedStudentIds = new Set();
+    const groupCount = parseInt(document.getElementById('group_count').value) || 20;
+    
+    for (let i = 1; i <= groupCount; i++) {
+        const membersDiv = document.getElementById(`group_${i}_members`);
+        if (membersDiv) {
+            membersDiv.querySelectorAll('input[name^="group_' + i + '_member"]').forEach(input => {
+                assignedStudentIds.add(input.value);
+            });
+        }
     }
+    
+    // 学生プールを再構築
+    const studentPool = document.getElementById('studentPool');
+    studentPool.innerHTML = '';
+    
+    students.forEach(student => {
+        // グループに配置されていない学生のみ表示
+        if (!assignedStudentIds.has(student.id)) {
+            restoreStudentToPool(student.id, student.name);
+        }
+    });
 }
 
-function clearAll() {
-    // 全てのグループをクリア
+function shuffleMembers() {
+    // 全てのグループをクリア（確認ダイアログなし）
     const groupCount = parseInt(document.getElementById('group_count').value);
     for (let i = 1; i <= groupCount; i++) {
         const membersDiv = document.getElementById(`group_${i}_members`);
         if (membersDiv) {
             membersDiv.innerHTML = '';
-            document.getElementById(`group_${i}_placeholder`).style.display = 'block';
+            const placeholder = document.getElementById(`group_${i}_placeholder`);
+            if (placeholder) {
+                placeholder.style.display = 'block';
+            }
         }
     }
     
@@ -306,30 +422,69 @@ function clearAll() {
     studentPool.innerHTML = '';
     
     students.forEach(student => {
-        const studentDiv = document.createElement('div');
-        studentDiv.className = 'student-item';
-        studentDiv.dataset.studentId = student.id;
-        studentDiv.dataset.studentName = student.name;
-        studentDiv.draggable = true;
-        studentDiv.ondragstart = drag;
-        studentDiv.innerHTML = `
-            <div class="d-flex align-items-center p-2 border rounded mb-2 bg-light">
-                <i class="fas fa-grip-vertical me-2 text-muted"></i>
-                <div>
-                    <strong>${student.name}</strong><br>
-                    <small class="text-muted">${student.id}</small>
-                </div>
-            </div>
-        `;
-        studentPool.appendChild(studentDiv);
+        restoreStudentToPool(student.id, student.name);
     });
+    
+    // ランダムに配置
+    const shuffledStudents = [...students].sort(() => Math.random() - 0.5);
+    
+    shuffledStudents.forEach((student, index) => {
+        const groupNum = (index % groupCount) + 1;
+        addMemberToGroup(groupNum, student.id, student.name);
+    });
+    
+    // 学生プールをクリア
+    document.getElementById('studentPool').innerHTML = '';
+}
+
+function clearAll() {
+    if (confirm('全てのグループ編成をクリアしますか？全てのメンバーが学生プールに戻されます。')) {
+        // 全てのグループをクリア
+        const groupCount = parseInt(document.getElementById('group_count').value);
+        for (let i = 1; i <= groupCount; i++) {
+            const membersDiv = document.getElementById(`group_${i}_members`);
+            if (membersDiv) {
+                membersDiv.innerHTML = '';
+                const placeholder = document.getElementById(`group_${i}_placeholder`);
+                if (placeholder) {
+                    placeholder.style.display = 'block';
+                }
+            }
+        }
+        
+        // 学生プールを復元
+        const studentPool = document.getElementById('studentPool');
+        studentPool.innerHTML = '';
+        
+        students.forEach(student => {
+            restoreStudentToPool(student.id, student.name);
+        });
+    }
 }
 
 function balanceGroups() {
     if (confirm('人数を均等に配置しますか？')) {
-        clearAll();
-        
+        // 全てのグループをクリア（確認ダイアログなし）
         const groupCount = parseInt(document.getElementById('group_count').value);
+        for (let i = 1; i <= groupCount; i++) {
+            const membersDiv = document.getElementById(`group_${i}_members`);
+            if (membersDiv) {
+                membersDiv.innerHTML = '';
+                const placeholder = document.getElementById(`group_${i}_placeholder`);
+                if (placeholder) {
+                    placeholder.style.display = 'block';
+                }
+            }
+        }
+        
+        // 学生プールを復元
+        const studentPool = document.getElementById('studentPool');
+        studentPool.innerHTML = '';
+        
+        students.forEach(student => {
+            restoreStudentToPool(student.id, student.name);
+        });
+        
         const studentsPerGroup = Math.ceil(students.length / groupCount);
         
         students.forEach((student, index) => {
@@ -344,10 +499,173 @@ function balanceGroups() {
     }
 }
 
+function addNewGroup() {
+    const container = document.getElementById('groupsContainer');
+    const existingGroups = container.querySelectorAll('.card').length;
+    const newGroupNumber = existingGroups + 1;
+    
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'card mb-3';
+    groupDiv.innerHTML = `
+        <div class="card-header bg-primary text-white d-flex align-items-center">
+            <div class="flex-grow-1">
+                <h6 class="mb-0"><i class="fas fa-users me-2"></i>グループ ${newGroupNumber}</h6>
+            </div>
+            <div class="ms-3" style="width: 200px;">
+                <input type="text" class="form-control form-control-sm text-white bg-transparent border-light" 
+                       name="group_${newGroupNumber}_name" 
+                       placeholder="グループ名（任意）"
+                       style="background-color: rgba(255,255,255,0.1) !important;">
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-light ms-2" onclick="removeGroup(${newGroupNumber})" title="グループを削除">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="card-body group-drop-zone" 
+             ondrop="drop(event)" 
+             ondragover="allowDrop(event)" 
+             data-group="${newGroupNumber}">
+            <div id="group_${newGroupNumber}_members" class="group-members">
+                <!-- メンバーがここに追加されます -->
+            </div>
+            <div class="text-center text-muted p-3" id="group_${newGroupNumber}_placeholder">
+                <i class="fas fa-user-plus fa-2x mb-2"></i>
+                <p class="mb-0">学生をここにドロップしてください</p>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(groupDiv);
+    updateGroupCountSelect();
+}
+
+function removeGroup(groupNumber) {
+    if (confirm('このグループを削除しますか？グループ内のメンバーは学生プールに戻されます。')) {
+        const container = document.getElementById('groupsContainer');
+        const groupCard = container.querySelector(`[data-group="${groupNumber}"]`)?.closest('.card');
+        
+        if (!groupCard) return;
+        
+        // グループ内のメンバーを学生プールに戻す
+        const membersDiv = document.getElementById(`group_${groupNumber}_members`);
+        if (membersDiv) {
+            membersDiv.querySelectorAll('.member-item').forEach(memberItem => {
+                const hiddenInput = memberItem.querySelector(`input[name^="group_${groupNumber}_member"]`);
+                const nameElement = memberItem.querySelector('strong');
+                if (hiddenInput && nameElement) {
+                    const studentId = hiddenInput.value;
+                    const studentName = nameElement.textContent.trim();
+                    restoreStudentToPool(studentId, studentName);
+                }
+            });
+        }
+        
+        // グループを削除
+        groupCard.remove();
+        
+        // グループ番号を再計算して更新
+        renumberGroups();
+        updateGroupCountSelect();
+    }
+}
+
+function renumberGroups() {
+    const container = document.getElementById('groupsContainer');
+    const groups = container.querySelectorAll('.card');
+    
+    groups.forEach((groupCard, index) => {
+        const newGroupNumber = index + 1;
+        const dropZone = groupCard.querySelector('.group-drop-zone');
+        const membersDiv = dropZone.querySelector('.group-members');
+        const placeholder = dropZone.querySelector(`[id^="group_"]`);
+        const headerTitle = groupCard.querySelector('h6');
+        const nameInput = groupCard.querySelector('input[name^="group_"]');
+        const removeButton = groupCard.querySelector('button[onclick^="removeGroup"]');
+        
+        // データ属性を更新
+        dropZone.dataset.group = newGroupNumber;
+        
+        // ヘッダータイトルを更新
+        if (headerTitle) {
+            headerTitle.innerHTML = `<i class="fas fa-users me-2"></i>グループ ${newGroupNumber}`;
+        }
+        
+        // グループ名入力のname属性を更新
+        if (nameInput) {
+            nameInput.name = `group_${newGroupNumber}_name`;
+        }
+        
+        // 削除ボタンのonclick属性を更新
+        if (removeButton) {
+            removeButton.onclick = () => removeGroup(newGroupNumber);
+        }
+        
+        // メンバーのhidden inputのname属性を更新
+        if (membersDiv) {
+            membersDiv.id = `group_${newGroupNumber}_members`;
+            membersDiv.querySelectorAll('input[name^="group_"]').forEach((input, memberIndex) => {
+                if (input.name.includes('_member_')) {
+                    input.name = `group_${newGroupNumber}_member_${memberIndex}`;
+                } else if (input.name.includes('_role_')) {
+                    input.name = `group_${newGroupNumber}_role_${memberIndex}`;
+                }
+            });
+        }
+        
+        // プレースホルダーのIDを更新
+        if (placeholder) {
+            placeholder.id = `group_${newGroupNumber}_placeholder`;
+        }
+    });
+}
+
+function updateGroupCountSelect() {
+    const container = document.getElementById('groupsContainer');
+    const currentGroupCount = container.querySelectorAll('.card').length;
+    const groupCountSelect = document.getElementById('group_count');
+    const currentValue = parseInt(groupCountSelect.value) || 0;
+    
+    // 現在のグループ数が最大値を超えている場合は選択肢を更新
+    const maxOption = Math.max(...Array.from(groupCountSelect.options).map(opt => parseInt(opt.value)));
+    
+    if (currentGroupCount > maxOption) {
+        // 新しい選択肢を追加
+        for (let i = maxOption + 1; i <= currentGroupCount; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `${i}グループ`;
+                groupCountSelect.appendChild(option);
+            }
+        }
+    
+    // 現在のグループ数に合わせて選択
+    groupCountSelect.value = currentGroupCount;
+}
+
+// 既存グループデータを保持
+const existingGroups = {
+    {% if group_masters %}
+        {% for group_master in group_masters %}
+        {{ group_master.group_number }}: {
+            name: "{{ group_master.group_name|escapejs|default:'' }}",
+            members: [
+                {% for member in group_master.members.all %}
+                {
+                    id: "{{ member.student.student_number }}",
+                    name: "{{ member.student.full_name|escapejs }}",
+                    role: "{{ member.role|escapejs|default:'' }}"
+                }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ]
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    {% endif %}
+};
+    
 // 初期化
 document.addEventListener('DOMContentLoaded', function() {
     {% if group_masters %}
-        // 既存のグループマスタがある場合、グループ数を設定
+        // 既存のグループがある場合、グループ数を設定
         const maxGroupNumber = {{ max_group_number|default:0 }};
         const groupCountSelect = document.getElementById('group_count');
         
@@ -366,45 +684,78 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 groupCountSelect.appendChild(option);
             }
-        }
-    {% endif %}
-    
-    // グループを更新
-    updateGroups();
-    
-    {% if group_masters %}
-        // 既存のグループマスタ編成を復元
-        {% for group_master in group_masters %}
-            // グループ名を設定
-            const groupNameInput_{{ group_master.group_number }} = document.querySelector(`input[name="group_{{ group_master.group_number }}_name"]`);
-            {% if group_master.group_name %}
-                if (groupNameInput_{{ group_master.group_number }}) {
-                    groupNameInput_{{ group_master.group_number }}.value = "{{ group_master.group_name|escapejs }}";
-                }
-            {% endif %}
             
-            // メンバーを追加
-            {% for member in group_master.members.all %}
-                addMemberToGroup({{ group_master.group_number }}, "{{ member.student.student_number }}", "{{ member.student.full_name|escapejs }}");
-                // 役割も設定（少し遅延させて確実に設定）
-                setTimeout(function() {
-                    const roleInput = document.querySelector(`input[name="group_{{ group_master.group_number }}_role_{{ forloop.counter0 }}"]`);
-                    {% if member.role %}
-                        if (roleInput) {
-                            roleInput.value = "{{ member.role|escapejs }}";
-                        }
-                    {% endif %}
-                }, 100);
+            // 既存のグループを構築（updateGroupsではなく直接構築）
+            const container = document.getElementById('groupsContainer');
+            container.innerHTML = '';
+            
+            // 既存のグループ構造を作成
+            {% for group_master in group_masters %}
+            (function() {
+                const groupNum = {{ group_master.group_number }};
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'card mb-3';
+                groupDiv.innerHTML = `
+                    <div class="card-header bg-primary text-white d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0"><i class="fas fa-users me-2"></i>グループ ${groupNum}</h6>
+                        </div>
+                        <div class="ms-3" style="width: 200px;">
+                            <input type="text" class="form-control form-control-sm text-white bg-transparent border-light" 
+                                   name="group_${groupNum}_name" 
+                                   placeholder="グループ名（任意）"
+                                   style="background-color: rgba(255,255,255,0.1) !important;"
+                                   value="{{ group_master.group_name|escapejs|default:'' }}">
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-light ms-2" onclick="removeGroup(${groupNum})" title="グループを削除">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="card-body group-drop-zone" 
+                         ondrop="drop(event)" 
+                         ondragover="allowDrop(event)" 
+                         data-group="${groupNum}">
+                        <div id="group_${groupNum}_members" class="group-members">
+                            <!-- メンバーがここに追加されます -->
+                        </div>
+                        <div class="text-center text-muted p-3" id="group_${groupNum}_placeholder">
+                            <i class="fas fa-user-plus fa-2x mb-2"></i>
+                            <p class="mb-0">学生をここにドロップしてください</p>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(groupDiv);
+            })();
             {% endfor %}
-        {% endfor %}
-        
-        // 既に配置されている学生を学生プールから削除
-        {% for group_master in group_masters %}
-            {% for member in group_master.members.all %}
-                const element = document.querySelector(`[data-student-id="{{ member.student.student_number }}"]`);
-                if (element) element.remove();
+            
+            // メンバーを追加（役割も一緒に設定）
+            {% for group_master in group_masters %}
+                {% for member in group_master.members.all %}
+                    addMemberToGroup({{ group_master.group_number }}, "{{ member.student.student_number }}", "{{ member.student.full_name|escapejs }}", "{{ member.role|escapejs|default:'' }}");
+                {% endfor %}
             {% endfor %}
-        {% endfor %}
+            
+            // 既に配置されている学生を学生プールから削除
+            {% for group_master in group_masters %}
+                {% for member in group_master.members.all %}
+                    const element_{{ member.student.student_number }} = document.querySelector(`[data-student-id="{{ member.student.student_number }}"]`);
+                    if (element_{{ member.student.student_number }}) {
+                        element_{{ member.student.student_number }}.remove();
+                    }
+                {% endfor %}
+            {% endfor %}
+            
+            // グループ数選択肢を更新
+            updateGroupCountSelect();
+        } else {
+            // 既存のグループがない場合は通常通りupdateGroups()を呼ぶ
+            updateGroups();
+            updateGroupCountSelect();
+        }
+    {% else %}
+        // 既存のグループがない場合
+        updateGroups();
+        updateGroupCountSelect();
     {% endif %}
 });
 </script>

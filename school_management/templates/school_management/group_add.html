@@ -1,0 +1,71 @@
+{% extends 'school_management/base.html' %}
+
+{% block title %}グループを追加 - 第{{ lesson_session.session_number }}回{% endblock %}
+{% block page_title %}グループを追加{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-plus me-2"></i>新しいグループを追加</h5>
+                <div>
+                    <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i>グループ一覧に戻る
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-3 p-3 bg-light rounded">
+                    <h6 class="text-primary mb-2"><i class="fas fa-info-circle me-2"></i>授業情報</h6>
+                    <strong>{{ lesson_session.classroom.class_name }}</strong> - 第{{ lesson_session.session_number }}回
+                    ({{ lesson_session.date|date:"Y年m月d日" }})
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="group_name" class="form-label">グループ名（任意）</label>
+                        <input type="text" class="form-control" id="group_name" name="group_name" 
+                               placeholder="例: チーム虎、開発班A">
+                        <div class="form-text">グループ名を入力しない場合、自動的に「グループ{番号}」が設定されます。</div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        新しいグループが追加されます。既存のグループは保持されます。
+                        グループ作成後、編集ページでメンバーを追加できます。
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>キャンセル
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>グループを追加
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- ヘルプ -->
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-lightbulb me-2"></i>グループ追加について</h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled small">
+                    <li><i class="fas fa-check text-success me-2"></i>既存のグループは保持されます</li>
+                    <li><i class="fas fa-check text-success me-2"></i>グループ作成後、編集ページでメンバーを追加できます</li>
+                    <li><i class="fas fa-check text-success me-2"></i>グループ名は後から変更可能です</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+

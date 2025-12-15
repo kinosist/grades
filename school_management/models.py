@@ -183,6 +183,47 @@ class GroupMember(models.Model):
         return f"{self.group} - {self.student.full_name}"
 
 
+class GroupMaster(models.Model):
+    """グループマスタ（クラスごとの固定グループ）"""
+    classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス', related_name='group_masters')
+    group_number = models.IntegerField(verbose_name='グループ番号')
+    group_name = models.CharField(max_length=100, blank=True, verbose_name='グループ名', help_text='例: チーム虎、開発班A、など')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'グループマスタ'
+        verbose_name_plural = 'グループマスタ'
+        unique_together = ['classroom', 'group_number']
+
+    def __str__(self):
+        if self.group_name:
+            return f"{self.classroom} {self.group_name}({self.group_number}グループ)"
+        return f"{self.classroom} グループ{self.group_number}"
+
+    @property
+    def display_name(self):
+        """表示用の名前を返す"""
+        if self.group_name:
+            return f"{self.group_name}"
+        return f"{self.group_number}グループ"
+
+
+class GroupMasterMember(models.Model):
+    """グループマスタメンバー"""
+    group_master = models.ForeignKey(GroupMaster, on_delete=models.CASCADE, verbose_name='グループマスタ', related_name='members')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name='学生', related_name='group_master_memberships')
+    role = models.CharField(max_length=50, blank=True, verbose_name='役割')
+
+    class Meta:
+        verbose_name = 'グループマスタメンバー'
+        verbose_name_plural = 'グループマスタメンバー'
+        unique_together = ['group_master', 'student']
+
+    def __str__(self):
+        return f"{self.group_master} - {self.student.full_name}"
+
+
 class Quiz(models.Model):
     """小テスト"""
     GRADING_METHOD_CHOICES = [

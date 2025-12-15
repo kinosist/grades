@@ -1,35 +1,28 @@
 {% extends 'school_management/base.html' %}
 
-{% block title %}グループ一覧 - 第{{ lesson_session.session_number }}回{% endblock %}
-{% block page_title %}グループ一覧{% endblock %}
+{% block title %}グループマスタ一覧 - {{ classroom.class_name }}{% endblock %}
+{% block page_title %}グループマスタ一覧{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5><i class="fas fa-users me-2"></i>グループ一覧</h5>
+                <h5><i class="fas fa-layer-group me-2"></i>グループマスタ一覧</h5>
                 <div>
-                    <a href="{% url 'school_management:group_master_copy' lesson_session.id %}" class="btn btn-info">
-                        <i class="fas fa-copy me-1"></i>マスタからコピー
+                    <a href="{% url 'school_management:group_master_management' classroom.id %}" class="btn btn-primary">
+                        <i class="fas fa-edit me-1"></i>グループマスタを編集
                     </a>
-                    <a href="{% url 'school_management:group_management' lesson_session.id %}" class="btn btn-primary">
-                        <i class="fas fa-users me-1"></i>グループ編成
-                    </a>
-                    <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left me-1"></i>授業回に戻る
+                    <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>クラスに戻る
                     </a>
                 </div>
             </div>
             <div class="card-body">
-                <!-- 授業情報 -->
+                <!-- クラス情報 -->
                 <div class="mb-4 p-3 bg-light rounded">
-                    <h6 class="text-primary mb-2"><i class="fas fa-info-circle me-2"></i>授業情報</h6>
-                    <strong>{{ lesson_session.classroom.class_name }}</strong> - 第{{ lesson_session.session_number }}回
-                    ({{ lesson_session.date|date:"Y年m月d日" }})
-                    {% if lesson_session.topic %}
-                        <br><small class="text-muted">{{ lesson_session.topic }}</small>
-                    {% endif %}
+                    <h6 class="text-primary mb-2"><i class="fas fa-info-circle me-2"></i>クラス情報</h6>
+                    <strong>{{ classroom.class_name }}</strong> - {{ classroom.year }}年 {{ classroom.get_semester_display }}
                 </div>
 
                 <!-- 統計情報 -->
@@ -69,13 +62,18 @@
                 </div>
 
                 {% if group_stats %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        グループマスタは、このクラスの固定グループ編成です。授業回を作成する際に、このマスタからグループをコピーできます。
+                    </div>
+                    
                     <div class="row">
                         {% for stat in group_stats %}
                         <div class="col-lg-4 col-md-6 mb-4">
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center">
                                     <h6 class="mb-0">
-                                        <i class="fas fa-users me-2"></i>{{ stat.group.display_name }}
+                                        <i class="fas fa-layer-group me-2"></i>{{ stat.group_master.display_name }}
                                     </h6>
                                     <span class="badge bg-primary">{{ stat.member_count }}名</span>
                                 </div>
@@ -108,11 +106,11 @@
                     </div>
                 {% else %}
                     <div class="text-center py-5">
-                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">グループがありません</h5>
-                        <p class="text-muted">まだグループが作成されていません。最初のグループを作成してください。</p>
-                        <a href="{% url 'school_management:group_management' lesson_session.id %}" class="btn btn-primary">
-                            <i class="fas fa-plus me-1"></i>グループを作成する
+                        <i class="fas fa-layer-group fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">グループマスタがありません</h5>
+                        <p class="text-muted">まだグループマスタが作成されていません。固定グループを設定する場合は、グループマスタを作成してください。</p>
+                        <a href="{% url 'school_management:group_master_management' classroom.id %}" class="btn btn-primary">
+                            <i class="fas fa-edit me-1"></i>グループマスタを作成する
                         </a>
                     </div>
                 {% endif %}
@@ -121,26 +119,5 @@
     </div>
 </div>
 
-<!-- 未配置学生の表示 -->
-{% if unassigned_students > 0 %}
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h6><i class="fas fa-exclamation-triangle me-2"></i>未配置学生</h6>
-            </div>
-            <div class="card-body">
-                <div class="alert alert-warning">
-                    <i class="fas fa-info-circle me-2"></i>
-                    {{ unassigned_students }}名の学生がまだグループに配置されていません。
-                    <a href="{% url 'school_management:group_management' lesson_session.id %}" class="alert-link">
-                        グループ編成ページで配置してください。
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
 {% endblock %}
+

@@ -1,31 +1,34 @@
 {% extends 'school_management/base.html' %}
 
-{% block title %}グループ編成 - 第{{ lesson_session.session_number }}回{% endblock %}
-{% block page_title %}グループ編成{% endblock %}
+{% block title %}グループマスタ編集 - {{ classroom.class_name }}{% endblock %}
+{% block page_title %}グループマスタ編集{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5><i class="fas fa-users me-2"></i>グループ編成</h5>
+                <h5><i class="fas fa-layer-group me-2"></i>グループマスタ編集</h5>
                 <div>
-                    <a href="{% url 'school_management:group_add' lesson_session.id %}" class="btn btn-success btn-sm me-2">
-                        <i class="fas fa-plus me-1"></i>グループを追加
+                    <a href="{% url 'school_management:group_master_list' classroom.id %}" class="btn btn-outline-info btn-sm me-2">
+                        <i class="fas fa-list me-1"></i>マスタ一覧
                     </a>
-                    <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-info btn-sm me-2">
-                        <i class="fas fa-list me-1"></i>グループ一覧
-                    </a>
-                    <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}" class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-arrow-left me-1"></i>授業回に戻る
+                    <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i>クラスに戻る
                     </a>
                 </div>
             </div>
             <div class="card-body">
                 <div class="mb-3 p-3 bg-light rounded">
-                    <h6 class="text-primary mb-2"><i class="fas fa-info-circle me-2"></i>授業情報</h6>
-                    <strong>{{ lesson_session.classroom.class_name }}</strong> - 第{{ lesson_session.session_number }}回
-                    ({{ lesson_session.date|date:"Y年m月d日" }})
+                    <h6 class="text-primary mb-2"><i class="fas fa-info-circle me-2"></i>クラス情報</h6>
+                    <strong>{{ classroom.class_name }}</strong> - {{ classroom.year }}年 {{ classroom.get_semester_display }}
+                </div>
+
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>グループマスタについて：</strong>グループマスタは、このクラスの固定グループ編成です。
+                    授業回を作成する際に、このマスタからグループをコピーできます。
+                    このページで保存すると、既存のグループマスタが全て削除され、新しく作成されます。
                 </div>
 
                 <form method="post" id="groupForm">
@@ -34,7 +37,7 @@
                         <div class="col-md-6">
                             <label for="group_count" class="form-label">グループ数</label>
                             <select class="form-control" id="group_count" name="group_count" onchange="updateGroups()">
-                                {% if groups %}
+                                {% if group_masters %}
                                     {% for i in "12345678" %}
                                         <option value="{{ forloop.counter }}" {% if forloop.counter == max_group_number %}selected{% endif %}>
                                             {{ forloop.counter }}グループ
@@ -50,9 +53,9 @@
                                     <option value="8">8グループ</option>
                                 {% endif %}
                             </select>
-                            {% if groups %}
+                            {% if group_masters %}
                                 <div class="form-text text-info">
-                                    <i class="fas fa-info-circle me-1"></i>既存のグループ数: {{ groups|length }}グループ
+                                    <i class="fas fa-info-circle me-1"></i>既存のグループ数: {{ group_masters|length }}グループ（編集フォームに自動読み込み）
                                 </div>
                             {% endif %}
                         </div>
@@ -81,7 +84,7 @@
                             </button>
                         </div>
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save me-1"></i>グループ編成を保存
+                            <i class="fas fa-save me-1"></i>グループマスタを保存
                         </button>
                     </div>
                 </form>
@@ -461,9 +464,27 @@ function clearAll() {
 
 function balanceGroups() {
     if (confirm('人数を均等に配置しますか？')) {
-        clearAll();
-        
+        // 全てのグループをクリア（確認ダイアログなし）
         const groupCount = parseInt(document.getElementById('group_count').value);
+        for (let i = 1; i <= groupCount; i++) {
+            const membersDiv = document.getElementById(`group_${i}_members`);
+            if (membersDiv) {
+                membersDiv.innerHTML = '';
+                const placeholder = document.getElementById(`group_${i}_placeholder`);
+                if (placeholder) {
+                    placeholder.style.display = 'block';
+                }
+            }
+        }
+        
+        // 学生プールを復元
+        const studentPool = document.getElementById('studentPool');
+        studentPool.innerHTML = '';
+        
+        students.forEach(student => {
+            restoreStudentToPool(student.id, student.name);
+        });
+        
         const studentsPerGroup = Math.ceil(students.length / groupCount);
         
         students.forEach((student, index) => {
@@ -610,12 +631,12 @@ function updateGroupCountSelect() {
     if (currentGroupCount > maxOption) {
         // 新しい選択肢を追加
         for (let i = maxOption + 1; i <= currentGroupCount; i++) {
-            const option = document.createElement('option');
-            option.value = i;
-            option.textContent = `${i}グループ`;
-            groupCountSelect.appendChild(option);
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `${i}グループ`;
+                groupCountSelect.appendChild(option);
+            }
         }
-    }
     
     // 現在のグループ数に合わせて選択
     groupCountSelect.value = currentGroupCount;
@@ -623,12 +644,12 @@ function updateGroupCountSelect() {
 
 // 既存グループデータを保持
 const existingGroups = {
-    {% if groups %}
-        {% for group in groups %}
-        {{ group.group_number }}: {
-            name: "{{ group.group_name|escapejs|default:'' }}",
+    {% if group_masters %}
+        {% for group_master in group_masters %}
+        {{ group_master.group_number }}: {
+            name: "{{ group_master.group_name|escapejs|default:'' }}",
             members: [
-                {% for member in group.groupmember_set.all %}
+                {% for member in group_master.members.all %}
                 {
                     id: "{{ member.student.student_number }}",
                     name: "{{ member.student.full_name|escapejs }}",
@@ -640,11 +661,11 @@ const existingGroups = {
         {% endfor %}
     {% endif %}
 };
-
+    
 // 初期化
 document.addEventListener('DOMContentLoaded', function() {
-    {% if groups %}
-        // 既存のグループがある場合
+    {% if group_masters %}
+        // 既存のグループがある場合、グループ数を設定
         const maxGroupNumber = {{ max_group_number|default:0 }};
         const groupCountSelect = document.getElementById('group_count');
         
@@ -669,9 +690,9 @@ document.addEventListener('DOMContentLoaded', function() {
             container.innerHTML = '';
             
             // 既存のグループ構造を作成
-            {% for group in groups %}
+            {% for group_master in group_masters %}
             (function() {
-                const groupNum = {{ group.group_number }};
+                const groupNum = {{ group_master.group_number }};
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'card mb-3';
                 groupDiv.innerHTML = `
@@ -684,7 +705,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                    name="group_${groupNum}_name" 
                                    placeholder="グループ名（任意）"
                                    style="background-color: rgba(255,255,255,0.1) !important;"
-                                   value="{{ group.group_name|escapejs|default:'' }}">
+                                   value="{{ group_master.group_name|escapejs|default:'' }}">
                         </div>
                         <button type="button" class="btn btn-sm btn-outline-light ms-2" onclick="removeGroup(${groupNum})" title="グループを削除">
                             <i class="fas fa-times"></i>
@@ -708,15 +729,15 @@ document.addEventListener('DOMContentLoaded', function() {
             {% endfor %}
             
             // メンバーを追加（役割も一緒に設定）
-            {% for group in groups %}
-                {% for member in group.groupmember_set.all %}
-                    addMemberToGroup({{ group.group_number }}, "{{ member.student.student_number }}", "{{ member.student.full_name|escapejs }}", "{{ member.role|escapejs|default:'' }}");
+            {% for group_master in group_masters %}
+                {% for member in group_master.members.all %}
+                    addMemberToGroup({{ group_master.group_number }}, "{{ member.student.student_number }}", "{{ member.student.full_name|escapejs }}", "{{ member.role|escapejs|default:'' }}");
                 {% endfor %}
             {% endfor %}
             
             // 既に配置されている学生を学生プールから削除
-            {% for group in groups %}
-                {% for member in group.groupmember_set.all %}
+            {% for group_master in group_masters %}
+                {% for member in group_master.members.all %}
                     const element_{{ member.student.student_number }} = document.querySelector(`[data-student-id="{{ member.student.student_number }}"]`);
                     if (element_{{ member.student.student_number }}) {
                         element_{{ member.student.student_number }}.remove();

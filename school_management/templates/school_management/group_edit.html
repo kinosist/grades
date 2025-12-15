@@ -4,17 +4,6 @@
 {% block page_title %}グループ編集{% endblock %}
 
 {% block content %}
-<!-- アラートメッセージの表示 -->
-{% if messages %}
-    {% for message in messages %}
-        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
-            <i class="fas fa-{% if message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'success' %}check-circle{% else %}info-circle{% endif %} me-2"></i>
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    {% endfor %}
-{% endif %}
-
 <div class="row">
     <div class="col-md-8">
         <div class="card">
@@ -111,34 +100,103 @@
                 {% if available_students %}
                 <div class="mb-4">
                     <h6>メンバーを追加</h6>
-                    <form method="post">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="add_member">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label for="student_id" class="form-label">学生を選択</label>
-                                <select class="form-select" id="student_id" name="student_id" required>
-                                    <option value="">学生を選択してください</option>
-                                    {% for student in available_students %}
-                                    <option value="{{ student.id }}">{{ student.full_name }} ({{ student.student_number }})</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="role" class="form-label">役割（任意）</label>
-                                <input type="text" class="form-control" id="role" name="role" 
-                                       placeholder="例: リーダー、書記">
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">&nbsp;</label>
-                                <div>
-                                    <button type="submit" class="btn btn-success w-100">
-                                        <i class="fas fa-plus me-1"></i>追加
+                    
+                    <!-- タブ切り替え -->
+                    <ul class="nav nav-tabs mb-3" id="addMemberTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="single-tab" data-bs-toggle="tab" data-bs-target="#single-add" type="button" role="tab">
+                                <i class="fas fa-user-plus me-1"></i>1人ずつ追加
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="bulk-tab" data-bs-toggle="tab" data-bs-target="#bulk-add" type="button" role="tab">
+                                <i class="fas fa-users me-1"></i>一括追加
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="addMemberTabContent">
+                        <!-- 1人ずつ追加 -->
+                        <div class="tab-pane fade show active" id="single-add" role="tabpanel">
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="add_member">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="student_id" class="form-label">学生を選択</label>
+                                        <select class="form-select" id="student_id" name="student_id" required>
+                                            <option value="">学生を選択してください</option>
+                                            {% for student in available_students %}
+                                            <option value="{{ student.id }}">{{ student.full_name }} ({{ student.student_number }})</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="role" class="form-label">役割（任意）</label>
+                                        <input type="text" class="form-control" id="role" name="role" 
+                                               placeholder="例: リーダー、書記">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">&nbsp;</label>
+                                        <div>
+                                            <button type="submit" class="btn btn-success w-100">
+                                                <i class="fas fa-plus me-1"></i>追加
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- 一括追加 -->
+                        <div class="tab-pane fade" id="bulk-add" role="tabpanel">
+                            <form method="post" id="bulkAddForm">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="add_members">
+                                
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="form-label mb-0">追加する学生を選択</label>
+                                        <div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllStudents()">
+                                                <i class="fas fa-check-square me-1"></i>すべて選択
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllStudents()">
+                                                <i class="fas fa-square me-1"></i>すべて解除
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                                        {% for student in available_students %}
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input student-checkbox" type="checkbox" 
+                                                   name="selected_students" value="{{ student.id }}" 
+                                                   id="student_{{ student.id }}">
+                                            <label class="form-check-label" for="student_{{ student.id }}">
+                                                <strong>{{ student.full_name }}</strong> 
+                                                <small class="text-muted">({{ student.student_number }})</small>
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="default_role" class="form-label">役割（任意・全員に適用）</label>
+                                    <input type="text" class="form-control" id="default_role" name="default_role" 
+                                           placeholder="例: メンバー">
+                                    <div class="form-text">選択した全員に同じ役割を設定します</div>
+                                </div>
+                                
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-success" onclick="return validateBulkAdd()">
+                                        <i class="fas fa-users me-1"></i>選択した学生を追加
                                     </button>
                                 </div>
-                            </div>
+                            </form>
                         </div>
-                    </form>
+                    </div>
                 </div>
                 {% else %}
                 <div class="alert alert-info">
@@ -205,5 +263,26 @@
         </div>
     </div>
 </div>
+
+<script>
+function selectAllStudents() {
+    const checkboxes = document.querySelectorAll('.student-checkbox');
+    checkboxes.forEach(checkbox => checkbox.checked = true);
+}
+
+function deselectAllStudents() {
+    const checkboxes = document.querySelectorAll('.student-checkbox');
+    checkboxes.forEach(checkbox => checkbox.checked = false);
+}
+
+function validateBulkAdd() {
+    const checkedBoxes = document.querySelectorAll('.student-checkbox:checked');
+    if (checkedBoxes.length === 0) {
+        alert('追加する学生を少なくとも1人選択してください。');
+        return false;
+    }
+    return true;
+}
+</script>
 
 {% endblock %}

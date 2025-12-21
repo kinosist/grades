@@ -52,26 +52,31 @@ else:
         ALLOWED_HOSTS.extend(['.railway.app', '.up.railway.app'])
 
 # CSRF trusted origins for Railway
-CSRF_TRUSTED_ORIGINS = []
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+]
+
+# Always add Railway patterns (wildcard patterns for any Railway deployment)
+CSRF_TRUSTED_ORIGINS.extend([
+    'https://*.railway.app',
+    'https://*.up.railway.app',
+])
+
+# Add specific Railway domain if available
 if 'RAILWAY_ENVIRONMENT' in os.environ:
     railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
     if railway_domain:
-        # Add both http and https versions
         CSRF_TRUSTED_ORIGINS.append(f'https://{railway_domain}')
-        CSRF_TRUSTED_ORIGINS.append(f'http://{railway_domain}')
 
     railway_static_url = os.environ.get('RAILWAY_STATIC_URL')
     if railway_static_url:
         CSRF_TRUSTED_ORIGINS.append(f'https://{railway_static_url}')
 
-    # Add Railway wildcard patterns
-    CSRF_TRUSTED_ORIGINS.extend([
-        'https://*.railway.app',
-        'https://*.up.railway.app'
-    ])
-else:
-    # Allow local development
-    CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://127.0.0.1:8000']
+# Add any custom domains from environment
+custom_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if custom_origins:
+    CSRF_TRUSTED_ORIGINS.extend(custom_origins.split(','))
 
 
 # Application definition

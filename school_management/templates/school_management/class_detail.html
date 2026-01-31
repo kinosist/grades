@@ -67,9 +67,15 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
-                    <a href="{% url 'school_management:group_master_management' classroom.id %}" class="btn btn-info">
+    <a href="{% url 'school_management:group_master_management' classroom.id %}" class="btn btn-info">
                         <i class="fas fa-layer-group me-2"></i>グループマスタ管理
                     </a>
+                    <form action="{% url 'school_management:class_delete' classroom.id %}" method="post" class="d-grid">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash-alt me-2"></i>クラスを削除
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

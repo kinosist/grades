@@ -16,9 +16,13 @@ from django.db import connection
 def create_admin_with_retry(max_retries=3, delay=2):
     """Create admin user with retry logic"""
     # 環境変数から管理者情報を取得
-    ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@example.com')
-    ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+    ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL')
+    ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
     ADMIN_NAME = os.environ.get('ADMIN_NAME', '管理者')
+
+    if not ADMIN_EMAIL or not ADMIN_PASSWORD:
+        print("環境変数 ADMIN_EMAIL と ADMIN_PASSWORD を設定してください。")
+        return False
 
     for attempt in range(max_retries):
         try:

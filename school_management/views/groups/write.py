@@ -17,9 +17,6 @@ def group_management(request, session_id):
         max_group_number = groups.aggregate(Max('group_number'))['group_number__max'] or 0
     
     if request.method == 'POST':
-        # デバッグ用：送信されたPOSTデータを確認
-        print("POST data:", dict(request.POST))
-        
         # 既存のグループを削除
         Group.objects.filter(lesson_session=lesson_session).delete()
         
@@ -38,7 +35,6 @@ def group_management(request, session_id):
             
             # グループメンバーを追加
             member_keys = [key for key in request.POST.keys() if key.startswith(f'group_{group_num}_member_')]
-            print(f"Group {group_num} member keys:", member_keys)
             
             for key in member_keys:
                 student_id = request.POST.get(key)
@@ -51,7 +47,6 @@ def group_management(request, session_id):
                             student=student,
                             role=role
                         )
-                        print(f"Added student {student_id} to group {group_num}")
                     except CustomUser.DoesNotExist:
                         messages.warning(request, f'学籍番号 {student_id} の学生が見つかりません。')
         

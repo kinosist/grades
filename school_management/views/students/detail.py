@@ -10,8 +10,12 @@ from ...models import (
 @login_required
 def student_detail_view(request, student_number):
     """学生詳細"""
+    if not request.user.is_teacher:
+        messages.error(request, 'この機能にアクセスする権限がありません。')
+        return redirect('school_management:dashboard')
+
     student = get_object_or_404(CustomUser, student_number=student_number, role='student')
-    
+
     # 削除処理
     if request.method == 'POST':
         action = request.POST.get('action')

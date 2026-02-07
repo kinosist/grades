@@ -12,11 +12,12 @@ from ...models import CustomUser, Student, ClassRoom, StudentClassPoints
 @login_required
 def student_edit_view(request, student_number):
     """学生編集"""
+    if not request.user.is_teacher:
+        messages.error(request, 'この機能にアクセスする権限がありません。')
+        return redirect('school_management:dashboard')
+
     student = get_object_or_404(CustomUser, student_number=student_number, role='student')
-    
-    # アクセス制御を緩和（すべての学生を編集可能に）
-    # 必要に応じて、管理者権限チェックを追加することも可能
-    
+
     csrf_token = get_token(request)
     
     if request.method == 'POST':
@@ -55,10 +56,10 @@ def student_edit_view(request, student_number):
 @login_required
 def student_create_view(request):
     """学生作成（単体・一括対応）"""
-    # デバッグ用: ログイン状態をチェック
-    if not request.user.is_authenticated:
-        return redirect('school_management:login')
-    
+    if not request.user.is_teacher:
+        messages.error(request, 'この機能にアクセスする権限がありません。')
+        return redirect('school_management:dashboard')
+
     csrf_token = get_token(request)
     
     if request.method == 'POST':

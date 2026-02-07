@@ -8,6 +8,10 @@ from ...models import Student
 @login_required
 def student_list_view(request):
     """学生一覧（すべての学生）"""
+    if not request.user.is_teacher:
+        messages.error(request, 'この機能にアクセスする権限がありません。')
+        return redirect('school_management:dashboard')
+
     # 削除処理
     if request.method == 'POST':
         action = request.POST.get('action')

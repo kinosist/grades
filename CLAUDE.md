@@ -39,7 +39,18 @@ uv run python create_test_users.py     # Create test user data
 - **`school_project/`**: Django settings and root URL configuration
 - **`school_management/`**: Main application with all business logic
   - `models.py`: All data models (unified CustomUser, ClassRoom, LessonSession, Group, Quiz, PeerEvaluation, etc.)
-  - `views.py`: View logic for all features
+  - `views/`: View logic split by feature domain
+    - `auth/`: Login/logout (`login.py`, `logout.py`)
+    - `dashboard/`: Dashboard views (`dashboard_view.py`, `teacher_dashboard.py`, `student_dashboard.py`, `admin_teacher_dashboard.py`)
+    - `classes/`: Class CRUD (`list.py`, `detail.py`, `management.py`)
+    - `sessions/`: Lesson session management (`list.py`, `detail.py`, `management.py`, `lesson.py`)
+    - `students/`: Student CRUD and enrollment (`list.py`, `detail.py`, `management.py`, `enrollment.py`)
+    - `quizzes/`: Quiz management and grading (`management.py`, `grading.py`, `questions.py`)
+    - `groups/`: Group management (`read.py`, `write.py`, `master.py`)
+    - `peer_eval/`: Peer evaluation (`management.py`, `form.py`, `improved.py`, `results.py`)
+    - `grades/`: Class evaluation and points (`class_evaluation.py`, `class_points.py`)
+    - `attendance/`: QR code and attendance (`manage.py`, `scan.py`, `student.py`, `utils.py`)
+    - `utils.py`: Shared utilities (health_check)
   - `urls.py`: URL routing (app_name='school_management')
   - `templates/school_management/`: All HTML templates
 

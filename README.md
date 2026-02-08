@@ -84,7 +84,17 @@ school_system/
 │   └── urls.py
 └── school_management/          # メインアプリケーション
     ├── models.py              # データモデル
-    ├── views.py               # ビュー
+    ├── views/                 # ビュー（機能別に分割）
+    │   ├── auth/              # ログイン・ログアウト
+    │   ├── dashboard/         # ダッシュボード
+    │   ├── classes/           # クラス管理
+    │   ├── sessions/          # 授業回管理
+    │   ├── students/          # 学生管理
+    │   ├── quizzes/           # 小テスト管理
+    │   ├── groups/            # グループ管理
+    │   ├── peer_eval/         # ピア評価
+    │   ├── grades/            # 成績・評価
+    │   └── attendance/        # QRコード・出席
     ├── urls.py                # URLパターン
     ├── admin.py               # 管理画面設定
     └── templates/             # HTMLテンプレート
@@ -93,8 +103,7 @@ school_system/
 ## データベースモデル
 
 ### 主要モデル
-- **Teacher**: 教員マスタ（カスタムユーザーモデル）
-- **Student**: 学生マスタ
+- **CustomUser**: 統合ユーザーモデル（教員・学生共通、role フィールドで区別）
 - **ClassRoom**: クラス
 - **LessonSession**: 授業回
 - **Group**: グループ

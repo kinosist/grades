@@ -14,85 +14,16 @@
     <div class="container-fluid">
         <div class="row">
             {% if user.is_authenticated %}
-            <!-- ナビゲーションバー（モバイル用） -->
-            <nav class="navbar navbar-expand-md navbar-dark bg-dark d-md-none">
-                <div class="container-fluid">
-                    <a class="navbar-brand" href="{% url 'school_management:dashboard' %}">
-                        <i class="fas fa-graduation-cap me-2"></i>学校管理システム
-                    </a>
-                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mobileNav">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
-                    <div class="collapse navbar-collapse" id="mobileNav">
-                        <ul class="navbar-nav me-auto">
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'school_management:dashboard' %}">
-                                    <i class="fas fa-tachometer-alt me-2"></i>ダッシュボード
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'school_management:class_list' %}">
-                                    <i class="fas fa-chalkboard-teacher me-2"></i>クラス管理
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'school_management:student_list' %}">
-                                    <i class="fas fa-users me-2"></i>学生管理
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'school_management:logout' %}">
-                                    <i class="fas fa-sign-out-alt me-2"></i>ログアウト
-                                </a>
-                            </li>
-                        </ul>
-                        <span class="navbar-text">
-                            {{ user.full_name }}
-                        </span>
-                    </div>
-                </div>
-            </nav>
             
-            <!-- サイドバー（デスクトップ用） -->
-            <nav class="col-md-3 col-lg-2 d-md-block d-none sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <div class="text-center mb-3">
-                        <h5>{{ user.full_name }}</h5>
-                        <small class="text-muted">{{ user.get_authority_display }}</small>
-                    </div>
-                    
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'school_management:dashboard' %}">
-                                <i class="fas fa-tachometer-alt me-2"></i>ダッシュボード
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'school_management:class_list' %}">
-                                <i class="fas fa-chalkboard-teacher me-2"></i>クラス管理
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'school_management:student_list' %}">
-                                <i class="fas fa-users me-2"></i>学生管理
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'school_management:logout' %}">
-                                <i class="fas fa-sign-out-alt me-2"></i>ログアウト
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
+            {% include 'school_management/includes/header.html' %}
+            
+            {% include 'school_management/includes/sidebar.html' %}
 
-            <!-- メインコンテンツ -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">{% block page_title %}{% endblock %}</h1>
                 </div>
                 
-                <!-- メッセージ表示 -->
                 {% if messages %}
                     {% for message in messages %}
                         <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
@@ -105,7 +36,6 @@
                 {% block content %}{% endblock %}
             </main>
             {% else %}
-            <!-- ログインしていない場合は全画面表示 -->
             <div class="col-12">
                 {% block login_content %}{% endblock %}
             </div>
@@ -113,33 +43,27 @@
         </div>
     </div>
 
-    <!-- サイドバーオーバーレイ (モバイル用) -->
     <div class="sidebar-overlay d-md-none" id="sidebarOverlay"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- レスポンシブサイドバー用JavaScript -->
     <script>
+        // サイドバー制御スクリプト（既存のまま）
         document.addEventListener('DOMContentLoaded', function() {
             const sidebarToggle = document.getElementById('sidebarToggle');
             const sidebar = document.querySelector('.sidebar');
             const overlay = document.getElementById('sidebarOverlay');
-            
             if (sidebarToggle) {
                 sidebarToggle.addEventListener('click', function() {
                     sidebar.classList.toggle('show');
                     overlay.classList.toggle('show');
                 });
             }
-            
             if (overlay) {
                 overlay.addEventListener('click', function() {
                     sidebar.classList.remove('show');
                     overlay.classList.remove('show');
                 });
             }
-            
-            // サイドバーのリンクをクリックしたらサイドバーを閉じる (モバイル用)
             const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
             sidebarLinks.forEach(link => {
                 link.addEventListener('click', function() {
@@ -151,7 +75,6 @@
             });
         });
     </script>
-    
     {% block extra_js %}{% endblock %}
 </body>
 </html>

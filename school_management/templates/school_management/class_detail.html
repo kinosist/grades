@@ -1,96 +1,79 @@
 {% extends 'school_management/base.html' %}
 
-{% block title %}{{ classroom.class_name }} - 学校管理システム{% endblock %}
-{% block page_title %}{{ classroom.class_name }}{% endblock %}
+{% block title %}{{ classroom.class_name }} - クラス詳細{% endblock %}
+{% block page_title %}
+    {{ classroom.class_name }}
+    <span class="text-muted fs-5 ms-2">
+        ({{ classroom.year }}年度 {{ classroom.get_semester_display }})
+    </span>
+    <span class="fs-6 text-muted ms-3 fw-normal">
+        <i class="fas fa-user-tie me-1"></i>担当：
+        {% for teacher in classroom.teachers.all %}
+            {{ teacher.full_name }}{% if not forloop.last %}・{% endif %}
+        {% endfor %}
+    </span>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .clickable-row {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .clickable-row:hover {
+        background-color: rgba(0,0,0,0.05) !important;
+    }
+    /* タブのアクティブ状態のスタイル調整 */
+    .nav-tabs .nav-link.active {
+        font-weight: bold;
+        border-top: 3px solid #0d6efd;
+    }
+    .hover-card {
+        transition: all 0.3s ease;
+    }
+    .hover-card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        border-color: #0d6efd;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 {% csrf_token %}
-<div class="row">
-    <!-- クラス情報カード -->
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-info-circle me-2"></i>クラス情報</h5>
-            </div>
-            <div class="card-body">
-                <table class="table table-borderless">
-                    <tr>
-                        <th>クラス名:</th>
-                        <td>{{ classroom.class_name }}</td>
-                    </tr>
-                    <tr>
-                        <th>年度:</th>
-                        <td>{{ classroom.year }}</td>
-                    </tr>
-                    <tr>
-                        <th>学期:</th>
-                        <td>{{ classroom.get_semester_display }}</td>
-                    </tr>
-                    <tr>
-                        <th>学生数:</th>
-                        <td>{{ students.count }}名</td>
-                    </tr>
-                    <tr>
-                        <th>授業回数:</th>
-                        <td>{{ sessions.count }}回</td>
-                    </tr>
-                    <tr>
-                        <th>作成日:</th>
-                        <td>{{ classroom.created_at|date:"Y年m月d日" }}</td>
-                    </tr>
-                </table>
-            </div>
-        </div>
 
-        <!-- 担当教員 -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h6><i class="fas fa-chalkboard-teacher me-2"></i>担当教員</h6>
-            </div>
-            <div class="card-body">
-                {% for teacher in classroom.teachers.all %}
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="fas fa-user-tie me-2"></i>
-                        <div>
-                            <strong>{{ teacher.full_name }}</strong><br>
-                            <small class="text-muted">{{ teacher.get_authority_display }}</small>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
+<!-- 2. タブ切り替え UI -->
+<ul class="nav nav-tabs mb-4" id="classTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="lessons-tab" data-bs-toggle="tab" data-bs-target="#lessons" type="button" role="tab" aria-controls="lessons" aria-selected="true">
+            <i class="fas fa-calendar me-2"></i>授業一覧 ({{ sessions.count }})
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="students-tab" data-bs-toggle="tab" data-bs-target="#students" type="button" role="tab" aria-controls="students" aria-selected="false">
+            <i class="fas fa-users me-2"></i>学生名簿 ({{ students.count }})
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="grades-tab" data-bs-toggle="tab" data-bs-target="#grades" type="button" role="tab" aria-controls="grades" aria-selected="false">
+            <i class="fas fa-chart-bar me-2"></i>成績・評価
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab" aria-controls="settings" aria-selected="false">
+            <i class="fas fa-cog me-2"></i>クラス管理
+        </button>
+    </li>
+</ul>
 
-        <!-- クラス管理メニュー -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h6><i class="fas fa-cog me-2"></i>クラス管理</h6>
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-    <a href="{% url 'school_management:group_master_management' classroom.id %}" class="btn btn-info">
-                        <i class="fas fa-layer-group me-2"></i>グループマスタ管理
-                    </a>
-                    <form action="{% url 'school_management:class_delete' classroom.id %}" method="post" class="d-grid">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-danger">
-                            <i class="fas fa-trash-alt me-2"></i>クラスを削除
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 授業回一覧 -->
-    <div class="col-md-8">
+<div class="tab-content" id="classTabsContent">
+    <!-- タブ 1: 授業一覧 -->
+    <div class="tab-pane fade show active" id="lessons" role="tabpanel" aria-labelledby="lessons-tab">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-calendar me-2"></i>授業回一覧</h5>
-                <div>
-                    <a href="{% url 'school_management:lesson_session_create' classroom.id %}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-plus me-1"></i>授業回を追加
-                    </a>
-                </div>
+                <a href="{% url 'school_management:lesson_session_create' classroom.id %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i>授業回を追加
+                </a>
             </div>
             <div class="card-body">
                 {% if lessons %}
@@ -103,12 +86,11 @@
                                     <th>トピック</th>
                                     <th>小テスト</th>
                                     <th>ピア評価</th>
-                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for lesson in lessons %}
-                                <tr>
+                                <tr class="clickable-row" onclick="window.location=`{% url 'school_management:lesson_session_detail' lesson.id %}`">
                                     <td><strong>第{{ lesson.session_number }}回</strong></td>
                                     <td>{{ lesson.date|date:"m/d" }}</td>
                                     <td>{{ lesson.topic|default:"-" }}</td>
@@ -126,12 +108,6 @@
                                             <span class="badge bg-secondary">なし</span>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        <a href="{% url 'school_management:lesson_session_detail' lesson.id %}" 
-                                           class="btn btn-outline-primary btn-sm">
-                                            <i class="fas fa-eye me-1"></i>詳細
-                                        </a>
-                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -148,38 +124,29 @@
                 {% endif %}
             </div>
         </div>
+    </div>
 
-        <!-- 学生一覧 -->
-        <div class="card mt-3">
+    <!-- タブ 2: 学生名簿 -->
+    <div class="tab-pane fade" id="students" role="tabpanel" aria-labelledby="students-tab">
+        <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-users me-2"></i>在籍学生 ({{ students.count }}名)</h5>
-                <div class="d-flex gap-2">
-                    <a href="{% url 'school_management:class_evaluation' classroom.id %}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-chart-bar me-1"></i>評価一覧
-                    </a>
-                    <a href="{% url 'school_management:class_points' classroom.id %}" class="btn btn-success btn-sm">
-                        <i class="fas fa-trophy me-1"></i>ポイント一覧
-                    </a>
-                    <a href="{% url 'school_management:class_qr_codes' classroom.id %}" class="btn btn-warning btn-sm">
-                        <i class="fas fa-qrcode me-1"></i>QRコード表示
-                    </a>
-                    <div class="dropdown">
-                        <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-user-plus me-1"></i>学生を追加
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li>
-                                <a class="dropdown-item" href="{% url 'school_management:class_student_select' classroom.id %}">
-                                    <i class="fas fa-user-check me-2"></i>既存学生から選択
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{% url 'school_management:bulk_student_add' classroom.id %}">
-                                    <i class="fas fa-file-csv me-2"></i>CSV一括追加
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
+                <div class="dropdown">
+                    <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-user-plus me-1"></i>学生を追加
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item" href="{% url 'school_management:class_student_select' classroom.id %}">
+                                <i class="fas fa-user-check me-2"></i>既存学生から選択
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="{% url 'school_management:bulk_student_add' classroom.id %}">
+                                <i class="fas fa-file-csv me-2"></i>CSV一括追加
+                            </a>
+                        </li>
+                    </ul>
                 </div>
             </div>
             <div class="card-body">
@@ -192,12 +159,12 @@
                                     <th>氏名</th>
                                     <th>ふりがな</th>
                                     <th>ポイント</th>
-                                    <th>操作</th>
+                                    <th style="width: 100px;"></th> <!-- アクションボタン用 -->
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for student in students %}
-                                <tr>
+                                <tr class="clickable-row" onclick="window.location=`{% url 'school_management:class_student_detail' classroom.id student.student_number %}`">
                                     <td>
                                         <span class="badge bg-secondary">{{ student.student_number }}</span>
                                     </td>
@@ -222,22 +189,19 @@
                                             </span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td class="text-end">
                                         <div class="btn-group btn-group-sm">
-                                            <a href="{% url 'school_management:class_student_detail' classroom.id student.student_number %}" class="btn btn-outline-primary" title="詳細">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
                                             {# ビューで student.class_point をセットしているのでそれを使う #}
                                             {% if student.class_point %}
-                                                <button class="btn btn-outline-warning" onclick="editStudentPoints('{{ student.id }}', '{{ student.class_point.points }}')" title="ポイント編集">
+                                                <button class="btn btn-outline-warning" onclick="event.stopPropagation(); editStudentPoints('{{ student.id }}', '{{ student.class_point.points }}')" title="ポイント編集">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                             {% else %}
-                                                <button class="btn btn-outline-warning" onclick="editStudentPoints('{{ student.id }}', '{{ student.points }}')" title="ポイント編集">
+                                                <button class="btn btn-outline-warning" onclick="event.stopPropagation(); editStudentPoints('{{ student.id }}', '{{ student.points }}')" title="ポイント編集">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                             {% endif %}
-                                            <button class="btn btn-outline-danger" onclick="removeStudent('{{ student.id }}', '{{ student.full_name|escapejs }}')" title="除籍">
+                                            <button class="btn btn-outline-danger" onclick="event.stopPropagation(); removeStudent('{{ student.id }}', '{{ student.full_name|escapejs }}')" title="除籍">
                                                 <i class="fas fa-user-times"></i>
                                             </button>
                                         </div>
@@ -253,6 +217,101 @@
                         <p class="text-muted">まだ学生が追加されていません。</p>
                     </div>
                 {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- タブ 3: 成績・評価 -->
+    <div class="tab-pane fade" id="grades" role="tabpanel" aria-labelledby="grades-tab">
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 text-center hover-card position-relative">
+                    <div class="position-absolute top-0 end-0 p-3">
+                        <i class="fas fa-external-link-alt text-muted"></i>
+                    </div>
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <i class="fas fa-chart-bar fa-3x text-primary mb-3"></i>
+                        <h5 class="card-title">評価一覧</h5>
+                        <p class="card-text text-muted">小テスト、ピア評価、出席点を含む詳細な成績表を確認します。</p>
+                        <a href="{% url 'school_management:class_evaluation' classroom.id %}" class="stretched-link text-decoration-none">
+                            <span class="text-primary fw-bold">詳細へ <i class="fas fa-chevron-right ms-1"></i></span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 text-center hover-card position-relative">
+                    <div class="position-absolute top-0 end-0 p-3">
+                        <i class="fas fa-external-link-alt text-muted"></i>
+                    </div>
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <i class="fas fa-trophy fa-3x text-success mb-3"></i>
+                        <h5 class="card-title">ポイント一覧</h5>
+                        <p class="card-text text-muted">学生ごとの獲得ポイントと出席率の概況を確認します。</p>
+                        <a href="{% url 'school_management:class_points' classroom.id %}" class="stretched-link text-decoration-none">
+                            <span class="text-success fw-bold">詳細へ <i class="fas fa-chevron-right ms-1"></i></span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 text-center hover-card position-relative">
+                    <div class="position-absolute top-0 end-0 p-3">
+                        <i class="fas fa-external-link-alt text-muted"></i>
+                    </div>
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <i class="fas fa-qrcode fa-3x text-warning mb-3"></i>
+                        <h5 class="card-title">QRコード表示</h5>
+                        <p class="card-text text-muted">クラス全員のQRコードを一覧表示し、スキャンを行います。</p>
+                        <a href="{% url 'school_management:class_qr_codes' classroom.id %}" class="stretched-link text-decoration-none">
+                            <span class="text-warning fw-bold">詳細へ <i class="fas fa-chevron-right ms-1"></i></span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- タブ 4: 設定 -->
+    <div class="tab-pane fade" id="settings" role="tabpanel" aria-labelledby="settings-tab">
+        <div class="row">
+            <div class="col-12 mb-3">
+                <div class="card bg-light border-0">
+                    <div class="card-body py-2 d-flex align-items-center">
+                        <i class="far fa-calendar-alt text-muted me-2"></i>
+                        <span class="text-muted me-2">クラス作成日:</span>
+                        <span class="fw-bold">{{ classroom.created_at|date:"Y年m月d日" }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h6><i class="fas fa-layer-group me-2"></i>グループ設定</h6>
+                    </div>
+                    <div class="card-body">
+                        <p>クラスの固定グループ（グループマスタ）を管理します。授業回ごとにここからグループ編成をコピーできます。</p>
+                        <a href="{% url 'school_management:group_master_management' classroom.id %}" class="btn btn-info text-white">
+                            <i class="fas fa-edit me-2"></i>グループマスタ管理
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card h-100 border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>危険な操作</h6>
+                    </div>
+                    <div class="card-body">
+                        <p>このクラスを削除します。クラスに関連する授業回、成績データなども全て削除されます。</p>
+                        <form action="{% url 'school_management:class_delete' classroom.id %}" method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger" onclick="return confirm('本当にこのクラスを削除しますか？この操作は取り消せません。')">
+                                <i class="fas fa-trash-alt me-2"></i>クラスを削除
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

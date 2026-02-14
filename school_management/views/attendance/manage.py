@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse
 from django.db import models
-# モデルのインポート（../../models.py を指す）
+# モデルのインポート
 from ...models import ClassRoom, Student, StudentQRCode, StudentClassPoints
 from .utils import generate_qr_code_image
 
@@ -14,7 +14,7 @@ def qr_code_list(request):
         messages.error(request, '教員のみアクセス可能です。')
         return redirect('school_management:dashboard')
     
-    classrooms = ClassRoom.objects.filter(teachers=request.user).order_by('-year', '-semester', 'class_name')
+    classrooms = ClassRoom.objects.filter(teachers=request.user)
     
     class_data = []
     for classroom in classrooms:

@@ -24,6 +24,7 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
+        {% with groups=groups|default:session.group_set.all %}
         <!-- タブナビゲーション -->
         <ul class="nav nav-tabs mb-4" id="sessionTabs" role="tablist">
             <li class="nav-item" role="presentation">
@@ -228,20 +229,19 @@
                             以下のリンクを学生に共有して、匿名でピア評価を実施してもらいます。
                         </div>
                         
-                        {% for group in groups %}
                         <div class="mb-3">
-                            <label class="form-label"><strong>グループ{{ group.group_number }}用リンク:</strong></label>
+                            <label class="form-label"><strong>ピア評価用共通リンク:</strong></label>
                             <div class="input-group">
                                 <input type="text" class="form-control" 
-                                       value="http://127.0.0.1:8000{% url 'school_management:peer_evaluation' session.id group.id %}" 
-                                       readonly id="peer-link-{{ group.id }}">
+                                       value="http://{{ request.get_host }}{% url 'school_management:peer_evaluation_common' session.id %}" 
+                                       readonly id="peer-link-common">
                                 <button class="btn btn-outline-secondary" type="button" 
-                                        onclick="copyToClipboard('peer-link-{{ group.id }}')">
+                                        onclick="copyToClipboard('peer-link-common')">
                                     <i class="fas fa-copy"></i>
                                 </button>
                             </div>
+                            <div class="form-text">学生はこのリンクから自分のグループを選択して評価を行います。</div>
                         </div>
-                        {% endfor %}
                     </div>
                 </div>
                 {% endif %}
@@ -292,6 +292,7 @@
             </div>
             {% endif %}
         </div>
+        {% endwith %}
     </div>
 </div>
 

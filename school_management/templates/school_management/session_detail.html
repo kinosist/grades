@@ -14,12 +14,17 @@
         font-weight: bold;
         border-top: 3px solid #0d6efd;
     }
+    .clickable-row {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
+        {% with groups=groups|default:session.group_set.all %}
         <!-- タブナビゲーション -->
         <ul class="nav nav-tabs mb-4" id="sessionTabs" role="tablist">
             <li class="nav-item" role="presentation">
@@ -175,7 +180,7 @@
                                     </thead>
                                     <tbody>
                                         {% for quiz in quizzes %}
-                                        <tr>
+                                        <tr class="clickable-row" onclick="window.location=`{% url 'school_management:quiz_detail' quiz.id %}`">
                                             <td><strong>{{ quiz.quiz_name }}</strong></td>
                                             <td>{{ quiz.max_score }}点</td>
                                             <td>
@@ -183,13 +188,10 @@
                                             </td>
                                             <td>{{ quiz.created_at|date:"m/d" }}</td>
                                             <td>
-                                                <a href="{% url 'school_management:quiz_detail' quiz.id %}" class="btn btn-outline-primary btn-sm">
-                                                    <i class="fas fa-eye me-1"></i>詳細
-                                                </a>
-                                                <a href="{% url 'school_management:question_manage' quiz.id %}" class="btn btn-outline-info btn-sm">
+                                                <a href="{% url 'school_management:question_manage' quiz.id %}" class="btn btn-outline-info btn-sm" onclick="event.stopPropagation()">
                                                     <i class="fas fa-clipboard-list me-1"></i>問題管理
                                                 </a>
-                                                <a href="{% url 'school_management:quiz_grading' quiz.id %}" class="btn btn-outline-success btn-sm">
+                                                <a href="{% url 'school_management:quiz_grading' quiz.id %}" class="btn btn-outline-success btn-sm" onclick="event.stopPropagation()">
                                                     <i class="fas fa-qrcode me-1"></i>採点
                                                 </a>
                                             </td>
@@ -227,20 +229,19 @@
                             以下のリンクを学生に共有して、匿名でピア評価を実施してもらいます。
                         </div>
                         
-                        {% for group in groups %}
                         <div class="mb-3">
-                            <label class="form-label"><strong>グループ{{ group.group_number }}用リンク:</strong></label>
+                            <label class="form-label"><strong>ピア評価用共通リンク:</strong></label>
                             <div class="input-group">
                                 <input type="text" class="form-control" 
-                                       value="http://127.0.0.1:8000{% url 'school_management:peer_evaluation' session.id group.id %}" 
-                                       readonly id="peer-link-{{ group.id }}">
+                                       value="http://{{ request.get_host }}{% url 'school_management:peer_evaluation_common' session.id %}" 
+                                       readonly id="peer-link-common">
                                 <button class="btn btn-outline-secondary" type="button" 
-                                        onclick="copyToClipboard('peer-link-{{ group.id }}')">
+                                        onclick="copyToClipboard('peer-link-common')">
                                     <i class="fas fa-copy"></i>
                                 </button>
                             </div>
+                            <div class="form-text">学生はこのリンクから自分のグループを選択して評価を行います。</div>
                         </div>
-                        {% endfor %}
                     </div>
                 </div>
                 {% endif %}
@@ -291,6 +292,7 @@
             </div>
             {% endif %}
         </div>
+        {% endwith %}
     </div>
 </div>
 

@@ -5,7 +5,6 @@
 {% block page_title %}ホーム{% endblock %}
 
 {% block breadcrumbs %}
-<li class="breadcrumb-item active" aria-current="page">ホーム</li>
 {% endblock %}
 
 {% block extra_css %}
@@ -35,6 +34,32 @@
     .badge-semester { border-radius: 10px; padding: 0.5em 0.8em; font-weight: 600; }
     .bg-spring { background-color: #e0e7ff; color: #4338ca; }
     .bg-fall { background-color: #ffedd5; color: #c2410c; }
+    
+    /* 日付ナビゲーションのスタイル */
+    .date-nav-btn {
+        text-decoration: none;
+        color: #6c757d;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: background-color 0.2s;
+    }
+    .date-nav-btn:hover {
+        background-color: #e9ecef;
+        color: #0d6efd;
+    }
+    .current-date-display {
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: #343a40;
+        margin: 0 1rem;
+        min-width: 140px;
+        text-align: center;
+    }
+
     .session-item {
         border: none; margin-bottom: 0.6rem; border-radius: 14px !important;
         background-color: #f1f5f9; transition: all 0.2s;
@@ -51,7 +76,7 @@
 
 <div class="row g-4">
     
-    <div class="col-lg-8">
+    <div class="col-xl-8">
         <div class="d-flex justify-content-between align-items-center mb-4 px-2">
             <h5 class="fw-bold m-0 text-dark"><i class="fas fa-layer-group me-2 text-primary"></i>担当クラス</h5>
         </div>
@@ -88,14 +113,14 @@
         {% endif %}
     </div>
 
-    <div class="col-lg-4">
+    <div class="col-xl-4">
         
         <div class="row g-3 mb-4">
             <div class="col-6">
                 <div class="card modern-card stats-card-mini h-100">
                     <div class="card-body p-0 text-center">
                         <div class="stats-icon-mini bg-orange-soft mx-auto mb-2"><i class="fas fa-calendar-check"></i></div>
-                        <p class="text-muted small mb-0 fw-bold">今週の授業回数</p>
+                        <p class="text-muted small mb-0 fw-bold">今週</p>
                         <h4 class="fw-bold mb-0 text-dark">{{ this_week_sessions }}<span class="fs-6 fw-normal ms-1">回</span></h4>
                     </div>
                 </div>
@@ -104,7 +129,7 @@
                 <div class="card modern-card stats-card-mini h-100">
                     <div class="card-body p-0 text-center">
                         <div class="stats-icon-mini bg-blue-soft mx-auto mb-2"><i class="fas fa-tasks"></i></div>
-                        <p class="text-muted small mb-0 fw-bold">評価完了率</p>
+                        <p class="text-muted small mb-0 fw-bold">評価</p>
                         <h4 class="fw-bold mb-0 text-dark">-<span class="fs-6 fw-normal ms-1">%</span></h4>
                     </div>
                 </div>
@@ -113,23 +138,38 @@
 
         <div class="card modern-card border-0">
             <div class="card-body p-4">
-                <h5 class="fw-bold mb-4 text-dark"><i class="fas fa-history me-2 text-primary"></i>最近の授業</h5>
-                {% if recent_sessions %}
+                <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
+                    <a href="?date={{ prev_date|date:'Y-m-d' }}" class="date-nav-btn">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    
+                    <div class="current-date-display">
+                        {% if is_today %}
+                            <span class="badge bg-primary me-2" style="font-size: 0.8rem;">今日</span>
+                        {% endif %}
+                        {{ current_date|date:"n月j日" }}
+                    </div>
+                    
+                    <a href="?date={{ next_date|date:'Y-m-d' }}" class="date-nav-btn">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </div>
+
+                {% if daily_sessions %}
                     <div class="list-group list-group-flush">
-                        {% for session in recent_sessions %}
+                        {% for session in daily_sessions %}
                         <a href="{% url 'school_management:class_detail' session.classroom.id %}" class="session-item">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <small class="text-muted fw-bold">{{ session.date|date:"m/d" }}</small>
                                 <span class="badge bg-white text-dark shadow-sm px-2 border-0" style="font-size: 0.7rem;">{{ session.classroom.class_name }}</span>
-                            </div>
+                                </div>
                             <h6 class="fw-bold mb-0 text-dark">第{{ session.session_number }}回</h6>
                         </a>
                         {% endfor %}
                     </div>
                 {% else %}
                     <div class="text-center py-5 opacity-50">
-                        <i class="fas fa-coffee fa-3x mb-3"></i>
-                        <p class="small fw-bold mb-0">最近の活動はありません</p>
+                        <i class="fas fa-mug-hot fa-3x mb-3"></i>
+                        <p class="small fw-bold mb-0">この日の授業はありません</p>
                     </div>
                 {% endif %}
             </div>

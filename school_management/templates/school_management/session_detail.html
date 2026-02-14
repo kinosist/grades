@@ -14,6 +14,10 @@
         font-weight: bold;
         border-top: 3px solid #0d6efd;
     }
+    .clickable-row {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
 </style>
 {% endblock %}
 
@@ -175,7 +179,7 @@
                                     </thead>
                                     <tbody>
                                         {% for quiz in quizzes %}
-                                        <tr>
+                                        <tr class="clickable-row" onclick="window.location=`{% url 'school_management:quiz_detail' quiz.id %}`">
                                             <td><strong>{{ quiz.quiz_name }}</strong></td>
                                             <td>{{ quiz.max_score }}点</td>
                                             <td>
@@ -183,13 +187,10 @@
                                             </td>
                                             <td>{{ quiz.created_at|date:"m/d" }}</td>
                                             <td>
-                                                <a href="{% url 'school_management:quiz_detail' quiz.id %}" class="btn btn-outline-primary btn-sm">
-                                                    <i class="fas fa-eye me-1"></i>詳細
-                                                </a>
-                                                <a href="{% url 'school_management:question_manage' quiz.id %}" class="btn btn-outline-info btn-sm">
+                                                <a href="{% url 'school_management:question_manage' quiz.id %}" class="btn btn-outline-info btn-sm" onclick="event.stopPropagation()">
                                                     <i class="fas fa-clipboard-list me-1"></i>問題管理
                                                 </a>
-                                                <a href="{% url 'school_management:quiz_grading' quiz.id %}" class="btn btn-outline-success btn-sm">
+                                                <a href="{% url 'school_management:quiz_grading' quiz.id %}" class="btn btn-outline-success btn-sm" onclick="event.stopPropagation()">
                                                     <i class="fas fa-qrcode me-1"></i>採点
                                                 </a>
                                             </td>

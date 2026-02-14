@@ -12,14 +12,17 @@ def session_create_view(request, class_id):
         session_number = request.POST.get('session_number')
         date = request.POST.get('date')
         topic = request.POST.get('topic')
-        
+        has_quiz = request.POST.get('has_quiz') == 'on'
+        has_peer_evaluation = request.POST.get('has_peer_evaluation') == 'on'
         if session_number and date:
             try:
                 session = LessonSession.objects.create(
                     classroom=classroom,
                     session_number=int(session_number),
                     date=date,
-                    topic=topic or ''
+                    topic=topic or "",
+                    has_quiz=has_quiz,
+                    has_peer_evaluation=has_peer_evaluation
                 )
                 messages.success(request, f'第{session_number}回授業を作成しました。')
                 return redirect('school_management:session_detail', session_id=session.id)

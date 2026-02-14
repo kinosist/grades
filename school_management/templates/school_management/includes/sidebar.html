@@ -14,7 +14,7 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link d-flex align-items-center rounded-3 text-nowrap {% if 'class' in request.resolver_match.url_name %}bg-primary text-white shadow-sm{% else %}text-dark hover-effect{% endif %}" href="{% url 'school_management:class_list' %}">
+                <a class="nav-link d-flex align-items-center rounded-3 text-nowrap {% if 'class' in request.resolver_match.url_name and 'qr_code' not in request.resolver_match.url_name %}bg-primary text-white shadow-sm{% else %}text-dark hover-effect{% endif %}" href="{% url 'school_management:class_list' %}">
                     <i class="fas fa-chalkboard-teacher me-3"></i>クラス管理
                 </a>
             </li>

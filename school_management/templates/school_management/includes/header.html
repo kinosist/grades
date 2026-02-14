@@ -1,5 +1,5 @@
 {% load static %}
-<nav class="navbar navbar-dark mb-0 shadow-sm" style="background: linear-gradient(to right, #212529, #343a40);">
+<nav class="navbar navbar-dark mb-0 shadow-sm d-md-none" style="background: linear-gradient(to right, #212529, #343a40);">
     <div class="container-fluid justify-content-start px-2">
         
         <button class="navbar-toggler border-0 me-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileNav" aria-controls="mobileNav">
@@ -11,7 +11,6 @@
         </a>
 
         <div class="offcanvas offcanvas-start rounded-end-3" tabindex="-1" id="mobileNav" aria-labelledby="mobileNavLabel" style="width: 280px; border: none;">
-            
             <div class="offcanvas-header border-bottom p-4">
                 <h5 class="offcanvas-title fw-bold text-dark" id="mobileNavLabel">
                     メニュー
@@ -20,7 +19,6 @@
             </div>
             
             <div class="offcanvas-body px-3 pt-4 d-flex flex-column">
-                
                 <div class="user-profile-card mb-4 p-3 rounded-3 text-center bg-light border-0">
                     <div class="avatar-circle mb-2 mx-auto bg-white shadow-sm d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; border-radius: 50%;">
                         <i class="fas fa-user text-secondary fa-lg"></i>
@@ -37,7 +35,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link d-flex align-items-center rounded-3 px-3 py-2 {% if 'class' in request.resolver_match.url_name %}active-menu shadow-sm text-white{% else %}text-secondary{% endif %}" 
+                        <a class="nav-link d-flex align-items-center rounded-3 px-3 py-2 {% if 'class' in request.resolver_match.url_name and 'qr_code' not in request.resolver_match.url_name %}active-menu shadow-sm text-white{% else %}text-secondary{% endif %}" 
                            href="{% url 'school_management:class_list' %}">
                             <i class="fas fa-chalkboard-teacher me-3" style="width: 20px; text-align: center;"></i>クラス管理
                         </a>

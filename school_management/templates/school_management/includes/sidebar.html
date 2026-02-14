@@ -1,38 +1,46 @@
 {% load static %}
-<nav class="col-md-3 col-lg-2 d-md-block d-none sidebar collapse bg-light border-end">
+<nav class="col-md-3 col-lg-3 col-xl-2 d-md-block d-none sidebar collapse bg-light border-end">
     <div class="position-sticky pt-3">
         <div class="text-center mb-4 px-3">
             <div class="mb-2"><i class="fas fa-user-circle fa-3x text-secondary opacity-50"></i></div>
-            <h5 class="fw-bold text-dark mb-1">{{ user.full_name }}</h5>
+            <h5 class="fw-bold text-dark mb-1 text-nowrap">{{ user.full_name }}</h5>
             <span class="badge bg-secondary-soft text-secondary small" style="background-color: #eaecf0;">{{ user.get_authority_display }}</span>
         </div>
         
         <ul class="nav flex-column gap-1 px-2">
             <li class="nav-item">
-                <a class="nav-link d-flex align-items-center rounded-3 {% if request.resolver_match.url_name == 'dashboard' %}bg-primary text-white shadow-sm{% else %}text-dark hover-effect{% endif %}" href="{% url 'school_management:dashboard' %}">
-                    <i class="fas fa-tachometer-alt me-3"></i>ホーム
+                <a class="nav-link d-flex align-items-center rounded-3 text-nowrap {% if request.resolver_match.url_name == 'dashboard' %}bg-primary text-white shadow-sm{% else %}text-dark hover-effect{% endif %}" href="{% url 'school_management:dashboard' %}">
+                    <i class="fas fa-home me-3"></i>ホーム
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link d-flex align-items-center text-dark rounded-3 hover-effect" href="{% url 'school_management:class_list' %}">
+                <a class="nav-link d-flex align-items-center rounded-3 text-nowrap {% if 'class' in request.resolver_match.url_name %}bg-primary text-white shadow-sm{% else %}text-dark hover-effect{% endif %}" href="{% url 'school_management:class_list' %}">
                     <i class="fas fa-chalkboard-teacher me-3"></i>クラス管理
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link d-flex align-items-center text-dark rounded-3 hover-effect" href="{% url 'school_management:student_list' %}">
+                <a class="nav-link d-flex align-items-center rounded-3 text-nowrap {% if 'student' in request.resolver_match.url_name %}bg-primary text-white shadow-sm{% else %}text-dark hover-effect{% endif %}" href="{% url 'school_management:student_list' %}">
                     <i class="fas fa-users me-3"></i>学生管理
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link d-flex align-items-center text-dark rounded-3 hover-effect" href="{% url 'school_management:qr_code_list' %}">
+                <a class="nav-link d-flex align-items-center rounded-3 text-nowrap {% if 'qr_code' in request.resolver_match.url_name %}bg-primary text-white shadow-sm{% else %}text-dark hover-effect{% endif %}" href="{% url 'school_management:qr_code_list' %}">
                     <i class="fas fa-qrcode me-3"></i>QRコード管理
                 </a>
             </li>
+
             <li class="nav-item mt-4 pt-4 border-top">
-                <a class="nav-link d-flex align-items-center text-danger rounded-3 hover-effect" href="{% url 'school_management:logout' %}" onclick="return confirm('ログアウトしてもよろしいですか？');">
+                <a class="nav-link d-flex align-items-center text-danger rounded-3 hover-effect text-nowrap" href="{% url 'school_management:logout' %}" onclick="return confirm('ログアウトしてもよろしいですか？');">
                     <i class="fas fa-sign-out-alt me-3"></i>ログアウト
                 </a>
             </li>
         </ul>
     </div>
 </nav>
+
+<style>
+    .hover-effect:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+        transition: background-color 0.2s ease;
+    }
+</style>

@@ -46,8 +46,8 @@
                         <label class="form-label"><strong>評価フォームURL</strong></label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="evaluation-url" 
-                                   value="{{ anonymous_url }}" readonly>
-                            <button class="btn btn-outline-secondary" type="button" onclick="copyUrl()">
+                                   value="{{ request.scheme }}://{{ request.get_host }}{% url 'school_management:peer_evaluation_common' session.id %}" readonly>
+                            <button class="btn btn-outline-secondary" type="button" onclick="copyUrl(this)">
                                 <i class="fas fa-copy"></i> コピー
                             </button>
                         </div>
@@ -153,7 +153,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // QRコード生成
     const qrCodeDiv = document.getElementById('qrcode');
-    const evaluationUrl = '{{ anonymous_url }}';
+    const evaluationUrl = document.getElementById('evaluation-url').value;
     
     QRCode.toCanvas(qrCodeDiv, evaluationUrl, {
         width: 200,
@@ -170,14 +170,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-function copyUrl() {
+function copyUrl(btnElement) {
     const urlInput = document.getElementById('evaluation-url');
     urlInput.select();
     urlInput.setSelectionRange(0, 99999); // モバイル対応
     
     navigator.clipboard.writeText(urlInput.value).then(function() {
         // 成功メッセージ
-        const button = event.target.closest('button');
+        const button = btnElement;
         const originalHTML = button.innerHTML;
         button.innerHTML = '<i class="fas fa-check"></i> コピー済み';
         button.classList.remove('btn-outline-secondary');
@@ -194,7 +194,7 @@ function copyUrl() {
 }
 
 function shareByEmail() {
-    const url = '{{ anonymous_url }}';
+    const url = document.getElementById('evaluation-url').value;
     const subject = encodeURIComponent('ピア評価フォーム - {{ session.classroom.class_name }} 第{{ session.session_number }}回');
     const body = encodeURIComponent(`{{ session.classroom.class_name }} 第{{ session.session_number }}回のピア評価フォームです。
 
@@ -208,14 +208,14 @@ ${url}
 }
 
 function shareByLine() {
-    const url = '{{ anonymous_url }}';
+    const url = document.getElementById('evaluation-url').value;
     const text = encodeURIComponent(`{{ session.classroom.class_name }} 第{{ session.session_number }}回のピア評価フォームです。匿名で評価できます。`);
     
     window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${text}`);
 }
 
 function shareByTeams() {
-    const url = '{{ anonymous_url }}';
+    const url = document.getElementById('evaluation-url').value;
     const text = encodeURIComponent(`{{ session.classroom.class_name }} 第{{ session.session_number }}回のピア評価フォーム`);
     
     window.open(`https://teams.microsoft.com/share?msgText=${text}&href=${encodeURIComponent(url)}`);

@@ -3,6 +3,13 @@
 {% block title %}授業回の削除 - {{ session.classroom.class_name }}{% endblock %}
 {% block page_title %}授業回削除{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' session.classroom.id %}">{{ session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:session_detail' session.id %}">第{{ session.session_number }}回</a></li>
+<li class="breadcrumb-item active" aria-current="page">授業回削除</li>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8">

@@ -3,6 +3,12 @@
 {% block title %}学生情報編集 - 学校管理システム{% endblock %}
 {% block page_title %}学生情報編集{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:student_list' %}">学生管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:student_detail' student.student_number %}">{{ student.full_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">学生情報編集</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">

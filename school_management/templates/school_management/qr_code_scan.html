@@ -1,6 +1,18 @@
 {% extends 'school_management/base.html' %}
 
 {% block title %}QRコードスキャン{% endblock %}
+{% block page_title %}QRコードスキャン{% endblock %}
+
+{% block breadcrumbs %}
+{% if classroom %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_qr_codes' classroom.id %}">QRコード一覧</a></li>
+{% else %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:qr_code_list' %}">QRコード管理</a></li>
+{% endif %}
+<li class="breadcrumb-item active" aria-current="page">スキャン結果</li>
+{% endblock %}
 
 {% block content %}
 <div class="container mt-4">

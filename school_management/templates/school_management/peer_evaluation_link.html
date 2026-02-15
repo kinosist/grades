@@ -3,6 +3,13 @@
 {% block title %}ピア評価リンク作成 - {{ session.classroom.class_name }} 第{{ session.session_number }}回{% endblock %}
 {% block page_title %}匿名ピア評価リンク{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' session.classroom.id %}">{{ session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:session_detail' session.id %}">第{{ session.session_number }}回</a></li>
+<li class="breadcrumb-item active" aria-current="page">ピア評価リンク</li>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <div class="row justify-content-center">

@@ -3,11 +3,16 @@
 
 {% block title %}{{ classroom.class_name }} - ポイント一覧{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">ポイント一覧</li>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <!-- ヘッダー情報 -->
             <div class="card mb-4">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
@@ -49,7 +54,6 @@
                 </div>
             </div>
 
-            <!-- 学生成績一覧 -->
             <div class="card">
                 <div class="card-body">
                     {% if student_grades %}
@@ -103,7 +107,6 @@
                                             </button>
                                         </td>
                                     </tr>
-                                    <!-- 詳細表示 -->
                                     <tr class="collapse" id="details-{{ grade.student.id }}">
                                         <td colspan="9">
                                             <div class="card">

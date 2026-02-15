@@ -3,6 +3,13 @@
 {% block title %}グループ一覧 - 第{{ lesson_session.session_number }}回{% endblock %}
 {% block page_title %}グループ一覧{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' lesson_session.classroom.id %}">{{ lesson_session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}">第{{ lesson_session.session_number }}回</a></li>
+<li class="breadcrumb-item active" aria-current="page">グループ一覧</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -22,7 +29,6 @@
                 </div>
             </div>
             <div class="card-body">
-                <!-- 授業情報 -->
                 <div class="mb-4 p-3 bg-light rounded">
                     <h6 class="text-primary mb-2"><i class="fas fa-info-circle me-2"></i>授業情報</h6>
                     <strong>{{ lesson_session.classroom.class_name }}</strong> - 第{{ lesson_session.session_number }}回
@@ -32,7 +38,6 @@
                     {% endif %}
                 </div>
 
-                <!-- 統計情報 -->
                 <div class="row mb-4">
                     <div class="col-md-3">
                         <div class="card text-center">
@@ -121,7 +126,6 @@
     </div>
 </div>
 
-<!-- 未配置学生の表示 -->
 {% if unassigned_students > 0 %}
 <div class="row mt-4">
     <div class="col-12">

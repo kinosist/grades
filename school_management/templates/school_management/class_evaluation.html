@@ -4,6 +4,12 @@
 
 {% block title %}{{ classroom.class_name }} - 評価一覧{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">評価一覧</li>
+{% endblock %}
+
 {% block extra_css %}
 <style>
     .evaluation-table {
@@ -213,7 +219,6 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <!-- ヘッダー情報 -->
             <div class="header-info">
                 <div class="class-title">
                     <i class="fas fa-chalkboard me-2"></i>{{ classroom.class_name }} - 評価一覧
@@ -240,7 +245,6 @@
                 </div>
             </div>
 
-            <!-- エクスポートボタン -->
             <div class="export-buttons">
                 <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-secondary btn-export">
                     <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
@@ -250,7 +254,6 @@
                 </button>
             </div>
 
-            <!-- 評価テーブル -->
             <div class="table-container">
                 <table class="evaluation-table">
                     <thead>

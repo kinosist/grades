@@ -43,6 +43,7 @@ urlpatterns = [
     # 新しい授業作成機能
     path('classes/<int:class_id>/lesson-sessions/create/', sessions.lesson_session_create, name='lesson_session_create'),
     path('lesson-sessions/<int:session_id>/', sessions.lesson_session_detail, name='lesson_session_detail'),
+    path('sessions/<int:session_id>/delete/', sessions.lesson_session_delete, name='session_delete'),
 
     # --- 小テスト（Quizzes） ---
     path('sessions/<int:session_id>/quizzes/', quizzes.quiz_list_view, name='quiz_list'),

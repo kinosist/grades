@@ -3,6 +3,18 @@
 {% block title %}クラス一覧 - 学校管理システム{% endblock %}
 {% block page_title %}クラス一覧{% endblock %}
 
+{% block extra_css %}
+<style>
+    .clickable-row {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .clickable-row:hover {
+        background-color: rgba(0,0,0,0.05) !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -20,33 +32,25 @@
                             <thead>
                                 <tr>
                                     <th>クラス名</th>
-                                    <th>年度</th>
-                                    <th>学期</th>
+                                    <th>年度・学期</th>
                                     <th>学生数</th>
                                     <th>作成日</th>
-                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for classroom in classes %}
-                                <tr>
+                                <tr class="clickable-row" onclick="window.location=`{% url 'school_management:class_detail' classroom.id %}`">
                                     <td>
-                                        <strong>{{ classroom.class_name }}</strong>
+                                        <i class="fas fa-chalkboard me-2 text-primary"></i><strong>{{ classroom.class_name }}</strong>
                                     </td>
-                                    <td>{{ classroom.year }}</td>
                                     <td>
-                                        <span class="badge bg-{% if classroom.semester == 'first' %}primary{% else %}secondary{% endif %}">
+                                        {{ classroom.year }}年度
+                                        <span class="badge bg-{% if classroom.semester == 'first' %}primary{% else %}secondary{% endif %} ms-1">
                                             {{ classroom.get_semester_display }}
                                         </span>
                                     </td>
-                                    <td>{{ classroom.students.count }}名</td>
-                                    <td>{{ classroom.created_at|date:"Y/m/d" }}</td>
-                                    <td>
-                                        <a href="{% url 'school_management:class_detail' classroom.id %}" 
-                                           class="btn btn-outline-primary btn-sm">
-                                            <i class="fas fa-eye me-1"></i>詳細
-                                        </a>
-                                    </td>
+                                    <td><i class="fas fa-users me-2 text-muted"></i>{{ classroom.students.count }}名</td>
+                                    <td><small class="text-muted">{{ classroom.created_at|date:"Y/m/d" }}</small></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

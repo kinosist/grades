@@ -41,7 +41,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link d-flex align-items-center rounded-3 px-3 py-2 {% if 'student' in request.resolver_match.url_name %}active-menu shadow-sm text-white{% else %}text-secondary{% endif %}" 
+                        <a class="nav-link d-flex align-items-center rounded-3 px-3 py-2 {% if 'student' in request.resolver_match.url_name and 'class' not in request.resolver_match.url_name %}active-menu shadow-sm text-white{% else %}text-secondary{% endif %}" 
                            href="{% url 'school_management:student_list' %}">
                             <i class="fas fa-users me-3" style="width: 20px; text-align: center;"></i>学生管理
                         </a>

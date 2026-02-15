@@ -19,7 +19,7 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link d-flex align-items-center rounded-3 text-nowrap {% if 'student' in request.resolver_match.url_name %}bg-primary text-white shadow-sm{% else %}text-dark hover-effect{% endif %}" href="{% url 'school_management:student_list' %}">
+                <a class="nav-link d-flex align-items-center rounded-3 text-nowrap {% if 'student' in request.resolver_match.url_name and 'class' not in request.resolver_match.url_name %}bg-primary text-white shadow-sm{% else %}text-dark hover-effect{% endif %}" href="{% url 'school_management:student_list' %}">
                     <i class="fas fa-users me-3"></i>学生管理
                 </a>
             </li>

@@ -9,7 +9,6 @@
         <div class="card">
             <div class="card-header">
                 <h5><i class="fas fa-user-edit me-2"></i>学生情報編集</h5>
-                <p class="mb-0 text-muted">学籍番号: {{ student.student_number }}</p>
             </div>
             <div class="card-body">
                 <form method="post" action="{% url 'school_management:student_edit' student.student_number %}">
@@ -18,78 +17,56 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="student_number" class="form-label">学籍番号</label>
-                                <input type="text" class="form-control" id="student_number" 
-                                       value="{{ student.student_number }}" readonly>
-                                <div class="form-text">学籍番号は変更できません</div>
+                                <label class="form-label">学籍番号</label>
+                                <p class="form-control-plaintext fw-bold">{{ student.student_number }}</p>
                             </div>
-                        </div>
-                        <div class="col-md-6">
+
                             <div class="mb-3">
                                 <label for="full_name" class="form-label">氏名 <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="full_name" name="full_name" 
                                        value="{{ student.full_name }}" required>
                             </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
+
                             <div class="mb-3">
                                 <label for="furigana" class="form-label">フリガナ <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="furigana" name="furigana" 
                                        value="{{ student.furigana }}" required>
                                 <div class="form-text">カタカナで入力してください</div>
                             </div>
-                        </div>
-                        <div class="col-md-6">
+
                             <div class="mb-3">
-                                <label for="email" class="form-label">メールアドレス</label>
+                                <label for="email" class="form-label">メールアドレス（任意）</label>
                                 <input type="email" class="form-control" id="email" name="email" 
                                        value="{{ student.email }}">
-                                <div class="form-text">通知用（任意）</div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="row">
+
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="role" class="form-label">役割</label>
-                                <input type="text" class="form-control" id="role" 
-                                       value="{{ student.get_role_display }}" readonly>
-                                <div class="form-text">役割は変更できません</div>
+                                <label class="form-label">役割</label>
+                                <p class="form-control-plaintext">{{ student.get_role_display }}</p>
                             </div>
-                        </div>
-                        <div class="col-md-6">
+
                             <div class="mb-3">
                                 <label class="form-label">ポイント</label>
                                 <div class="form-control-plaintext text-muted">
-                                    クラスごとに独立管理されています
+                                    <small>※クラスごとに独立管理されています</small>
                                 </div>
-                                <div class="form-text">各クラスの詳細ページから更新してください</div>
                             </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
+
                             <div class="mb-3">
-                                <label for="created_at" class="form-label">登録日時</label>
-                                <input type="text" class="form-control" id="created_at" 
-                                       value="{{ student.created_at|date:'Y年m月d日 H:i' }}" readonly>
+                                <label class="form-label">登録日時</label>
+                                <p class="form-control-plaintext">{{ student.created_at|date:'Y年m月d日 H:i' }}</p>
                             </div>
-                        </div>
-                        <div class="col-md-6">
+
                             <div class="mb-3">
-                                <label for="updated_at" class="form-label">最終更新日時</label>
-                                <input type="text" class="form-control" id="updated_at" 
-                                       value="{{ student.updated_at|date:'Y年m月d日 H:i' }}" readonly>
+                                <label class="form-label">最終更新日時</label>
+                                <p class="form-control-plaintext">{{ student.updated_at|date:'Y年m月d日 H:i' }}</p>
                             </div>
                         </div>
                     </div>
 
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 mt-4">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save me-2"></i>更新
                         </button>
@@ -101,40 +78,6 @@
                         </a>
                     </div>
                 </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 学生の基本情報表示 -->
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h6><i class="fas fa-info-circle me-2"></i>編集可能な項目</h6>
-            </div>
-            <div class="card-body">
-                <ul class="list-unstyled mb-0">
-                    <li><i class="fas fa-check text-success me-2"></i>氏名</li>
-                    <li><i class="fas fa-check text-success me-2"></i>フリガナ</li>
-                    <li><i class="fas fa-check text-success me-2"></i>メールアドレス</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h6><i class="fas fa-lock me-2"></i>変更不可の項目</h6>
-            </div>
-            <div class="card-body">
-                <ul class="list-unstyled mb-0">
-                    <li><i class="fas fa-times text-danger me-2"></i>学籍番号</li>
-                    <li><i class="fas fa-times text-danger me-2"></i>役割</li>
-                    <li><i class="fas fa-times text-danger me-2"></i>登録日時</li>
-                    <li><i class="fas fa-times text-danger me-2"></i>最終更新日時</li>
-                </ul>
             </div>
         </div>
     </div>

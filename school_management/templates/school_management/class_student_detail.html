@@ -4,23 +4,14 @@
 {% block title %}{{ student.full_name }} - {{ classroom.class_name }} - 学校管理システム{% endblock %}
 {% block page_title %}{{ classroom.class_name }}内の学生詳細{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">{{ student.full_name }}</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
-    <!-- パンくずナビ -->
-    <div class="col-12 mb-3">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'school_management:dashboard' %}">ダッシュボード</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス一覧</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
-                <li class="breadcrumb-item active" aria-current="page">{{ student.full_name }}</li>
-            </ol>
-        </nav>
-    </div>
-</div>
-
-<div class="row">
-    <!-- 学生基本情報 -->
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">
@@ -53,7 +44,6 @@
             </div>
         </div>
         
-        <!-- 統計情報 -->
         <div class="card mt-3">
             <div class="card-header">
                 <h6><i class="fas fa-chart-bar me-2"></i>クラス内での統計</h6>
@@ -89,9 +79,7 @@
         </div>
     </div>
     
-    <!-- 詳細情報 -->
     <div class="col-md-8">
-        <!-- クイズ成績 -->
         <div class="card mt-3">
             <div class="card-header">
                 <h6><i class="fas fa-clipboard-check me-2"></i>クイズ成績（最新10件）</h6>
@@ -135,7 +123,6 @@
             </div>
         </div>
         
-        <!-- 出席記録 -->
         <div class="card mt-3">
             <div class="card-header">
                 <h6><i class="fas fa-calendar-check me-2"></i>出席記録（最新10件）</h6>
@@ -179,7 +166,6 @@
             </div>
         </div>
         
-        <!-- ピア評価 -->
         <div class="card mt-3">
             <div class="card-header">
                 <h6><i class="fas fa-users me-2"></i>ピア評価履歴（最新10件）</h6>

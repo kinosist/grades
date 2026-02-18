@@ -40,7 +40,7 @@
     
     .stat-item {
         background-color: #f8f9fa;
-        padding: 10px 20px;
+        padding: 15px 20px; /* パディングを少し増やして強調 */
         border-radius: 8px;
         border: 1px solid #dee2e6;
         min-width: 140px;
@@ -49,7 +49,7 @@
     }
     
     .stat-label {
-        font-size: 12px;
+        font-size: 13px;
         color: #6c757d;
         margin-bottom: 5px;
         font-weight: 600;
@@ -57,7 +57,7 @@
     }
     
     .stat-value {
-        font-size: 20px;
+        font-size: 24px; /* 数字を大きく */
         font-weight: bold;
         color: #212529;
     }
@@ -81,7 +81,7 @@
 
     .points-table th,
     .points-table td {
-        padding: 12px 15px;
+        padding: 15px 20px; /* 余白を広げてゆったりと */
         vertical-align: middle;
         border-bottom: 1px solid #dee2e6;
         white-space: nowrap;
@@ -109,26 +109,26 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 30px;
-        height: 30px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         font-weight: bold;
         color: white;
-        background-color: #6c757d; /* デフォルト（4位以下） */
-        font-size: 0.9em;
+        background-color: #6c757d;
+        font-size: 0.95em;
     }
     .rank-1 { background: linear-gradient(135deg, #FFD700, #FDB931); box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3); }
     .rank-2 { background: linear-gradient(135deg, #E0E0E0, #BDBDBD); box-shadow: 0 2px 4px rgba(189, 189, 189, 0.3); }
     .rank-3 { background: linear-gradient(135deg, #CD7F32, #A0522D); box-shadow: 0 2px 4px rgba(205, 127, 50, 0.3); }
 
-    /* 詳細行のスタイル */
+    /* 詳細行 */
     .detail-row {
         background-color: #f8f9fa;
     }
     .detail-card {
         border: none;
         background-color: transparent;
-        padding: 15px;
+        padding: 20px;
     }
     .detail-table th { background-color: white; }
     
@@ -143,12 +143,12 @@
             gap: 10px;
         }
         .stat-item { padding: 10px; min-width: auto; }
-        .stat-value { font-size: 18px; }
+        .stat-value { font-size: 20px; }
 
         .action-buttons { flex-direction: column; width: 100%; }
         .action-buttons .btn { width: 100%; margin-bottom: 10px; }
 
-        /* テーブルの列固定（Sticky） */
+        /* 列固定 */
         .points-table th.col-rank,
         .points-table td.col-rank {
             position: sticky;
@@ -162,22 +162,20 @@
         .points-table th.col-name,
         .points-table td.col-name {
             position: sticky;
-            left: 50px; /* ランク列の幅分ずらす */
+            left: 50px;
             z-index: 11;
             background-color: #fff;
             border-right: 2px solid #dee2e6;
             box-shadow: 2px 0 5px rgba(0,0,0,0.05);
-            min-width: 120px;
+            min-width: 140px;
         }
         
-        /* ヘッダーのz-index調整 */
         .points-table th.col-rank, 
         .points-table th.col-name {
-            background-color: #f8f9fa; /* ヘッダー背景色に戻す */
+            background-color: #f8f9fa;
             z-index: 12;
         }
 
-        /* 詳細行の調整 */
         .detail-row td { white-space: normal; }
     }
 </style>
@@ -209,14 +207,6 @@
                         <div class="stat-label">クラス平均</div>
                         <div class="stat-value text-success">{{ class_stats.class_average }}</div>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-label">最高平均</div>
-                        <div class="stat-value text-info">{{ class_stats.max_average }}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">最低平均</div>
-                        <div class="stat-value text-secondary">{{ class_stats.min_average }}</div>
-                    </div>
                 </div>
             </div>
 
@@ -224,14 +214,11 @@
                 <table class="points-table">
                     <thead>
                         <tr>
-                            <th class="col-rank text-center">順位</th>
+                            <th class="col-rank text-center" style="width: 80px;">順位</th>
                             <th class="col-name">氏名 / 学籍番号</th>
-                            <th class="text-center">総ポイント<br><small class="text-muted fw-normal">（授業合計）</small></th>
-                            <th class="text-center">平均<br><small class="text-muted fw-normal">（/回）</small></th>
-                            <th class="text-center">参加回数</th>
+                            <th class="text-center">総ポイント</th>
                             <th class="text-center">評価</th>
-                            <th class="text-center">全体ポイント<br><small class="text-muted fw-normal">（所持合計）</small></th>
-                            <th class="text-center">操作</th>
+                            <th class="text-center" style="width: 100px;">操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -247,26 +234,13 @@
                                 <div class="text-muted small">{{ grade.student.student_number }}</div>
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-success rounded-pill px-3">{{ grade.total_points }}pt</span>
+                                <span class="badge bg-success rounded-pill px-4 py-2 fs-6">{{ grade.total_points }}pt</span>
                             </td>
                             <td class="text-center">
-                                <strong class="text-primary">{{ grade.average_points }}</strong>
+                                <span class="badge bg-{{ grade.grade_color }} px-3">{{ grade.grade_level }}</span>
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-light text-dark border">{{ grade.session_count }}回</span>
-                            </td>
-                            <td class="text-center">
-                                <span class="badge bg-{{ grade.grade_color }}">{{ grade.grade_level }}</span>
-                            </td>
-                            <td class="text-center fw-bold text-dark">
-                                {% if grade.student.class_point %}
-                                    {{ grade.student.class_point.points }}pt
-                                {% else %}
-                                    {{ grade.student.points }}pt
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                <button class="btn btn-outline-primary btn-sm rounded-pill" type="button"
+                                <button class="btn btn-outline-primary btn-sm rounded-pill px-3" type="button"
                                         data-bs-toggle="collapse" data-bs-target="#details-{{ grade.student.id }}">
                                     <i class="fas fa-chevron-down me-1"></i>詳細
                                 </button>
@@ -274,20 +248,20 @@
                         </tr>
                         
                         <tr class="detail-row collapse" id="details-{{ grade.student.id }}">
-                            <td colspan="8" class="p-0">
+                            <td colspan="5" class="p-0">
                                 <div class="detail-card">
-                                    <h6 class="mb-3 text-primary">
-                                        <i class="fas fa-history me-2"></i>{{ grade.student.full_name }}さんの履歴
+                                    <h6 class="mb-3 text-primary border-bottom pb-2">
+                                        <i class="fas fa-history me-2"></i>{{ grade.student.full_name }}さんの獲得履歴
                                     </h6>
                                     {% if grade.lesson_points %}
                                         <div class="table-responsive">
-                                            <table class="table table-sm table-bordered detail-table mb-0">
+                                            <table class="table table-sm table-bordered detail-table mb-0 w-100">
                                                 <thead class="table-light">
                                                     <tr>
-                                                        <th>回数</th>
-                                                        <th>日付</th>
-                                                        <th>獲得ポイント</th>
-                                                        <th>累計推移</th>
+                                                        <th style="width: 20%;">回数</th>
+                                                        <th style="width: 20%;">日付</th>
+                                                        <th style="width: 30%;">獲得ポイント</th>
+                                                        <th style="width: 30%;">累計推移</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -312,14 +286,14 @@
                                             </table>
                                         </div>
                                     {% else %}
-                                        <p class="text-muted mb-0 small"><i class="fas fa-info-circle me-1"></i>授業でのポイント履歴はありません。</p>
+                                        <p class="text-muted mb-0 small"><i class="fas fa-info-circle me-1"></i>授業でのポイント獲得履歴はありません。</p>
                                     {% endif %}
                                 </div>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center py-5">
+                            <td colspan="5" class="text-center py-5">
                                 <i class="fas fa-user-slash fa-3x text-muted mb-3 opacity-50"></i>
                                 <h5 class="text-muted">学生データがありません</h5>
                                 <p class="text-muted small">学生を追加して授業を開始してください。</p>

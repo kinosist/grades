@@ -159,9 +159,10 @@
                                 <tr>
                                     <th>学籍番号</th>
                                     <th>氏名</th>
-                                    <th>ふりがな</th>
-                                    <th>ポイント</th>
-                                    <th style="width: 100px;"></th> </tr>
+                                    <th>フリガナ</th>
+                                    <th style="width: 1%; white-space: nowrap;">ポイント</th>
+                                    <th style="width: 1%; white-space: nowrap;">編集</th>
+                                </tr>
                             </thead>
                             <tbody>
                                 {% for student in students %}
@@ -181,31 +182,25 @@
                                     <td>
                                         {# クラス単位のポイントがある場合はそれを優先表示 #}
                                         {% if student.class_point %}
-                                            <span class="badge bg-{% if student.class_point.points >= 80 %}success{% elif student.class_point.points >= 60 %}warning{% else %}secondary{% endif %}">
+                                            <span id="point-badge-{{ student.id }}" class="badge bg-{% if student.class_point.points >= 80 %}success{% elif student.class_point.points >= 60 %}warning{% else %}secondary{% endif %}">
                                                 {{ student.class_point.points }}pt
                                             </span>
                                         {% else %}
-                                            <span class="badge bg-{% if student.points >= 80 %}success{% elif student.points >= 60 %}warning{% else %}secondary{% endif %}">
+                                            <span id="point-badge-{{ student.id }}" class="badge bg-{% if student.points >= 80 %}success{% elif student.points >= 60 %}warning{% else %}secondary{% endif %}">
                                                 {{ student.points }}pt
                                             </span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-end">
-                                        <div class="btn-group btn-group-sm">
-                                            {# ビューで student.class_point をセットしているのでそれを使う #}
-                                            {% if student.class_point %}
-                                                <button class="btn btn-outline-warning" onclick="event.stopPropagation(); editStudentPoints('{{ student.id }}', '{{ student.class_point.points }}')" title="ポイント編集">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                            {% else %}
-                                                <button class="btn btn-outline-warning" onclick="event.stopPropagation(); editStudentPoints('{{ student.id }}', '{{ student.points }}')" title="ポイント編集">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                            {% endif %}
-                                            <button class="btn btn-outline-danger" onclick="event.stopPropagation(); removeStudent('{{ student.id }}', '{{ student.full_name|escapejs }}')" title="除籍">
-                                                <i class="fas fa-user-times"></i>
+                                    <td class="text-center">
+                                        {% if student.class_point %}
+                                            <button id="edit-btn-{{ student.id }}" class="btn btn-outline-warning btn-sm border-0 py-0 px-2" onclick="event.stopPropagation(); editStudentPoints('{{ student.id }}', '{{ student.class_point.points }}')" title="ポイント編集">
+                                                <i class="fas fa-edit"></i>
                                             </button>
-                                        </div>
+                                        {% else %}
+                                            <button id="edit-btn-{{ student.id }}" class="btn btn-outline-warning btn-sm border-0 py-0 px-2" onclick="event.stopPropagation(); editStudentPoints('{{ student.id }}', '{{ student.points }}')" title="ポイント編集">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -343,37 +338,27 @@ function editStudentPoints(studentId, currentPoints) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                location.reload();
+                // DOMを直接更新（リロードしない）
+                const badge = document.getElementById(`point-badge-${studentId}`);
+                if (badge) {
+                    badge.textContent = `${newPoints}pt`;
+                    
+                    // ポイントに応じてバッジの色を更新
+                    const points = parseInt(newPoints);
+                    let badgeClass = 'badge ';
+                    if (points >= 80) badgeClass += 'bg-success';
+                    else if (points >= 60) badgeClass += 'bg-warning';
+                    else badgeClass += 'bg-secondary';
+                    badge.className = badgeClass;
+                }
+
+                // 次回クリック時のためにボタンのonclick属性を更新
+                const btn = document.getElementById(`edit-btn-${studentId}`);
+                if (btn) {
+                    btn.setAttribute('onclick', `event.stopPropagation(); editStudentPoints('${studentId}', '${newPoints}')`);
+                }
             } else {
                 alert('ポイントの更新に失敗しました');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('エラーが発生しました');
-        });
-    }
-}
-
-function removeStudent(studentId, studentName) {
-    if (confirm(`${studentName}さんをこのクラスから除籍しますか？`)) {
-        // AJAX呼び出しで学生を除籍
-        fetch(`{% url 'school_management:remove_student_from_class' student_id=0 %}`.replace('0', studentId), {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}',
-            },
-            body: JSON.stringify({
-                class_id: "{{ classroom.id }}"
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('除籍に失敗しました');
             }
         })
         .catch(error => {

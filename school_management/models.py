@@ -497,8 +497,17 @@ class StudentClassPoints(models.Model):
             lesson_session__classroom=self.classroom
         ).aggregate(total=Sum('points'))['total'] or 0
         
-        # 合計を計算 (出席点を含む)
-        self.points = int(quiz_total + lesson_total + self.attendance_points)
+        # QRコードスキャンの合計
+        qr_total = QRCodeScan.objects.filter(
+            scanned_by=self.student,
+            lesson_session__classroom=self.classroom
+        ).aggregate(total=Sum('points_awarded'))['total'] or 0
+        
+        # 授業点 = 小テスト + 授業内ポイント + QRコード
+        class_points_val = quiz_total + lesson_total + qr_total
+        
+        # 合計を計算 (出席点 + 授業点 * 2)
+        self.points = int(self.attendance_points + (class_points_val * 2))
 
     @property
     def live_points(self):
@@ -508,9 +517,25 @@ class StudentClassPoints(models.Model):
 
     @property
     def class_points(self):
-        """授業点: 小テストの合計点 + 授業内獲得ポイントの合計"""
-        self.calculate_points_internal()
-        return self.points - int(self.attendance_points)
+        """授業点: 小テストの合計点 + 授業内獲得ポイントの合計 + QRコード"""
+        # 合計点からの逆算ではなく、純粋な合計値を再計算して返す
+        quiz_total = QuizScore.objects.filter(
+            student=self.student,
+            quiz__lesson_session__classroom=self.classroom,
+            is_cancelled=False
+        ).aggregate(total=Sum('score'))['total'] or 0
+        
+        lesson_total = StudentLessonPoints.objects.filter(
+            student=self.student,
+            lesson_session__classroom=self.classroom
+        ).aggregate(total=Sum('points'))['total'] or 0
+
+        qr_total = QRCodeScan.objects.filter(
+            scanned_by=self.student,
+            lesson_session__classroom=self.classroom
+        ).aggregate(total=Sum('points_awarded'))['total'] or 0
+        
+        return int(quiz_total + lesson_total + qr_total)
 
     @property
     def total_points(self):

@@ -67,7 +67,6 @@
     }
     .evaluation-table .attendance-point-col { min-width: 80px; }
     .evaluation-table .score-col { min-width: 70px; }
-    .evaluation-table .multiplier-col { min-width: 60px; color: #6c757d; }
     
     .header-sub-text {
         display: block;
@@ -256,12 +255,9 @@
                             <th class="score-col">
                                 授業点
                             </th>
-                            <th class="multiplier-col">
-                                倍率
-                                <span class="header-sub-text">(×2)</span>
-                            </th>
                             <th class="total-col">
                                 合計
+                                <span class="header-sub-text">( 出席点 + (授業点 * 2) )</span>
                             </th>
                         </tr>
                     </thead>
@@ -293,15 +289,13 @@
 
                             <td class="score-col">{{ evaluation.class_points|default:0 }}</td>
 
-                            <td class="multiplier-col">{{ evaluation.multiplier|default:2 }}</td>
-
                             <td class="total-col">
                                 <span class="total-points">{{ evaluation.total_points|floatformat:1 }}</span>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center py-5">
+                            <td colspan="7" class="text-center py-5">
                                 <i class="fas fa-user-slash fa-3x text-muted mb-3 opacity-50"></i>
                                 <h5 class="text-muted">データがありません</h5>
                             </td>
@@ -346,10 +340,8 @@ function saveAttendanceRate(input) {
     const scoreCell = row.querySelector('.score-col');
     // 余分な空白や文字を除去して数値のみ抽出 (例: "10pt" -> 10)
     const classPoints = parseFloat(scoreCell.textContent.trim().replace(/[^0-9.-]/g, '')) || 0;
-    const multiplierCell = row.querySelector('.multiplier-col');
-    // 余分な空白や文字を除去して数値のみ抽出
-    const multiplier = parseFloat(multiplierCell.textContent.trim().replace(/[^0-9.-]/g, '')) || 2;
-    const newTotalPoints = newAttendancePoints + (classPoints * multiplier);
+    // 合計 = 出席点 + (授業点 * 2)
+    const newTotalPoints = newAttendancePoints + (classPoints * 2);
     
     // 画面更新
     const attendancePointsSpan = row.querySelector('.attendance-points');

@@ -124,6 +124,18 @@ class ClassRoom(models.Model):
     def __str__(self):
         return f"{self.year}年 {self.get_semester_display()} {self.class_name}"
 
+    def get_average_points(self):
+        """クラスの平均総合ポイントを計算"""
+        points_list = self.student_class_points.all()
+        count = points_list.count()
+        
+        if count == 0:
+            return 0.0
+            
+        # 各学生のtotal_pointsプロパティ（出席点 + 授業点*2）の合計を計算
+        total_sum = sum(sp.total_points for sp in points_list)
+        return round(total_sum / count, 1)
+
 
 class LessonSession(models.Model):
     """授業回マスタ"""

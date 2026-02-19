@@ -218,11 +218,7 @@
                     <div class="stat-item">
                         <div class="stat-label">平均ポイント</div>
                         <div class="stat-value">
-                            {% if student_evaluations %}
-                                {{ student_evaluations|length|floatformat:1 }}
-                            {% else %}
-                                0.0
-                            {% endif %}
+                            {{ classroom.get_average_points }}
                         </div>
                     </div>
                 </div>

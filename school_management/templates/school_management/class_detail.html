@@ -324,14 +324,17 @@ function editStudentPoints(studentId, currentPoints) {
     const newPoints = prompt('新しいポイント数を入力してください:', currentPoints);
     if (newPoints !== null && !isNaN(newPoints)) {
         // AJAX呼び出しでポイントを更新
-        fetch(`{% url 'school_management:update_student_points' student_id=0 %}`.replace('0', studentId), {
+        // URLのプレースホルダー '0' を実際の studentId に置換
+        // 注意: URLパターンが /update_student_points/0/ のようになっていることを想定
+        const url = "{% url 'school_management:update_student_points' student_id=0 %}".replace('0', studentId);
+        fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': '{{ csrf_token }}',
             },
                     body: JSON.stringify({
-                        points: parseInt(newPoints),
+                        points: parseFloat(newPoints) || 0,
                         class_id: parseInt('{{ classroom.id }}')
                     })
         })
@@ -344,7 +347,7 @@ function editStudentPoints(studentId, currentPoints) {
                     badge.textContent = `${newPoints}pt`;
                     
                     // ポイントに応じてバッジの色を更新
-                    const points = parseInt(newPoints);
+                    const points = parseFloat(newPoints);
                     let badgeClass = 'badge ';
                     if (points >= 80) badgeClass += 'bg-success';
                     else if (points >= 60) badgeClass += 'bg-warning';

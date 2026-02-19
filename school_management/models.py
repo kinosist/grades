@@ -3,6 +3,9 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
 import uuid
+from django.db.models import Sum
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
 
 
 class CustomUserManager(BaseUserManager):
@@ -478,3 +481,68 @@ class StudentClassPoints(models.Model):
 
     def __str__(self):
         return f"{self.student.full_name} - {self.classroom.class_name} - {self.points}pt"
+
+    def calculate_points_internal(self):
+        """内部計算用: 各種スコアを集計してpointsフィールドを更新する"""
+        # 小テストの合計
+        quiz_total = QuizScore.objects.filter(
+            student=self.student,
+            quiz__lesson_session__classroom=self.classroom,
+            is_cancelled=False
+        ).aggregate(total=Sum('score'))['total'] or 0
+        
+        # 授業ポイントの合計
+        lesson_total = StudentLessonPoints.objects.filter(
+            student=self.student,
+            lesson_session__classroom=self.classroom
+        ).aggregate(total=Sum('points'))['total'] or 0
+        
+        # 合計を計算 (出席点を含む)
+        self.points = int(quiz_total + lesson_total + self.attendance_points)
+
+    @property
+    def live_points(self):
+        """表示用にリアルタイムで再計算した値を返す（DB保存はしない）"""
+        self.calculate_points_internal()
+        return self.points
+
+    @property
+    def class_points(self):
+        """授業点: 小テストの合計点 + 授業内獲得ポイントの合計"""
+        self.calculate_points_internal()
+        return self.points - int(self.attendance_points)
+
+    @property
+    def total_points(self):
+        """総合ポイント"""
+        self.calculate_points_internal()
+        return self.points
+
+    def save(self, *args, **kwargs):
+        """保存時に自動的にポイントを再計算する"""
+        self.calculate_points_internal()
+        super().save(*args, **kwargs)
+
+    def recalculate_total(self):
+        """外部呼び出し用互換メソッド（シグナル等から呼ばれる）"""
+        self.save()
+
+
+# --- Signals ---
+@receiver([post_save, post_delete], sender=QuizScore)
+def update_class_points_from_quiz(sender, instance, **kwargs):
+    if instance.quiz.lesson_session.classroom:
+        scp, _ = StudentClassPoints.objects.get_or_create(
+            student=instance.student,
+            classroom=instance.quiz.lesson_session.classroom
+        )
+        scp.recalculate_total()
+
+@receiver([post_save, post_delete], sender=StudentLessonPoints)
+def update_class_points_from_lesson(sender, instance, **kwargs):
+    if instance.lesson_session.classroom:
+        scp, _ = StudentClassPoints.objects.get_or_create(
+            student=instance.student,
+            classroom=instance.lesson_session.classroom
+        )
+        scp.recalculate_total()

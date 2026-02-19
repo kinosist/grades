@@ -222,7 +222,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for grade in student_grades %}
+                        {% for grade in student_grades|dictsortreversed:"class_points" %}
                         <tr>
                             <td class="col-rank text-center">
                                 <span class="rank-badge rank-{{ forloop.counter }}">
@@ -234,7 +234,10 @@
                                 <div class="text-muted small">{{ grade.student.student_number }}</div>
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-success rounded-pill px-4 py-2 fs-6">{{ grade.total_points }}pt</span>
+                                <span class="badge bg-success rounded-pill px-4 py-2 fs-6">
+                                    {# gradeオブジェクトが辞書かモデルか不明なため、両方の可能性を考慮して表示 #}
+                                    {{ grade.class_points|default:grade.total_points|default:0 }}pt
+                                </span>
                             </td>
                             <td class="text-center">
                                 <span class="badge bg-{{ grade.grade_color }} px-3">{{ grade.grade_level }}</span>
@@ -251,7 +254,7 @@
                             <td colspan="5" class="p-0">
                                 <div class="detail-card">
                                     <h6 class="mb-3 text-primary border-bottom pb-2">
-                                        <i class="fas fa-history me-2"></i>{{ grade.student.full_name }}さんの獲得履歴
+                                        <i class="fas fa-history me-2"></i>授業ポイント履歴
                                     </h6>
                                     {% if grade.lesson_points %}
                                         <div class="table-responsive">
@@ -270,15 +273,10 @@
                                                         <td>第{{ point.lesson_session.session_number }}回</td>
                                                         <td>{{ point.lesson_session.date|date:"m/d" }}</td>
                                                         <td class="fw-bold text-success">+{{ point.points }}pt</td>
-                                                        <td class="text-muted">
-                                                            {% with total=0 %}
-                                                                {% for p in grade.lesson_points %}
-                                                                    {% if p.lesson_session.session_number <= point.lesson_session.session_number %}
-                                                                        {% with total=total|add:p.points %}{% endwith %}
-                                                                    {% endif %}
-                                                                {% endfor %}
-                                                                {{ total }}pt
-                                                            {% endwith %}
+                                                        <td class="text-muted cumulative-calc" 
+                                                            data-session="{{ point.lesson_session.session_number|default:0 }}" 
+                                                            data-points="{{ point.points|default:0 }}">
+                                                            - pt
                                                         </td>
                                                     </tr>
                                                     {% endfor %}
@@ -288,6 +286,34 @@
                                     {% else %}
                                         <p class="text-muted mb-0 small"><i class="fas fa-info-circle me-1"></i>授業でのポイント獲得履歴はありません。</p>
                                     {% endif %}
+
+                                    <h6 class="mt-4 mb-3 text-success border-bottom pb-2">
+                                        <i class="fas fa-clipboard-check me-2"></i>小テスト履歴
+                                    </h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered detail-table mb-0 w-100">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width: 20%;">回数</th>
+                                                    <th style="width: 20%;">日付</th>
+                                                    <th style="width: 40%;">テスト名</th>
+                                                    <th style="width: 20%;">得点</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for score in grade.student.quiz_scores_as_student.all|dictsortreversed:"graded_at" %}
+                                                    {% if score.quiz.lesson_session.classroom.id == classroom.id and not score.is_cancelled %}
+                                                    <tr>
+                                                        <td>第{{ score.quiz.lesson_session.session_number }}回</td>
+                                                        <td>{{ score.quiz.lesson_session.date|date:"m/d" }}</td>
+                                                        <td>{{ score.quiz.quiz_name }}</td>
+                                                        <td class="fw-bold text-success">{{ score.score }}点</td>
+                                                    </tr>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -306,4 +332,28 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 各学生の詳細テーブルごとに累積ポイントを計算
+    document.querySelectorAll('.detail-table').forEach(table => {
+        // そのテーブル内の全行のデータを取得
+        const cells = Array.from(table.querySelectorAll('.cumulative-calc'));
+        const pointsData = cells.map(el => ({
+            session: parseInt(el.dataset.session),
+            points: parseFloat(el.dataset.points)
+        }));
+
+        // 各行について、自分以下のセッション番号を持つポイントを合計して表示
+        cells.forEach((cell, index) => {
+            const currentSession = pointsData[index].session;
+            const total = pointsData
+                .filter(p => p.session <= currentSession)
+                .reduce((sum, p) => sum + (p.points || 0), 0);
+            // 小数点以下があれば表示、なければ整数表示
+            cell.textContent = (Number.isInteger(total) ? total : total.toFixed(1)) + 'pt';
+        });
+    });
+});
+</script>
 {% endblock %}

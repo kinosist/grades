@@ -24,9 +24,13 @@
                     </div>
                     <h4 class="mb-1">{{ student.full_name }}</h4>
                     <p class="text-muted mb-2">{{ student.furigana|default:"-" }}</p>
-                    <span class="badge bg-{% if student.points >= 80 %}success{% elif student.points >= 60 %}warning{% else %}secondary{% endif %} fs-6">
-                        {{ student.points }}pt
-                    </span>
+                    {% for cp in student.class_points.all %}
+                        {% if cp.classroom.id == classroom.id %}
+                            <span id="student-total-badge" class="badge bg-{% if cp.points >= 80 %}success{% elif cp.points >= 60 %}warning{% else %}secondary{% endif %} fs-6">
+                                {{ cp.points }}pt
+                            </span>
+                        {% endif %}
+                    {% endfor %}
                 </div>
                 
                 <hr>
@@ -99,17 +103,19 @@
                             </thead>
                             <tbody>
                                 {% for score in quiz_scores %}
+                                {% if not score.is_cancelled %}
                                 <tr>
                                     <td>{{ score.quiz.lesson_session.date|date:"m/d" }}</td>
                                     <td>{{ score.quiz.title|truncatechars:20 }}</td>
                                     <td>
-                                        <span class="badge bg-{% if score.percentage >= 80 %}success{% elif score.percentage >= 60 %}warning{% else %}danger{% endif %}">
+                                        <span class="badge bg-{% if score.percentage >= 80 %}success{% elif score.percentage >= 60 %}warning{% else %}danger{% endif %} quiz-score-value" data-score="{{ score.score }}">
                                             {{ score.score }}
                                         </span>
                                     </td>
                                     <td>{{ score.quiz.total_points }}</td>
                                     <td>{{ score.percentage|floatformat:0 }}%</td>
                                 </tr>
+                                {% endif %}
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -245,4 +251,22 @@
     color: #6c757d;
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // クイズの合計点を計算
+    let quizTotal = 0;
+    document.querySelectorAll('.quiz-score-value').forEach(badge => {
+        quizTotal += parseFloat(badge.dataset.score) || 0;
+    });
+
+    // 現在のクラスのポイントをテーブルから取得して、上部のバッジ（氏名の下）に反映する
+    const currentClassSource = document.querySelector('.current-class-points-source');
+    const totalBadge = document.getElementById('student-total-badge');
+    
+    if (currentClassSource && totalBadge) {
+        totalBadge.textContent = currentClassSource.textContent.trim();
+    }
+});
+</script>
 {% endblock %}

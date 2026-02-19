@@ -291,9 +291,9 @@
                                 <span class="attendance-points">{{ evaluation.attendance_points|floatformat:1 }}</span>
                             </td>
 
-                            <td class="score-col">{{ evaluation.class_points }}</td>
+                            <td class="score-col">{{ evaluation.class_points|default:0 }}</td>
 
-                            <td class="multiplier-col">{{ evaluation.multiplier }}</td>
+                            <td class="multiplier-col">{{ evaluation.multiplier|default:2 }}</td>
 
                             <td class="total-col">
                                 <span class="total-points">{{ evaluation.total_points|floatformat:1 }}</span>
@@ -344,9 +344,11 @@ function saveAttendanceRate(input) {
     const newAttendancePoints = (attendanceRate / 100) * ATTENDANCE_MAX_POINTS;
     const row = input.closest('tr');
     const scoreCell = row.querySelector('.score-col');
-    const classPoints = parseFloat(scoreCell.textContent) || 0;
+    // 余分な空白や文字を除去して数値のみ抽出 (例: "10pt" -> 10)
+    const classPoints = parseFloat(scoreCell.textContent.trim().replace(/[^0-9.-]/g, '')) || 0;
     const multiplierCell = row.querySelector('.multiplier-col');
-    const multiplier = parseFloat(multiplierCell.textContent) || 2;
+    // 余分な空白や文字を除去して数値のみ抽出
+    const multiplier = parseFloat(multiplierCell.textContent.trim().replace(/[^0-9.-]/g, '')) || 2;
     const newTotalPoints = newAttendancePoints + (classPoints * multiplier);
     
     // 画面更新
@@ -356,7 +358,8 @@ function saveAttendanceRate(input) {
     if (totalPointsSpan) totalPointsSpan.textContent = newTotalPoints.toFixed(1);
     
     // サーバー送信
-    fetch(`/classes/${classId}/attendance-rate/`, {
+    const url = "{% url 'school_management:update_attendance_rate' classroom.id %}";
+    fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

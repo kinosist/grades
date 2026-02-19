@@ -27,7 +27,7 @@
                     {% for cp in student.class_points.all %}
                         {% if cp.classroom.id == classroom.id %}
                             <span id="student-total-badge" class="badge bg-{% if cp.points >= 80 %}success{% elif cp.points >= 60 %}warning{% else %}secondary{% endif %} fs-6">
-                                {{ cp.points }}pt
+                                {{ cp.class_points }}pt
                             </span>
                         {% endif %}
                     {% endfor %}

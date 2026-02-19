@@ -56,13 +56,21 @@
                 <div class="row text-center">
                     <div class="col-6">
                         <div class="stat-item">
-                            <div class="stat-value text-primary">{{ stats.total_quizzes }}</div>
+                            <div class="stat-value text-primary">
+                                {% for cp in student.class_points.all %}
+                                    {% if cp.classroom.id == classroom.id %}{{ cp.quiz_stats.count }}{% endif %}
+                                {% endfor %}
+                            </div>
                             <div class="stat-label">クイズ回数</div>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="stat-item">
-                            <div class="stat-value text-success">{{ stats.avg_score }}点</div>
+                            <div class="stat-value text-success">
+                                {% for cp in student.class_points.all %}
+                                    {% if cp.classroom.id == classroom.id %}{{ cp.quiz_stats.average }}{% endif %}
+                                {% endfor %}点
+                            </div>
                             <div class="stat-label">平均点</div>
                         </div>
                     </div>
@@ -106,13 +114,13 @@
                                 {% if not score.is_cancelled %}
                                 <tr>
                                     <td>{{ score.quiz.lesson_session.date|date:"m/d" }}</td>
-                                    <td>{{ score.quiz.title|truncatechars:20 }}</td>
+                                    <td>{{ score.quiz.quiz_name|truncatechars:20 }}</td>
                                     <td>
                                         <span class="badge bg-{% if score.percentage >= 80 %}success{% elif score.percentage >= 60 %}warning{% else %}danger{% endif %} quiz-score-value" data-score="{{ score.score }}">
                                             {{ score.score }}
                                         </span>
                                     </td>
-                                    <td>{{ score.quiz.total_points }}</td>
+                                    <td>{{ score.quiz.max_score }}</td>
                                     <td>{{ score.percentage|floatformat:0 }}%</td>
                                 </tr>
                                 {% endif %}

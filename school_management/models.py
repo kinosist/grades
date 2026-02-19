@@ -272,6 +272,12 @@ class QuizScore(models.Model):
     def __str__(self):
         return f"{self.quiz} - {self.student.full_name}: {self.score}点"
 
+    @property
+    def percentage(self):
+        """正答率を計算"""
+        if self.quiz.max_score > 0:
+            return (self.score / self.quiz.max_score) * 100
+        return 0
 
 class Question(models.Model):
     """小テストの問題"""
@@ -512,6 +518,24 @@ class StudentClassPoints(models.Model):
         
         # 合計を計算 (出席点 + 授業点 * 2)
         self.points = int(self.attendance_points + (class_points_val * 2))
+
+    @property
+    def quiz_stats(self):
+        """重複を除外したクイズ統計を返す（回数と平均点）"""
+        all_quiz_scores = QuizScore.objects.filter(
+            student=self.student,
+            quiz__lesson_session__classroom=self.classroom,
+            is_cancelled=False
+        ).order_by('graded_at')
+        
+        # 辞書で上書きすることで最新のスコアのみを残す（重複対策）
+        unique_scores = {qs.quiz_id: qs.score for qs in all_quiz_scores}
+        
+        count = len(unique_scores)
+        total = sum(unique_scores.values())
+        avg = round(total / count, 1) if count > 0 else 0
+        
+        return {'count': count, 'average': avg}
 
     @property
     def live_points(self):

@@ -40,7 +40,7 @@ def student_detail_view(request, student_number):
     for classroom in classes:
         try:
             class_points_obj = StudentClassPoints.objects.get(student=student, classroom=classroom)
-            class_points = class_points_obj.points
+            class_points = class_points_obj.class_points
         except StudentClassPoints.DoesNotExist:
             class_points = 0
         
@@ -49,10 +49,32 @@ def student_detail_view(request, student_number):
             'points': class_points
         })
     
+    # 統計情報を計算 (全クラス合計)
+    # 1. 小テスト統計 (重複除外)
+    all_quiz_scores = QuizScore.objects.filter(
+        student=student,
+        is_cancelled=False
+    ).order_by('graded_at')
+    
+    unique_scores = {qs.quiz_id: qs.score for qs in all_quiz_scores}
+    total_quizzes = len(unique_scores)
+    avg_score = round(sum(unique_scores.values()) / total_quizzes, 1) if total_quizzes > 0 else 0
+    
+    # 2. ピア評価回数 (評価した回数)
+    student_groups = GroupMember.objects.filter(student=student).values_list('group', flat=True)
+    peer_eval_count = PeerEvaluation.objects.filter(
+        evaluator_group__in=student_groups
+    ).count()
+    
     context = {
         'student': student,
         'classes': classes,
         'class_data': class_data,
+        'stats': {
+            'total_quizzes': total_quizzes,
+            'avg_score': avg_score,
+            'peer_eval_count': peer_eval_count,
+        }
     }
     return render(request, 'school_management/student_detail.html', context)
 

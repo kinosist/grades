@@ -485,11 +485,15 @@ class StudentClassPoints(models.Model):
     def calculate_points_internal(self):
         """内部計算用: 各種スコアを集計してpointsフィールドを更新する"""
         # 小テストの合計
-        quiz_total = QuizScore.objects.filter(
+        # 重複データ対策: 同一クイズのスコアが複数ある場合は最新のみ採用
+        all_quiz_scores = QuizScore.objects.filter(
             student=self.student,
             quiz__lesson_session__classroom=self.classroom,
             is_cancelled=False
-        ).aggregate(total=Sum('score'))['total'] or 0
+        ).order_by('graded_at')
+        
+        # 辞書で上書きすることで最新のスコアのみを残す
+        quiz_total = sum({qs.quiz_id: qs.score for qs in all_quiz_scores}.values())
         
         # 授業ポイントの合計
         lesson_total = StudentLessonPoints.objects.filter(
@@ -519,11 +523,13 @@ class StudentClassPoints(models.Model):
     def class_points(self):
         """授業点: 小テストの合計点 + 授業内獲得ポイントの合計 + QRコード"""
         # 合計点からの逆算ではなく、純粋な合計値を再計算して返す
-        quiz_total = QuizScore.objects.filter(
+        # 小テスト (重複対策)
+        all_quiz_scores = QuizScore.objects.filter(
             student=self.student,
             quiz__lesson_session__classroom=self.classroom,
             is_cancelled=False
-        ).aggregate(total=Sum('score'))['total'] or 0
+        ).order_by('graded_at')
+        quiz_total = sum({qs.quiz_id: qs.score for qs in all_quiz_scores}.values())
         
         lesson_total = StudentLessonPoints.objects.filter(
             student=self.student,
@@ -540,8 +546,8 @@ class StudentClassPoints(models.Model):
     @property
     def total_points(self):
         """総合ポイント"""
-        self.calculate_points_internal()
-        return self.points
+        # 表示用に、出席点(float)を含めた正確な値を返す
+        return self.attendance_points + (self.class_points * 2)
 
     def save(self, *args, **kwargs):
         """保存時に自動的にポイントを再計算する"""

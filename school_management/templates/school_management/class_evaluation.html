@@ -287,10 +287,18 @@
                                 <span class="attendance-points">{{ evaluation.attendance_points|floatformat:1 }}</span>
                             </td>
 
-                            <td class="score-col">{{ evaluation.class_points|default:0 }}</td>
+                            <td class="score-col">
+                                {% for cp in evaluation.student.class_points.all %}
+                                    {% if cp.classroom.id == classroom.id %}{{ cp.class_points }}{% endif %}
+                                {% endfor %}
+                            </td>
 
                             <td class="total-col">
-                                <span class="total-points">{{ evaluation.total_points|floatformat:1 }}</span>
+                                <span class="total-points">
+                                    {% for cp in evaluation.student.class_points.all %}
+                                        {% if cp.classroom.id == classroom.id %}{{ cp.total_points|floatformat:1 }}{% endif %}
+                                    {% endfor %}
+                                </span>
                             </td>
                         </tr>
                         {% empty %}

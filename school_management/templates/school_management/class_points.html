@@ -236,7 +236,9 @@
                             <td class="text-center">
                                 <span class="badge bg-success rounded-pill px-4 py-2 fs-6">
                                     {# gradeオブジェクトが辞書かモデルか不明なため、両方の可能性を考慮して表示 #}
-                                    {{ grade.class_points|default:grade.total_points|default:0 }}pt
+                                    {% for cp in grade.student.class_points.all %}
+                                        {% if cp.classroom.id == classroom.id %}{{ cp.class_points }}pt{% endif %}
+                                    {% endfor %}
                                 </span>
                             </td>
                             <td class="text-center">

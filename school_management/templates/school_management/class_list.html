@@ -19,13 +19,22 @@
     .clickable-row:hover {
         background-color: rgba(0,0,0,0.05) !important;
     }
+
+   .modern-card {
+        border: none !important;
+        border-radius: 20px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        background-color: #ffffff;
+    }
+
 </style>
+
 {% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
-      <div class="card border-0 ">
+      <div class="card modern-card">
             <div class=" bg-white  p-4 d-flex justify-content-between align-items-center">
             <h5 class="fw-bold m-0 text-dark"><i class="fas fa-list me-2 text-primary"></i>担当クラス一覧</h5>
                 <a href="{% url 'school_management:class_create' %}" class="btn btn-primary">

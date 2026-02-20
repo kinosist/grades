@@ -16,10 +16,8 @@ def lesson_session_create(request, class_id):
         has_quiz = request.POST.get('has_quiz') == 'on'
         has_peer_evaluation = request.POST.get('has_peer_evaluation') == 'on'
         
-        print(has_quiz)
-        print(request.POST)
         # 授業回作成
-        lesson_session = LessonSession.objects.create(
+        LessonSession.objects.create(
             classroom=classroom,
             session_number=session_number,
             date=date,
@@ -27,8 +25,6 @@ def lesson_session_create(request, class_id):
             has_quiz=has_quiz,
             has_peer_evaluation=has_peer_evaluation
         )
-
-        
         
         messages.success(request, f'第{session_number}回の授業を作成しました。 {request.POST.get("has_quiz")}')
         return redirect('school_management:class_detail', class_id=class_id)

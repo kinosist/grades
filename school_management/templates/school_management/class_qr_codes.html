@@ -1,6 +1,7 @@
 {% extends 'school_management/base.html' %}
 
 {% block title %}{{ classroom.class_name }} - QRコード一覧{% endblock %}
+{% block page_title %}QRコード一覧{% endblock %}
 
 {% block breadcrumbs %}
 <li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>

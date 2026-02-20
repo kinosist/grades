@@ -1,12 +1,19 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponseRedirect
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
 from ...models import (
     ClassRoom, LessonSession, CustomUser,
     StudentGoal, LessonReport, SelfEvaluation
 )
+
+
+def _student_detail_url(class_id, student_number, tab_hash=''):
+    """クラス内学生詳細URLを生成（タブハッシュ付き）"""
+    url = reverse('school_management:class_student_detail',
+                  kwargs={'class_id': class_id, 'student_number': student_number})
+    return f'{url}{tab_hash}'
 
 
 @login_required
@@ -33,10 +40,9 @@ def student_goal_edit(request, class_id, student_number):
             messages.success(request, f'{student.full_name}さんの目標を保存しました。')
         else:
             messages.error(request, '目標を入力してください。')
-        return redirect('school_management:class_student_detail', class_id=class_id, student_number=student_number)
+        return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#goal'))
 
-    # GET は class_student_detail へのリダイレクト（フォームはそっちに埋め込む）
-    return redirect('school_management:class_student_detail', class_id=class_id, student_number=student_number)
+    return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#goal'))
 
 
 @login_required
@@ -127,10 +133,10 @@ def self_evaluation_edit(request, class_id, student_number):
                         self_eval.teacher_score = score
                     else:
                         messages.error(request, '点数は0〜100で入力してください。')
-                        return redirect('school_management:class_student_detail', class_id=class_id, student_number=student_number)
+                        return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))
                 except ValueError:
                     messages.error(request, '点数は数値で入力してください。')
-                    return redirect('school_management:class_student_detail', class_id=class_id, student_number=student_number)
+                    return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))
             else:
                 self_eval.teacher_score = None
         elif section == 'student':
@@ -144,15 +150,15 @@ def self_evaluation_edit(request, class_id, student_number):
                         self_eval.student_score = score
                     else:
                         messages.error(request, '点数は0〜100で入力してください。')
-                        return redirect('school_management:class_student_detail', class_id=class_id, student_number=student_number)
+                        return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))
                 except ValueError:
                     messages.error(request, '点数は数値で入力してください。')
-                    return redirect('school_management:class_student_detail', class_id=class_id, student_number=student_number)
+                    return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))
             else:
                 self_eval.student_score = None
 
         self_eval.save()
         messages.success(request, '評価を保存しました。')
-        return redirect('school_management:class_student_detail', class_id=class_id, student_number=student_number)
+        return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))
 
-    return redirect('school_management:class_student_detail', class_id=class_id, student_number=student_number)
+    return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))

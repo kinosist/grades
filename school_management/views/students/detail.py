@@ -4,7 +4,8 @@ from django.contrib import messages
 from django.db.models import Avg
 from ...models import (
     CustomUser, ClassRoom, LessonSession, QuizScore, 
-    Attendance, GroupMember, PeerEvaluation, StudentClassPoints
+    Attendance, GroupMember, PeerEvaluation, StudentClassPoints,
+    StudentGoal, SelfEvaluation, LessonReport
 )
 
 @login_required
@@ -140,6 +141,16 @@ def class_student_detail_view(request, class_id, student_number):
     total_sessions = class_sessions.count()
     attendance_rate = (attendance_count / total_sessions * 100) if total_sessions > 0 else 0
     
+    # 目標・自己評価の取得
+    goal = StudentGoal.objects.filter(student=student, classroom=classroom).first()
+    self_eval = SelfEvaluation.objects.filter(student=student, classroom=classroom).first()
+
+    # このクラスでの日報一覧（授業回日付順）
+    lesson_reports = LessonReport.objects.filter(
+        student=student,
+        lesson_session__classroom=classroom
+    ).select_related('lesson_session').order_by('lesson_session__date')
+
     context = {
         'classroom': classroom,
         'student': student,
@@ -147,6 +158,9 @@ def class_student_detail_view(request, class_id, student_number):
         'quiz_scores': quiz_scores,  # 重複排除済みのリスト（最大10件）
         'attendance_records': attendance_records[:10],  # 最新10件の出席記録
         'peer_evaluations': peer_evaluations[:10],  # 最新10件のピア評価
+        'goal': goal,
+        'self_eval': self_eval,
+        'lesson_reports': lesson_reports,
         'stats': {
             'total_quizzes': total_quizzes,
             'avg_score': round(avg_score, 1),

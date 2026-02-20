@@ -10,8 +10,66 @@
 <li class="breadcrumb-item active" aria-current="page">{{ student.full_name }}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+.avatar-circle {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid #e0e0e0;
+}
+.stat-item { padding: 8px 0; }
+.stat-value { font-size: 1.5rem; font-weight: bold; margin-bottom: 2px; }
+.stat-label { font-size: 0.875rem; color: #6c757d; }
+
+.nav-tabs .nav-link {
+    color: #6c757d;
+    border-radius: 8px 8px 0 0;
+    font-weight: 500;
+}
+.nav-tabs .nav-link.active {
+    color: #0d6efd;
+    font-weight: 700;
+}
+.tab-content {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 20px;
+}
+.score-display {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+}
+.eval-card {
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+}
+.eval-card .card-header {
+    border-radius: 11px 11px 0 0;
+    font-weight: 600;
+}
+.score-pill {
+    display: inline-flex;
+    align-items: center;
+    background: #f3f4f6;
+    border-radius: 24px;
+    padding: 4px 16px;
+    gap: 6px;
+    font-size: 0.9rem;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
+    <!-- 左カラム: 学生情報 -->
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">
@@ -20,7 +78,7 @@
             <div class="card-body">
                 <div class="text-center mb-3">
                     <div class="avatar-circle mx-auto mb-2">
-                        <i class="fas fa-user-graduate fa-3x text-primary"></i>
+                        <span style="font-size:2rem;color:white;font-weight:700;">{{ student.full_name|first }}</span>
                     </div>
                     <h4 class="mb-1">{{ student.full_name }}</h4>
                     <p class="text-muted mb-2">{{ student.furigana|default:"-" }}</p>
@@ -32,22 +90,18 @@
                         {% endif %}
                     {% endfor %}
                 </div>
-                
                 <hr>
-                
                 <dl class="row small">
                     <dt class="col-5">学籍番号:</dt>
                     <dd class="col-7">{{ student.student_number }}</dd>
-                    
                     <dt class="col-5">メール:</dt>
                     <dd class="col-7">{{ student.email|default:"未設定" }}</dd>
-                    
                     <dt class="col-5">クラス:</dt>
                     <dd class="col-7">{{ classroom.class_name }}</dd>
                 </dl>
             </div>
         </div>
-        
+
         <div class="card mt-3">
             <div class="card-header">
                 <h6><i class="fas fa-chart-bar me-2"></i>クラス内での統計</h6>
@@ -90,15 +144,37 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- 右カラム: タブ -->
     <div class="col-md-8">
-        <div class="card mt-3">
-            <div class="card-header">
-                <h6><i class="fas fa-clipboard-check me-2"></i>クイズ成績（最新10件）</h6>
-            </div>
-            <div class="card-body">
+        <ul class="nav nav-tabs mt-3" id="studentTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="grades-tab" data-bs-toggle="tab" data-bs-target="#grades" type="button">
+                    <i class="fas fa-clipboard-check me-1"></i>成績・出席
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="goal-tab" data-bs-toggle="tab" data-bs-target="#goal" type="button">
+                    <i class="fas fa-bullseye me-1"></i>目標
+                    {% if goal %}<span class="badge bg-primary ms-1">設定済</span>{% endif %}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="eval-tab" data-bs-toggle="tab" data-bs-target="#eval" type="button">
+                    <i class="fas fa-star me-1"></i>評価
+                    {% if self_eval and self_eval.teacher_score is not None %}<span class="badge bg-success ms-1">入力済</span>{% endif %}
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="studentTabsContent">
+
+            <!-- 成績・出席タブ -->
+            <div class="tab-pane fade show active" id="grades" role="tabpanel">
+                <!-- クイズ成績 -->
+                <h6 class="fw-bold mb-3"><i class="fas fa-clipboard-check me-2 text-primary"></i>クイズ成績（最新10件）</h6>
                 {% if quiz_scores %}
-                    <div class="table-responsive">
+                    <div class="table-responsive mb-4">
                         <table class="table table-sm table-hover">
                             <thead>
                                 <tr>
@@ -129,28 +205,16 @@
                         </table>
                     </div>
                 {% else %}
-                    <div class="text-center py-3 text-muted">
-                        <i class="fas fa-clipboard-check fa-2x mb-2"></i>
-                        <p>まだクイズ成績がありません</p>
-                    </div>
+                    <p class="text-muted text-center py-3"><i class="fas fa-clipboard-check fa-2x mb-2 d-block opacity-50"></i>まだクイズ成績がありません</p>
                 {% endif %}
-            </div>
-        </div>
-        
-        <div class="card mt-3">
-            <div class="card-header">
-                <h6><i class="fas fa-calendar-check me-2"></i>出席記録（最新10件）</h6>
-            </div>
-            <div class="card-body">
+
+                <!-- 出席記録 -->
+                <h6 class="fw-bold mb-3"><i class="fas fa-calendar-check me-2 text-info"></i>出席記録（最新10件）</h6>
                 {% if attendance_records %}
-                    <div class="table-responsive">
+                    <div class="table-responsive mb-4">
                         <table class="table table-sm table-hover">
                             <thead>
-                                <tr>
-                                    <th>日付</th>
-                                    <th>セッション</th>
-                                    <th>出席状況</th>
-                                </tr>
+                                <tr><th>日付</th><th>セッション</th><th>出席状況</th></tr>
                             </thead>
                             <tbody>
                                 {% for record in attendance_records %}
@@ -158,13 +222,9 @@
                                     <td>{{ record.lesson_session.date|date:"Y/m/d" }}</td>
                                     <td>{{ record.lesson_session.topic|truncatechars:30 }}</td>
                                     <td>
-                                        {% if record.status == 'present' %}
-                                            <span class="badge bg-success">出席</span>
-                                        {% elif record.status == 'late' %}
-                                            <span class="badge bg-warning">遅刻</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">欠席</span>
-                                        {% endif %}
+                                        {% if record.status == 'present' %}<span class="badge bg-success">出席</span>
+                                        {% elif record.status == 'late' %}<span class="badge bg-warning">遅刻</span>
+                                        {% else %}<span class="badge bg-danger">欠席</span>{% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -172,29 +232,16 @@
                         </table>
                     </div>
                 {% else %}
-                    <div class="text-center py-3 text-muted">
-                        <i class="fas fa-calendar-check fa-2x mb-2"></i>
-                        <p>まだ出席記録がありません</p>
-                    </div>
+                    <p class="text-muted text-center py-3"><i class="fas fa-calendar-check fa-2x mb-2 d-block opacity-50"></i>まだ出席記録がありません</p>
                 {% endif %}
-            </div>
-        </div>
-        
-        <div class="card mt-3">
-            <div class="card-header">
-                <h6><i class="fas fa-users me-2"></i>ピア評価履歴（最新10件）</h6>
-            </div>
-            <div class="card-body">
+
+                <!-- ピア評価 -->
+                <h6 class="fw-bold mb-3"><i class="fas fa-users me-2 text-success"></i>ピア評価履歴（最新10件）</h6>
                 {% if peer_evaluations %}
                     <div class="table-responsive">
                         <table class="table table-sm table-hover">
                             <thead>
-                                <tr>
-                                    <th>日付</th>
-                                    <th>セッション</th>
-                                    <th>1位評価グループ</th>
-                                    <th>評価理由</th>
-                                </tr>
+                                <tr><th>日付</th><th>セッション</th><th>1位評価グループ</th><th>評価理由</th></tr>
                             </thead>
                             <tbody>
                                 {% for evaluation in peer_evaluations %}
@@ -202,22 +249,176 @@
                                     <td>{{ evaluation.created_at|date:"m/d" }}</td>
                                     <td>{{ evaluation.lesson_session.topic|truncatechars:20 }}</td>
                                     <td>{{ evaluation.first_place_group.name }}</td>
-                                    <td>
-                                        <small class="text-muted">{{ evaluation.first_place_reason|truncatechars:30 }}</small>
-                                    </td>
+                                    <td><small class="text-muted">{{ evaluation.first_place_reason|truncatechars:30 }}</small></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 {% else %}
-                    <div class="text-center py-3 text-muted">
-                        <i class="fas fa-users fa-2x mb-2"></i>
-                        <p>まだピア評価履歴がありません</p>
-                    </div>
+                    <p class="text-muted text-center py-3"><i class="fas fa-users fa-2x mb-2 d-block opacity-50"></i>まだピア評価履歴がありません</p>
                 {% endif %}
             </div>
-        </div>
+
+            <!-- 目標タブ -->
+            <div class="tab-pane fade" id="goal" role="tabpanel">
+                <h6 class="fw-bold mb-3"><i class="fas fa-bullseye me-2 text-primary"></i>{{ classroom.class_name }} — 学期目標</h6>
+
+                {% if goal %}
+                <div class="alert alert-info py-2 mb-3">
+                    <small><i class="fas fa-clock me-1"></i>最終更新: {{ goal.updated_at|date:"Y/m/d H:i" }}</small>
+                </div>
+                {% endif %}
+
+                <form method="post" action="{% url 'school_management:student_goal_edit' classroom.id student.student_number %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">目標テキスト</label>
+                        <textarea name="goal_text" class="form-control" rows="5"
+                            placeholder="この学期に取り組む目標、達成したいこと、頑張ることなどを入力してください..."
+                        >{{ goal.goal_text|default:'' }}</textarea>
+                        <div class="form-text">先生が学生の目標を設定・編集できます。</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>目標を保存
+                    </button>
+                    {% if goal %}
+                        <button type="button" class="btn btn-outline-danger ms-2" onclick="document.querySelector('[name=goal_text]').value = ''">
+                            <i class="fas fa-trash me-1"></i>クリア
+                        </button>
+                    {% endif %}
+                </form>
+
+                {% if not goal %}
+                <div class="text-center text-muted mt-4 py-3 border rounded" style="border-style:dashed!important">
+                    <i class="fas fa-bullseye fa-2x mb-2 opacity-50"></i>
+                    <p>まだ目標が設定されていません。上記フォームから設定してください。</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 評価タブ -->
+            <div class="tab-pane fade" id="eval" role="tabpanel">
+                <h6 class="fw-bold mb-3"><i class="fas fa-star me-2 text-warning"></i>目標に対する評価</h6>
+
+                {% if goal %}
+                <div class="alert alert-secondary py-2 mb-3">
+                    <small><strong><i class="fas fa-bullseye me-1"></i>目標:</strong> {{ goal.goal_text }}</small>
+                </div>
+                {% else %}
+                <div class="alert alert-warning py-2 mb-3">
+                    <small><i class="fas fa-exclamation-triangle me-1"></i>目標が設定されていません。「目標」タブから先に設定することをお勧めします。</small>
+                </div>
+                {% endif %}
+
+                {% if lesson_reports %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold mb-0"><i class="fas fa-book-open me-2 text-secondary"></i>日報一覧 <span class="badge bg-secondary">{{ lesson_reports|length }}件</span></h6>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#reportHistory">
+                            <i class="fas fa-chevron-down me-1"></i>表示／非表示
+                        </button>
+                    </div>
+                    <div class="collapse show" id="reportHistory">
+                        <div class="d-flex flex-column gap-2">
+                            {% for report in lesson_reports %}
+                            <div class="rounded border p-2 px-3 bg-light">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-semibold small">
+                                        <i class="fas fa-calendar me-1 text-muted"></i>{{ report.lesson_session.date|date:"m/d" }} — 第{{ report.lesson_session.session_number }}回
+                                        {% if report.lesson_session.topic %}<span class="text-muted fw-normal"> / {{ report.lesson_session.topic|truncatechars:30 }}</span>{% endif %}
+                                    </span>
+                                </div>
+                                <p class="mb-0 small">{{ report.report_text }}</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="row g-3">
+                    <!-- 学生自己評価 -->
+                    <div class="col-md-6">
+                        <div class="card eval-card h-100">
+                            <div class="card-header bg-light">
+                                <i class="fas fa-user me-2 text-info"></i>学生の自己評価
+                                {% if self_eval and self_eval.student_score is not None %}
+                                    <span class="float-end score-pill">
+                                        <i class="fas fa-star text-warning"></i>
+                                        <strong>{{ self_eval.student_score }}</strong>/100
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                <form method="post" action="{% url 'school_management:self_evaluation_edit' classroom.id student.student_number %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="section" value="student">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">コメント</label>
+                                        <textarea name="student_comment" class="form-control" rows="4"
+                                            placeholder="目標に対する学生自身の振り返り、コメント..."
+                                        >{{ self_eval.student_comment|default:'' }}</textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">自己評価点 (0〜100)</label>
+                                        <input type="number" name="student_score" class="form-control"
+                                            min="0" max="100" placeholder="例: 75"
+                                            value="{{ self_eval.student_score|default:'' }}">
+                                    </div>
+                                    <button type="submit" class="btn btn-outline-info btn-sm w-100">
+                                        <i class="fas fa-save me-1"></i>学生評価を保存
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 教師評価 -->
+                    <div class="col-md-6">
+                        <div class="card eval-card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <i class="fas fa-chalkboard-teacher me-2"></i>教師評価
+                                {% if self_eval and self_eval.teacher_score is not None %}
+                                    <span class="float-end score-pill bg-white text-dark">
+                                        <i class="fas fa-star text-warning"></i>
+                                        <strong>{{ self_eval.teacher_score }}</strong>/100
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                <form method="post" action="{% url 'school_management:self_evaluation_edit' classroom.id student.student_number %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="section" value="teacher">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">コメント</label>
+                                        <textarea name="teacher_comment" class="form-control" rows="4"
+                                            placeholder="目標に対する教師側の評価、フィードバック..."
+                                        >{{ self_eval.teacher_comment|default:'' }}</textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">教師評価点 (0〜100)</label>
+                                        <input type="number" name="teacher_score" class="form-control"
+                                            min="0" max="100" placeholder="例: 80"
+                                            value="{{ self_eval.teacher_score|default:'' }}">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                                        <i class="fas fa-save me-1"></i>教師評価を保存
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if self_eval %}
+                <div class="mt-3 text-muted small">
+                    <i class="fas fa-clock me-1"></i>最終更新: {{ self_eval.updated_at|date:"Y/m/d H:i" }}
+                </div>
+                {% endif %}
+            </div>
+
+        </div><!-- /.tab-content -->
     </div>
 </div>
 
@@ -232,49 +433,29 @@
     </div>
 </div>
 
-<style>
-.avatar-circle {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background-color: #f8f9fa;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid #dee2e6;
-}
-
-.stat-item {
-    padding: 8px 0;
-}
-
-.stat-value {
-    font-size: 1.5rem;
-    font-weight: bold;
-    margin-bottom: 2px;
-}
-
-.stat-label {
-    font-size: 0.875rem;
-    color: #6c757d;
-}
-</style>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // クイズの合計点を計算
+    // URLハッシュでタブを制御
+    const hash = window.location.hash;
+    if (hash) {
+        const tabTrigger = document.querySelector(`[data-bs-target="${hash}"]`);
+        if (tabTrigger) {
+            new bootstrap.Tab(tabTrigger).show();
+        }
+    }
+
+    // タブ切り替え時にURLハッシュを更新
+    document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
+        tab.addEventListener('shown.bs.tab', e => {
+            history.replaceState(null, null, e.target.dataset.bsTarget);
+        });
+    });
+
+    // クイズ合計点計算
     let quizTotal = 0;
     document.querySelectorAll('.quiz-score-value').forEach(badge => {
         quizTotal += parseFloat(badge.dataset.score) || 0;
     });
-
-    // 現在のクラスのポイントをテーブルから取得して、上部のバッジ（氏名の下）に反映する
-    const currentClassSource = document.querySelector('.current-class-points-source');
-    const totalBadge = document.getElementById('student-total-badge');
-    
-    if (currentClassSource && totalBadge) {
-        totalBadge.textContent = currentClassSource.textContent.trim();
-    }
 });
 </script>
 {% endblock %}

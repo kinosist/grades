@@ -595,6 +595,70 @@ class StudentClassPoints(models.Model):
         self.save()
 
 
+class StudentGoal(models.Model):
+    """学生のクラス目標（学期ごとに先生が設定）"""
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, verbose_name='学生', related_name='goals')
+    classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス', related_name='student_goals')
+    goal_text = models.TextField(verbose_name='目標')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='作成日時')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
+
+    class Meta:
+        verbose_name = '学生目標'
+        verbose_name_plural = '学生目標'
+        unique_together = ['student', 'classroom']
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.classroom.class_name}: {self.goal_text[:30]}"
+
+
+class LessonReport(models.Model):
+    """授業回ごとの学生日報（先生が入力）"""
+    lesson_session = models.ForeignKey(LessonSession, on_delete=models.CASCADE, verbose_name='授業回', related_name='lesson_reports')
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, verbose_name='学生', related_name='lesson_reports')
+    report_text = models.TextField(verbose_name='日報・今日やったこと')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='作成日時')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
+
+    class Meta:
+        verbose_name = '日報'
+        verbose_name_plural = '日報'
+        unique_together = ['lesson_session', 'student']
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.lesson_session}: {self.report_text[:30]}"
+
+
+class SelfEvaluation(models.Model):
+    """学期末の自己評価・教師評価"""
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, verbose_name='学生', related_name='self_evaluations')
+    classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス', related_name='self_evaluations')
+    # 学生の自己評価
+    student_comment = models.TextField(blank=True, verbose_name='学生コメント')
+    student_score = models.IntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        verbose_name='学生自己評価点'
+    )
+    # 教師評価
+    teacher_comment = models.TextField(blank=True, verbose_name='教師コメント')
+    teacher_score = models.IntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        verbose_name='教師評価点'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='作成日時')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
+
+    class Meta:
+        verbose_name = '自己評価'
+        verbose_name_plural = '自己評価'
+        unique_together = ['student', 'classroom']
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.classroom.class_name} 自己評価"
+
+
 # --- Signals ---
 @receiver([post_save, post_delete], sender=QuizScore)
 def update_class_points_from_quiz(sender, instance, **kwargs):

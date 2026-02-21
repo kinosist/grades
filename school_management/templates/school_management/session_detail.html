@@ -48,6 +48,14 @@
                     {% endif %}
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="report-tab" data-bs-toggle="tab" data-bs-target="#report" type="button" role="tab" aria-controls="report" aria-selected="false">
+                    <i class="fas fa-book-open me-2"></i>日報
+                    {% with report_count=session.lesson_reports.count %}
+                        {% if report_count > 0 %}<span class="badge bg-success ms-1">{{ report_count }}</span>{% endif %}
+                    {% endwith %}
+                </button>
+            </li>
             {% if session.has_quiz %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="quiz-tab" data-bs-toggle="tab" data-bs-target="#quiz" type="button" role="tab" aria-controls="quiz" aria-selected="false">
@@ -72,7 +80,7 @@
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5><i class="fas fa-info-circle me-2"></i>授業内容</h5>
                         <div>
-                            <a href="#" class="btn btn-warning btn-sm me-2">
+                            <a href="{{ '#' }}" class="btn btn-warning btn-sm me-2">
                                 <i class="fas fa-qrcode me-1"></i>QR巡回採点
                             </a>
                             <a href="{% url 'school_management:session_delete' session.id %}" class="btn btn-outline-danger btn-sm me-2">
@@ -169,7 +177,52 @@
                 </div>
             </div>
 
-            <!-- 小テスト管理タブ -->
+            <!-- 日報タブ -->
+            <div class="tab-pane fade" id="report" role="tabpanel" aria-labelledby="report-tab">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-book-open me-2"></i>日報入力</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'school_management:session_detail' session.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="save_reports">
+                            {% if student_report_data %}
+                                <div class="row g-3 mb-3">
+                                    {% for item in student_report_data %}
+                                    <div class="col-md-6 col-xl-4">
+                                        <div class="card h-100 report-item-card" data-has-report="{% if item.report %}1{% else %}0{% endif %}">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-2 gap-2">
+                                                    <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:.85rem;flex-shrink:0;">{{ item.student.full_name|first }}</div>
+                                                    <div>
+                                                        <div class="fw-bold small">{{ item.student.full_name }}</div>
+                                                        <small class="text-muted">{{ item.student.student_number }}</small>
+                                                    </div>
+                                                    {% if item.report %}<span class="ms-auto badge bg-success"><i class="fas fa-check"></i></span>{% endif %}
+                                                </div>
+                                                {% if item.goal %}
+                                                    <div class="small rounded p-1 px-2 mb-2" style="background:#e3f0ff;color:#0d47a1;border:1px solid #90caf9;">
+                                                        <i class="fas fa-bullseye me-1"></i>{{ item.goal.goal_text|truncatechars:60 }}
+                                                    </div>
+                                                {% endif %}
+                                                <textarea name="report_{{ item.student.id }}" class="form-control" style="min-height:70px;font-size:.875rem;resize:vertical;" placeholder="今日やったこと・気づき...">{{ item.report.report_text|default:'' }}</textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>すべて保存</button>
+                                </div>
+                            {% else %}
+                                <p class="text-muted text-center py-3">このクラスに学生が登録されていません。</p>
+                            {% endif %}
+                        </form>
+                    </div>
+                </div>
+            </div>
+
             {% if session.has_quiz %}
             <div class="tab-pane fade" id="quiz" role="tabpanel" aria-labelledby="quiz-tab">
                 <div class="card mb-4">
@@ -332,5 +385,14 @@ function copyToClipboard(elementId) {
         button.innerHTML = originalIcon;
     }, 2000);
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 日報カードの左ボーダー色をデータ属性から設定
+    document.querySelectorAll('.report-item-card').forEach(card => {
+        card.style.borderLeft = card.dataset.hasReport === '1'
+            ? '4px solid #198754'
+            : '4px solid #0d6efd';
+    });
+});
 </script>
 {% endblock %}

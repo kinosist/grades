@@ -4,6 +4,7 @@ from .views import (
     utils, auth, dashboard, classes, sessions,
     students, quizzes, groups, peer_eval, grades, attendance
 )
+from .views.students import self_eval
 
 app_name = 'school_management'
 
@@ -35,6 +36,11 @@ urlpatterns = [
     path('classes/<int:class_id>/students/select/', students.bulk_student_add, name='class_student_select'),
     path('classes/<int:class_id>/students/bulk-csv/', students.bulk_student_add_csv, name='bulk_student_add'),
     path('classes/<int:class_id>/students/<str:student_number>/', students.class_student_detail_view, name='class_student_detail'),
+
+    # --- 自己評価システム ---
+    path('classes/<int:class_id>/students/<str:student_number>/goal/', self_eval.student_goal_edit, name='student_goal_edit'),
+    path('classes/<int:class_id>/students/<str:student_number>/self-evaluation/', self_eval.self_evaluation_edit, name='self_evaluation_edit'),
+    path('lesson-sessions/<int:session_id>/reports/', self_eval.lesson_report_tab, name='lesson_report_tab'),
 
     # --- 授業セッション（Sessions） ---
     path('classes/<int:class_id>/sessions/', sessions.session_list_view, name='session_list'),

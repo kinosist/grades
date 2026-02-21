@@ -30,11 +30,10 @@ def student_goal_edit(request, class_id, student_number):
         messages.error(request, 'この学生は指定されたクラスに所属していません。')
         return redirect('school_management:class_detail', class_id=class_id)
 
-    goal, _ = StudentGoal.objects.get_or_create(student=student, classroom=classroom)
-
     if request.method == 'POST':
         goal_text = request.POST.get('goal_text', '').strip()
         if goal_text:
+            goal, _ = StudentGoal.objects.get_or_create(student=student, classroom=classroom)
             goal.goal_text = goal_text
             goal.save()
             messages.success(request, f'{student.full_name}さんの目標を保存しました。')
@@ -118,9 +117,9 @@ def self_evaluation_edit(request, class_id, student_number):
         messages.error(request, 'この学生は指定されたクラスに所属していません。')
         return redirect('school_management:class_detail', class_id=class_id)
 
-    self_eval, _ = SelfEvaluation.objects.get_or_create(student=student, classroom=classroom)
 
     if request.method == 'POST':
+        self_eval, _ = SelfEvaluation.objects.get_or_create(student=student, classroom=classroom)
         section = request.POST.get('section', 'teacher')  # 'teacher' or 'student'
         if section == 'teacher':
             teacher_comment = request.POST.get('teacher_comment', '').strip()

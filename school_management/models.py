@@ -3,6 +3,9 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
 import uuid
+from django.db.models import Sum
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
 
 
 class CustomUserManager(BaseUserManager):
@@ -120,6 +123,18 @@ class ClassRoom(models.Model):
 
     def __str__(self):
         return f"{self.year}年 {self.get_semester_display()} {self.class_name}"
+
+    def get_average_points(self):
+        """クラスの平均総合ポイントを計算"""
+        points_list = self.student_class_points.all()
+        count = points_list.count()
+        
+        if count == 0:
+            return 0.0
+            
+        # 各学生のtotal_pointsプロパティ（出席点 + 授業点*2）の合計を計算
+        total_sum = sum(sp.total_points for sp in points_list)
+        return round(total_sum / count, 1)
 
 
 class LessonSession(models.Model):
@@ -269,6 +284,12 @@ class QuizScore(models.Model):
     def __str__(self):
         return f"{self.quiz} - {self.student.full_name}: {self.score}点"
 
+    @property
+    def percentage(self):
+        """正答率を計算"""
+        if self.quiz.max_score > 0:
+            return (self.score / self.quiz.max_score) * 100
+        return 0
 
 class Question(models.Model):
     """小テストの問題"""
@@ -478,3 +499,181 @@ class StudentClassPoints(models.Model):
 
     def __str__(self):
         return f"{self.student.full_name} - {self.classroom.class_name} - {self.points}pt"
+
+    def calculate_points_internal(self):
+        """内部計算用: 各種スコアを集計してpointsフィールドを更新する"""
+        # 小テストの合計
+        # 重複データ対策: 同一クイズのスコアが複数ある場合は最新のみ採用
+        all_quiz_scores = QuizScore.objects.filter(
+            student=self.student,
+            quiz__lesson_session__classroom=self.classroom,
+            is_cancelled=False
+        ).order_by('graded_at')
+        
+        # 辞書で上書きすることで最新のスコアのみを残す
+        quiz_total = sum({qs.quiz_id: qs.score for qs in all_quiz_scores}.values())
+        
+        # 授業ポイントの合計
+        lesson_total = StudentLessonPoints.objects.filter(
+            student=self.student,
+            lesson_session__classroom=self.classroom
+        ).aggregate(total=Sum('points'))['total'] or 0
+        
+        # QRコードスキャンの合計
+        qr_total = QRCodeScan.objects.filter(
+            scanned_by=self.student,
+            lesson_session__classroom=self.classroom
+        ).aggregate(total=Sum('points_awarded'))['total'] or 0
+        
+        # 授業点 = 小テスト + 授業内ポイント + QRコード
+        class_points_val = quiz_total + lesson_total + qr_total
+        
+        # 合計を計算 (出席点 + 授業点 * 2)
+        self.points = int(self.attendance_points + (class_points_val * 2))
+
+    @property
+    def quiz_stats(self):
+        """重複を除外したクイズ統計を返す（回数と平均点）"""
+        all_quiz_scores = QuizScore.objects.filter(
+            student=self.student,
+            quiz__lesson_session__classroom=self.classroom,
+            is_cancelled=False
+        ).order_by('graded_at')
+        
+        # 辞書で上書きすることで最新のスコアのみを残す（重複対策）
+        unique_scores = {qs.quiz_id: qs.score for qs in all_quiz_scores}
+        
+        count = len(unique_scores)
+        total = sum(unique_scores.values())
+        avg = round(total / count, 1) if count > 0 else 0
+        
+        return {'count': count, 'average': avg}
+
+    @property
+    def live_points(self):
+        """表示用にリアルタイムで再計算した値を返す（DB保存はしない）"""
+        self.calculate_points_internal()
+        return self.points
+
+    @property
+    def class_points(self):
+        """授業点: 小テストの合計点 + 授業内獲得ポイントの合計 + QRコード"""
+        # 合計点からの逆算ではなく、純粋な合計値を再計算して返す
+        # 小テスト (重複対策)
+        all_quiz_scores = QuizScore.objects.filter(
+            student=self.student,
+            quiz__lesson_session__classroom=self.classroom,
+            is_cancelled=False
+        ).order_by('graded_at')
+        quiz_total = sum({qs.quiz_id: qs.score for qs in all_quiz_scores}.values())
+        
+        lesson_total = StudentLessonPoints.objects.filter(
+            student=self.student,
+            lesson_session__classroom=self.classroom
+        ).aggregate(total=Sum('points'))['total'] or 0
+
+        qr_total = QRCodeScan.objects.filter(
+            scanned_by=self.student,
+            lesson_session__classroom=self.classroom
+        ).aggregate(total=Sum('points_awarded'))['total'] or 0
+        
+        return int(quiz_total + lesson_total + qr_total)
+
+    @property
+    def total_points(self):
+        """総合ポイント"""
+        # 表示用に、出席点(float)を含めた正確な値を返す
+        return self.attendance_points + (self.class_points * 2)
+
+    def save(self, *args, **kwargs):
+        """保存時に自動的にポイントを再計算する"""
+        self.calculate_points_internal()
+        super().save(*args, **kwargs)
+
+    def recalculate_total(self):
+        """外部呼び出し用互換メソッド（シグナル等から呼ばれる）"""
+        self.save()
+
+
+class StudentGoal(models.Model):
+    """学生のクラス目標（学期ごとに先生が設定）"""
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, verbose_name='学生', related_name='goals')
+    classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス', related_name='student_goals')
+    goal_text = models.TextField(verbose_name='目標')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='作成日時')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
+
+    class Meta:
+        verbose_name = '学生目標'
+        verbose_name_plural = '学生目標'
+        unique_together = ['student', 'classroom']
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.classroom.class_name}: {self.goal_text[:30]}"
+
+
+class LessonReport(models.Model):
+    """授業回ごとの学生日報（先生が入力）"""
+    lesson_session = models.ForeignKey(LessonSession, on_delete=models.CASCADE, verbose_name='授業回', related_name='lesson_reports')
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, verbose_name='学生', related_name='lesson_reports')
+    report_text = models.TextField(verbose_name='日報・今日やったこと')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='作成日時')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
+
+    class Meta:
+        verbose_name = '日報'
+        verbose_name_plural = '日報'
+        unique_together = ['lesson_session', 'student']
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.lesson_session}: {self.report_text[:30]}"
+
+
+class SelfEvaluation(models.Model):
+    """学期末の自己評価・教師評価"""
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, verbose_name='学生', related_name='self_evaluations')
+    classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス', related_name='self_evaluations')
+    # 学生の自己評価
+    student_comment = models.TextField(blank=True, verbose_name='学生コメント')
+    student_score = models.IntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        verbose_name='学生自己評価点'
+    )
+    # 教師評価
+    teacher_comment = models.TextField(blank=True, verbose_name='教師コメント')
+    teacher_score = models.IntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        verbose_name='教師評価点'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='作成日時')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
+
+    class Meta:
+        verbose_name = '自己評価'
+        verbose_name_plural = '自己評価'
+        unique_together = ['student', 'classroom']
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.classroom.class_name} 自己評価"
+
+
+# --- Signals ---
+@receiver([post_save, post_delete], sender=QuizScore)
+def update_class_points_from_quiz(sender, instance, **kwargs):
+    if instance.quiz.lesson_session.classroom:
+        scp, _ = StudentClassPoints.objects.get_or_create(
+            student=instance.student,
+            classroom=instance.quiz.lesson_session.classroom
+        )
+        scp.recalculate_total()
+
+@receiver([post_save, post_delete], sender=StudentLessonPoints)
+def update_class_points_from_lesson(sender, instance, **kwargs):
+    if instance.lesson_session.classroom:
+        scp, _ = StudentClassPoints.objects.get_or_create(
+            student=instance.student,
+            classroom=instance.lesson_session.classroom
+        )
+        scp.recalculate_total()

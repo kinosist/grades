@@ -1,8 +1,19 @@
 {% extends 'school_management/base.html' %}
 
 {% block title %}{{ classroom.class_name }} - QRコード一覧{% endblock %}
+{% block page_title %}QRコード一覧{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">QRコード一覧</li>
+{% endblock %}
 
 {% block content %}
+<style>
+    body { background-color: #f8fafc; }
+</style>
+
 <div class="container mt-4">
     <div class="row">
         <div class="col-12">
@@ -44,7 +55,7 @@
                                         
                                         <div class="d-flex justify-content-between align-items-center">
                                             <span class="badge bg-primary">スキャン数: {{ qr_data.scan_count }}</span>
-                                            <span class="badge bg-success">ポイント: {{ qr_data.class_points }}pt</span>
+                                            <span class="badge bg-success">ポイント: {{ qr_data.scan_count }}pt</span>
                                         </div>
                                     </div>
                                     <div class="card-footer">
@@ -75,7 +86,6 @@
     </div>
 </div>
 
-<!-- カメラスキャンモーダル -->
 <div class="modal fade" id="cameraScannerModal" tabindex="-1" aria-labelledby="cameraScannerModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">

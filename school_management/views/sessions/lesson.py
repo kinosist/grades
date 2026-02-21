@@ -17,7 +17,7 @@ def lesson_session_create(request, class_id):
         has_peer_evaluation = request.POST.get('has_peer_evaluation') == 'on'
         
         # 授業回作成
-        lesson_session = LessonSession.objects.create(
+        LessonSession.objects.create(
             classroom=classroom,
             session_number=session_number,
             date=date,
@@ -26,7 +26,7 @@ def lesson_session_create(request, class_id):
             has_peer_evaluation=has_peer_evaluation
         )
         
-        messages.success(request, f'第{session_number}回の授業を作成しました。')
+        messages.success(request, f'第{session_number}回の授業を作成しました。 {request.POST.get("has_quiz")}')
         return redirect('school_management:class_detail', class_id=class_id)
     
     # 次の回数を自動設定
@@ -48,3 +48,16 @@ def lesson_session_detail(request, session_id):
         'lesson_session': lesson_session,
     }
     return render(request, 'school_management/lesson_session_detail.html', context)
+
+@login_required
+def lesson_session_delete(request, session_id):
+    """授業回削除"""
+    session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
+    
+    if request.method == 'POST':
+        classroom_id = session.classroom.id
+        session.delete()
+        messages.success(request, '授業回を削除しました。')
+        return redirect('school_management:class_detail', class_id=classroom_id)
+    
+    return render(request, 'school_management/session_delete.html', {'session': session})

@@ -1,8 +1,18 @@
 {% extends 'school_management/base.html' %}
 
 {% block title %}マイQRコード{% endblock %}
+{% block page_title %}マイQRコード{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:student_dashboard' %}">ダッシュボード</a></li>
+<li class="breadcrumb-item active" aria-current="page">マイQRコード</li>
+{% endblock %}
 
 {% block content %}
+<style>
+    body { background-color: #f8fafc; }
+</style>
+
 <div class="container mt-4">
     <div class="row">
         <div class="col-12">

@@ -1,0 +1,156 @@
+{% extends 'school_management/base.html' %}
+{% load static %}
+
+{% block title %}日報 - 第{{ lesson_session.session_number }}回 - {{ classroom.class_name }}{% endblock %}
+{% block page_title %}日報入力{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}">第{{ lesson_session.session_number }}回</a></li>
+<li class="breadcrumb-item active">日報</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.report-card {
+    border-left: 4px solid #0d6efd;
+    transition: box-shadow 0.2s ease;
+}
+.report-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.goal-badge {
+    background: linear-gradient(135deg, #e3f0ff, #c8e0ff);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    color: #0d47a1;
+    border: 1px solid #90caf9;
+}
+.goal-empty {
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    color: #9e9e9e;
+    border: 1px dashed #bdbdbd;
+}
+.student-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+.report-textarea {
+    resize: vertical;
+    min-height: 80px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    transition: border-color 0.2s;
+}
+.report-textarea:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+}
+.session-info-bar {
+    background: linear-gradient(135deg, #1e3a5f, #0d6efd);
+    color: white;
+    border-radius: 12px;
+    padding: 16px 24px;
+    margin-bottom: 24px;
+}
+.has-report {
+    border-left-color: #198754;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="session-info-bar d-flex justify-content-between align-items-center">
+    <div>
+        <h5 class="mb-1 fw-bold"><i class="fas fa-book-open me-2"></i>{{ classroom.class_name }} — 第{{ lesson_session.session_number }}回日報</h5>
+        <small class="opacity-75">{{ lesson_session.date|date:"Y年m月d日" }}{% if lesson_session.topic %} / {{ lesson_session.topic }}{% endif %}</small>
+    </div>
+    <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}" class="btn btn-outline-light btn-sm">
+        <i class="fas fa-arrow-left me-1"></i>授業回詳細に戻る
+    </a>
+</div>
+
+<form method="post" action="{% url 'school_management:lesson_report_tab' lesson_session.id %}">
+    {% csrf_token %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <p class="text-muted mb-0">
+            <i class="fas fa-info-circle me-1"></i>
+            {{ student_data|length }}人の学生が登録されています。各学生の今日やったこと・日報を入力してください。
+        </p>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save me-1"></i>すべて保存
+        </button>
+    </div>
+
+    {% if student_data %}
+        <div class="row g-3">
+            {% for item in student_data %}
+            <div class="col-md-6 col-xl-4">
+                <div class="card report-card h-100 {% if item.report %}has-report{% endif %}">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3 gap-2">
+                            <div class="student-avatar">
+                                {{ item.student.full_name|first }}
+                            </div>
+                            <div>
+                                <div class="fw-bold">{{ item.student.full_name }}</div>
+                                <small class="text-muted">{{ item.student.student_number }}</small>
+                            </div>
+                            {% if item.report %}
+                                <span class="ms-auto badge bg-success"><i class="fas fa-check me-1"></i>記入済</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-2">
+                            {% if item.goal %}
+                                <div class="goal-badge">
+                                    <i class="fas fa-bullseye me-1"></i><strong>目標:</strong> {{ item.goal.goal_text|truncatechars:80 }}
+                                </div>
+                            {% else %}
+                                <div class="goal-empty">
+                                    <i class="fas fa-bullseye me-1"></i>目標未設定
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <label class="form-label small fw-semibold text-secondary mt-2 mb-1">
+                            <i class="fas fa-pencil-alt me-1"></i>今日やったこと・日報
+                        </label>
+                        <textarea
+                            name="report_{{ item.student.id }}"
+                            class="form-control report-textarea"
+                            placeholder="今日取り組んだこと、気づき、進捗など..."
+                        >{{ item.report.report_text|default:'' }}</textarea>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="d-flex justify-content-end mt-4">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-save me-2"></i>すべて保存
+            </button>
+        </div>
+    {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="fas fa-user-graduate fa-3x mb-3 opacity-50"></i>
+            <p>このクラスに学生が登録されていません。</p>
+        </div>
+    {% endif %}
+</form>
+{% endblock %}

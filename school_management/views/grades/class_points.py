@@ -67,51 +67,53 @@ def class_points_view(request, class_id):
             lesson_session__classroom=classroom
         ).select_related('lesson_session').order_by('lesson_session__session_number')
         
-        total_class_points = sum(point.points for point in lesson_points)
+        # クラス単位の合計ポイントを取得（StudentClassPoints から純粋なポイントを取得）
+        try:
+            scp = StudentClassPoints.objects.get(student=student, classroom=classroom)
+            current_points = scp.class_points
+        except StudentClassPoints.DoesNotExist:
+            current_points = 0
+
+        # 授業ポイントのみの集計（バッジ判定用）
+        lesson_total = sum(point.points for point in lesson_points)
         session_count = lesson_points.count()
-        average_points = round(total_class_points / session_count, 1) if session_count > 0 else 0
+        lesson_average = round(lesson_total / session_count, 1) if session_count > 0 else 0
         
         # 成績評価
-        if average_points >= 5:
+        if lesson_average >= 5:
             grade_level = '優秀'
             grade_color = 'success'
-        elif average_points >= 3:
+        elif lesson_average >= 3:
             grade_level = '良好'
             grade_color = 'warning'
-        elif average_points >= 1:
+        elif lesson_average >= 1:
             grade_level = '普通'
             grade_color = 'info'
         else:
             grade_level = '要努力'
             grade_color = 'secondary'
-        
-        # クラス単位の合計ポイントを取得（StudentClassPoints があれば優先して表示）
-        try:
-            student_class_point = StudentClassPoints.objects.get(student=student, classroom=classroom).points
-        except StudentClassPoints.DoesNotExist:
-            student_class_point = None
 
         student_grades.append({
             'student': student,
-            'total_points': total_class_points,
-            'average_points': average_points,
+            'total_points': current_points,  # 純粋な合計ポイント（統計・ソート用）
+            'average_points': lesson_average,
             'session_count': session_count,
             'lesson_points': lesson_points,
             'grade_level': grade_level,
             'grade_color': grade_color,
             'overall_points': student.points,  # 全体のポイント（参考用）
-            'class_points': student_class_point,  # クラス単位のポイント（あれば表示）
+            'class_points': current_points,  # クラス単位のポイント
         })
     
-    # 平均ポイント順でソート
-    student_grades.sort(key=lambda x: x['average_points'], reverse=True)
+    # 合計ポイント順でソート
+    student_grades.sort(key=lambda x: x['total_points'], reverse=True)
     
     # クラス全体の統計
     total_students = len(student_grades)
     if total_students > 0:
-        class_average = round(sum(grade['average_points'] for grade in student_grades) / total_students, 1)
-        max_average = max(grade['average_points'] for grade in student_grades)
-        min_average = min(grade['average_points'] for grade in student_grades)
+        class_average = round(sum(grade['total_points'] for grade in student_grades) / total_students, 1)
+        max_average = max(grade['total_points'] for grade in student_grades)
+        min_average = min(grade['total_points'] for grade in student_grades)
     else:
         class_average = 0
         max_average = 0

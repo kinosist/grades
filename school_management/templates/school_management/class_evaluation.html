@@ -3,208 +3,200 @@
 {% load evaluation_filters %}
 
 {% block title %}{{ classroom.class_name }} - 評価一覧{% endblock %}
+{% block page_title %}評価一覧{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">評価一覧</li>
+{% endblock %}
 
 {% block extra_css %}
 <style>
+    
+body { background-color: #f8fafc; }
+
+    /* --- ベースのスタイル --- */
     .evaluation-table {
         font-size: 14px;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         width: 100%;
-        margin-top: 20px;
+        margin-top: 0;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
     }
     
     .evaluation-table th,
     .evaluation-table td {
-        border: 1px solid #ddd;
-        padding: 8px;
+        border-bottom: 1px solid #dee2e6;
+        border-right: 1px solid #dee2e6;
+        padding: 12px 8px;
         text-align: center;
         vertical-align: middle;
+        background-color: #fff;
+    }
+    
+    .evaluation-table th:last-child,
+    .evaluation-table td:last-child {
+        border-right: none;
+    }
+
+    .evaluation-table tr:last-child td {
+        border-bottom: none;
     }
     
     .evaluation-table th {
         background-color: #f8f9fa;
-        font-weight: bold;
+        color: #495057;
+        font-weight: 600;
         position: sticky;
         top: 0;
         z-index: 10;
+        border-bottom: 2px solid #dee2e6;
     }
     
-    .evaluation-table .student-info {
-        text-align: left;
-        min-width: 120px;
-    }
-    
-    .evaluation-table .number-col {
-        width: 50px;
-    }
-    
-    .evaluation-table .name-col {
-        width: 100px;
-    }
-    
-    .evaluation-table .furigana-col {
-        width: 100px;
-    }
-    
+    /* 列ごとの設定 */
+    .evaluation-table .number-col { width: 40px; background-color: #f8f9fa; }
+    .evaluation-table .name-col { text-align: left; min-width: 120px; font-weight: 600; color: #212529; }
+    .evaluation-table .furigana-col { text-align: left; min-width: 120px; color: #6c757d; font-size: 0.9em; }
+    .evaluation-table .input-col { background-color: #f0f7ff; width: 100px; }
     .evaluation-table .total-col {
-        width: 80px;
-        background-color: #e3f2fd;
+        min-width: 80px;
+        background-color: #e9ecef;
         font-weight: bold;
+        color: #0d6efd;
+        font-size: 1.1em;
     }
+    .evaluation-table .attendance-point-col { min-width: 80px; }
+    .evaluation-table .score-col { min-width: 70px; }
     
-    .evaluation-table .attendance-col {
-        width: 80px;
-        background-color: #f3e5f5;
-    }
-    
-    .evaluation-table .multiplier-col {
-        width: 60px;
-        background-color: #e8f5e8;
-    }
-    
-    .evaluation-table .session-col {
-        width: 60px;
-        background-color: #fff3e0;
-    }
-    
-    .evaluation-table .score-col {
-        width: 80px;
-        background-color: #e1f5fe;
-        font-weight: bold;
-    }
-    
-    .evaluation-table .multiplier-value {
-        background-color: #e8f5e8;
-        font-weight: bold;
-    }
-    
-    .evaluation-table .attendance-rate {
-        font-size: 12px;
-        color: #666;
-    }
-    
-    .evaluation-table .attendance-multiplier {
-        font-size: 12px;
-        color: #666;
-    }
-    
-    .evaluation-table .session-points {
-        font-weight: bold;
-        color: #1976d2;
-    }
-    
-    .evaluation-table .qr-points-main {
-        font-weight: bold;
-        color: #1976d2;
-        font-size: 16px;
-        text-align: center;
-    }
-    
-    .evaluation-table .peer-score-main {
-        font-weight: bold;
-        color: #ff9800;
-        font-size: 12px;
-        text-align: center;
+    .header-sub-text {
+        display: block;
+        font-size: 0.8em;
+        font-weight: normal;
+        color: #6c757d;
         margin-top: 2px;
     }
     
-    .evaluation-table .qr-points-small {
-        font-size: 10px;
-        color: #1976d2;
-        text-align: center;
-        margin-top: 2px;
-    }
-    
-    .evaluation-table .quiz-score {
-        color: #4caf50;
-        font-weight: bold;
-        font-size: 11px;
-        text-align: center;
-        margin-bottom: 2px;
-    }
-    
-    .evaluation-table .peer-score {
-        font-size: 11px;
-        color: #ff9800;
-        font-weight: bold;
-    }
-    
-    .evaluation-table .total-score {
-        font-size: 12px;
-        color: #4caf50;
-        font-weight: bold;
-        border-top: 1px solid #ddd;
-        margin-top: 2px;
-        padding-top: 2px;
-    }
-    
-    .evaluation-table .spacer-div {
-        height: 11px;
-    }
-    
-    .evaluation-table .empty-session {
-        color: #ccc;
-    }
-    
-    .evaluation-table .peer-avg {
-        color: #ff9800;
-        font-weight: bold;
-        font-size: 10px;
-    }
-    
+    /* テーブルコンテナ（スクロール用） */
     .table-container {
         overflow-x: auto;
         max-height: 80vh;
-        border: 1px solid #ddd;
         border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        position: relative;
     }
-    
+
     .header-info {
-        background-color: #f8f9fa;
-        padding: 15px;
+        background-color: white;
+        padding: 20px;
         border-radius: 8px;
         margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     
     .class-title {
         font-size: 24px;
         font-weight: bold;
-        color: #1976d2;
-        margin-bottom: 10px;
+        color: #212529;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
     }
     
     .class-stats {
         display: flex;
-        gap: 20px;
+        gap: 15px;
         flex-wrap: wrap;
     }
     
     .stat-item {
-        background-color: white;
-        padding: 10px 15px;
-        border-radius: 6px;
-        border: 1px solid #e0e0e0;
-        min-width: 120px;
+        background-color: #f8f9fa;
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        min-width: 140px;
+        flex: 1;
     }
     
     .stat-label {
         font-size: 12px;
-        color: #666;
-        margin-bottom: 5px;
+        color: #6c757d;
+        margin-bottom: 2px;
+        font-weight: 600;
+        text-transform: uppercase;
     }
     
     .stat-value {
-        font-size: 18px;
+        font-size: 20px;
         font-weight: bold;
-        color: #1976d2;
+        color: #212529;
     }
     
-    .export-buttons {
-        margin-bottom: 20px;
+    .attendance-input {
+        text-align: center;
+        font-weight: bold;
+        color: #0d6efd;
+    }
+
+    /* --- 📱 レスポンス対応 --- */
+    @media (max-width: 768px) {
+        .header-info { padding: 15px; margin-bottom: 15px; }
+        .class-title { font-size: 18px; margin-bottom: 10px; }
+        .class-title .text-muted { font-size: 14px !important; margin-left: 0 !important; width: 100%; display: block; margin-top: 4px; }
+        
+        .class-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-item { min-width: auto; padding: 8px 12px; }
+        .stat-value { font-size: 16px; }
+
+        .action-buttons { flex-direction: column; gap: 10px; }
+        .action-buttons .btn { width: 100%; }
+
+        .evaluation-table th, .evaluation-table td { padding: 8px 4px; font-size: 12px; }
+        .input-group-text { padding: 2px 6px; font-size: 12px; }
+        
+        .evaluation-table .number-col {
+            position: sticky;
+            left: 0;
+            z-index: 11;
+            border-right: 1px solid #dee2e6;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+        }
+        .evaluation-table .name-col {
+            position: sticky;
+            left: 40px;
+            z-index: 11;
+            border-right: 2px solid #dee2e6;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+            min-width: 100px;
+            max-width: 120px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .evaluation-table th.number-col,
+        .evaluation-table th.name-col {
+            z-index: 12;
+        }
+
+        .furigana-col { display: none; }
     }
     
-    .btn-export {
-        margin-right: 10px;
+    @media print {
+        .no-print { display: none !important; }
+        .table-container {
+            overflow: visible;
+            max-height: none;
+            box-shadow: none;
+        }
+        .evaluation-table { border: 1px solid #000; font-size: 10pt; }
+        .evaluation-table th, .evaluation-table td { border: 1px solid #000; padding: 4px; }
+        .input-col, .total-col { background-color: white !important; color: black !important; }
+        .furigana-col { display: table-cell !important; }
     }
 </style>
 {% endblock %}
@@ -213,10 +205,10 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <!-- ヘッダー情報 -->
             <div class="header-info">
                 <div class="class-title">
-                    <i class="fas fa-chalkboard me-2"></i>{{ classroom.class_name }} - 評価一覧
+                    <div><i class="fas fa-chalkboard me-2 text-primary"></i>{{ classroom.class_name }}</div>
+                    <span class="text-muted fs-5 ms-2 fw-normal">- 評価一覧</span>
                 </div>
                 <div class="class-stats">
                     <div class="stat-item">
@@ -230,47 +222,42 @@
                     <div class="stat-item">
                         <div class="stat-label">平均ポイント</div>
                         <div class="stat-value">
-                            {% if student_evaluations %}
-                                {{ student_evaluations|length|floatformat:1 }}
-                            {% else %}
-                                0
-                            {% endif %}
+                            {{ classroom.get_average_points }}
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- エクスポートボタン -->
-            <div class="export-buttons">
-                <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-secondary btn-export">
+            <div class="d-flex justify-content-between align-items-center mb-3 no-print action-buttons">
+                <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
                 </a>
-                <button class="btn btn-success btn-export" onclick="window.print()">
-                    <i class="fas fa-print me-1"></i>印刷
+                <button class="btn btn-success" onclick="window.print()">
+                    <i class="fas fa-print me-1"></i>印刷 / PDF保存
                 </button>
             </div>
 
-            <!-- 評価テーブル -->
             <div class="table-container">
                 <table class="evaluation-table">
                     <thead>
                         <tr>
-                            <th class="number-col">No</th>
+                            <th class="number-col">No.</th>
                             <th class="name-col">氏名</th>
-                            <th class="furigana-col">シメイ</th>
-                            <th class="total-col">合計点</th>
-                            <th class="attendance-col">
-                                出席点<br>
-                                <small class="attendance-multiplier">20%</small>
+                            <th class="furigana-col">フリガナ</th>
+                            <th class="input-col">
+                                出席率
+                                <span class="header-sub-text">入力(%)</span>
                             </th>
-                            <th class="attendance-col">
-                                出席率<br>
-                                <small class="attendance-multiplier">0.00%</small>
+                            <th class="attendance-point-col">
+                                出席点
+                                <span class="header-sub-text">(MAX20)</span>
                             </th>
-                            <th class="score-col">点数</th>
-                            <th class="multiplier-col">
-                                倍率<br>
-                                <small class="attendance-multiplier">2</small>
+                            <th class="score-col">
+                                授業点
+                            </th>
+                            <th class="total-col">
+                                合計
+                                <span class="header-sub-text">( 出席点 + (授業点 * 2) )</span>
                             </th>
                         </tr>
                     </thead>
@@ -278,34 +265,47 @@
                         {% for evaluation in student_evaluations %}
                         <tr>
                             <td class="number-col">{{ forloop.counter }}</td>
-                            <td class="student-info name-col">{{ evaluation.student.full_name }}</td>
-                            <td class="student-info furigana-col">{{ evaluation.student.furigana|default:"" }}</td>
-                            <td class="total-col">{{ evaluation.total_points }}</td>
-                            <td class="attendance-col attendance-points">
-                                {{ evaluation.attendance_points }}<br>
-                                <small class="attendance-rate">{{ evaluation.attendance_rate|floatformat:2 }}%</small>
+                            <td class="name-col">
+                                {{ evaluation.student.full_name }}
                             </td>
-                            <td class="attendance-col">
-                                <input type="number" 
-                                       name="attendance_rate_{{ evaluation.student.id }}" 
-                                       value="{{ evaluation.attendance_rate }}" 
-                                       min="0" 
-                                       max="100" 
-                                       step="0.1"
-                                       data-student-id="{{ evaluation.student.id }}"
-                                       data-class-id="{{ classroom.id }}"
-                                       onchange="saveAttendanceRate(this)"
-                                       style="width: 70px; padding: 2px; text-align: center; border: 1px solid #ccc; border-radius: 3px;">
-                                %
+                            <td class="furigana-col">{{ evaluation.student.furigana|default:"-" }}</td>
+                            
+                            <td class="input-col">
+                                <div class="input-group input-group-sm">
+                                    <input type="number" 
+                                           class="form-control attendance-input"
+                                           name="attendance_rate_{{ evaluation.student.id }}" 
+                                           value="{{ evaluation.attendance_rate }}" 
+                                           min="0" max="100" step="1"
+                                           data-student-id="{{ evaluation.student.id }}"
+                                           data-class-id="{{ classroom.id }}"
+                                           onchange="saveAttendanceRate(this)">
+                                </div>
                             </td>
-                            <td class="score-col">{{ evaluation.class_points }}</td>
-                            <td class="multiplier-col multiplier-value">{{ evaluation.multiplier }}</td>
+
+                            <td class="attendance-point-col">
+                                <span class="attendance-points">{{ evaluation.attendance_points|floatformat:1 }}</span>
+                            </td>
+
+                            <td class="score-col">
+                                {% for cp in evaluation.student.class_points.all %}
+                                    {% if cp.classroom.id == classroom.id %}{{ cp.class_points }}{% endif %}
+                                {% endfor %}
+                            </td>
+
+                            <td class="total-col">
+                                <span class="total-points">
+                                    {% for cp in evaluation.student.class_points.all %}
+                                        {% if cp.classroom.id == classroom.id %}{{ cp.total_points|floatformat:1 }}{% endif %}
+                                    {% endfor %}
+                                </span>
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center py-4">
-                                <i class="fas fa-user-slash fa-2x text-muted mb-2"></i>
-                                <p class="text-muted">このクラスに学生がいません</p>
+                            <td colspan="7" class="text-center py-5">
+                                <i class="fas fa-user-slash fa-3x text-muted mb-3 opacity-50"></i>
+                                <h5 class="text-muted">データがありません</h5>
                             </td>
                         </tr>
                         {% endfor %}
@@ -328,9 +328,9 @@ window.addEventListener('afterprint', function() {
     document.querySelector('.table-container').style.overflow = 'auto';
 });
 
-// 出席率の自動保存
+// 出席率の自動保存 & リアルタイム計算
 function saveAttendanceRate(input) {
-    const attendanceRate = parseFloat(input.value);
+    let attendanceRate = parseFloat(input.value);
     const studentId = input.dataset.studentId;
     const classId = input.dataset.classId;
     
@@ -338,36 +338,28 @@ function saveAttendanceRate(input) {
     if (isNaN(attendanceRate) || attendanceRate < 0 || attendanceRate > 100) {
         alert('出席率は0〜100の範囲で入力してください。');
         input.value = 0;
-        return;
+        attendanceRate = 0;
     }
     
-    // 出席点を計算（最大20点）
+    // 計算ロジック
     const ATTENDANCE_MAX_POINTS = 20;
     const newAttendancePoints = (attendanceRate / 100) * ATTENDANCE_MAX_POINTS;
-    
-    // 行全体のデータを取得
     const row = input.closest('tr');
-    
-    // 現在の合計点と点数（クラスポイント）を取得
-    const totalPointsCell = row.querySelector('.total-col');
     const scoreCell = row.querySelector('.score-col');
-    const currentTotalPoints = parseFloat(totalPointsCell.textContent) || 0;
-    const classPoints = parseFloat(scoreCell.textContent) || 0;
-    
-    // 新しい合計点を計算（出席点 + 点数×2）
+    // 余分な空白や文字を除去して数値のみ抽出 (例: "10pt" -> 10)
+    const classPoints = parseFloat(scoreCell.textContent.trim().replace(/[^0-9.-]/g, '')) || 0;
+    // 合計 = 出席点 + (授業点 * 2)
     const newTotalPoints = newAttendancePoints + (classPoints * 2);
     
-    // 出席点のセルを更新
-    const attendancePointsCell = row.querySelector('.attendance-points');
-    if (attendancePointsCell) {
-        attendancePointsCell.innerHTML = newAttendancePoints.toFixed(1) + '<br><small class="attendance-rate">' + attendanceRate.toFixed(2) + '%</small>';
-    }
+    // 画面更新
+    const attendancePointsSpan = row.querySelector('.attendance-points');
+    const totalPointsSpan = row.querySelector('.total-points');
+    if (attendancePointsSpan) attendancePointsSpan.textContent = newAttendancePoints.toFixed(1);
+    if (totalPointsSpan) totalPointsSpan.textContent = newTotalPoints.toFixed(1);
     
-    // 合計点のセルを更新
-    totalPointsCell.textContent = newTotalPoints.toFixed(1);
-    
-    // サーバーに送信
-    fetch(`/classes/${classId}/attendance-rate/`, {
+    // サーバー送信
+    const url = "{% url 'school_management:update_attendance_rate' classroom.id %}";
+    fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -380,21 +372,17 @@ function saveAttendanceRate(input) {
             attendance_points: newAttendancePoints
         })
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            console.log('出席率を保存しました:', attendanceRate);
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            // 保存成功時のチェックマーク表示を削除（スムーズな入力のため）
+            console.log('保存成功');
         } else {
-            alert('保存に失敗しました: ' + (data.error || '不明なエラー'));
+            input.classList.add('is-invalid');
         }
-    })
-    .catch(error => {
-        console.error('エラー:', error);
-        alert('保存に失敗しました');
     });
 }
 
-// CSRFトークンを取得する関数
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {

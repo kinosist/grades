@@ -2,172 +2,362 @@
 {% load static %}
 
 {% block title %}{{ classroom.class_name }} - ポイント一覧{% endblock %}
+{% block page_title %}ポイント一覧{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">ポイント一覧</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    body { background-color: #f8fafc; }
+    /* --- ベーススタイル --- */
+    .header-info {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .class-title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #212529;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    /* 統計カード */
+    .class-stats {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .stat-item {
+        background-color: #f8f9fa;
+        padding: 15px 20px; /* パディングを少し増やして強調 */
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        min-width: 140px;
+        flex: 1;
+        text-align: center;
+    }
+    
+    .stat-label {
+        font-size: 13px;
+        color: #6c757d;
+        margin-bottom: 5px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .stat-value {
+        font-size: 24px; /* 数字を大きく */
+        font-weight: bold;
+        color: #212529;
+    }
+
+    /* --- テーブルスタイル --- */
+    .table-container {
+        background-color: white;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        overflow-x: auto;
+        position: relative;
+    }
+
+    .points-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 14px;
+    }
+
+    .points-table th,
+    .points-table td {
+        padding: 15px 20px; /* 余白を広げてゆったりと */
+        vertical-align: middle;
+        border-bottom: 1px solid #dee2e6;
+        white-space: nowrap;
+    }
+
+    .points-table th {
+        background-color: #f8f9fa;
+        color: #495057;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #dee2e6;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .points-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* 順位バッジ */
+    .rank-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        font-weight: bold;
+        color: white;
+        background-color: #6c757d;
+        font-size: 0.95em;
+    }
+    .rank-1 { background: linear-gradient(135deg, #FFD700, #FDB931); box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3); }
+    .rank-2 { background: linear-gradient(135deg, #E0E0E0, #BDBDBD); box-shadow: 0 2px 4px rgba(189, 189, 189, 0.3); }
+    .rank-3 { background: linear-gradient(135deg, #CD7F32, #A0522D); box-shadow: 0 2px 4px rgba(205, 127, 50, 0.3); }
+
+    /* 詳細行 */
+    .detail-row {
+        background-color: #f8f9fa;
+    }
+    .detail-card {
+        border: none;
+        background-color: transparent;
+        padding: 20px;
+    }
+    .detail-table th { background-color: white; }
+    
+    /* --- 📱 レスポンス対応 --- */
+    @media (max-width: 768px) {
+        .header-info { padding: 15px; }
+        .class-title { font-size: 18px; }
+        
+        .class-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .stat-item { padding: 10px; min-width: auto; }
+        .stat-value { font-size: 20px; }
+
+        .action-buttons { flex-direction: column; width: 100%; }
+        .action-buttons .btn { width: 100%; margin-bottom: 10px; }
+
+        /* 列固定 */
+        .points-table th.col-rank,
+        .points-table td.col-rank {
+            position: sticky;
+            left: 0;
+            z-index: 11;
+            background-color: #fff;
+            border-right: 1px solid #dee2e6;
+            width: 50px;
+            text-align: center;
+        }
+        .points-table th.col-name,
+        .points-table td.col-name {
+            position: sticky;
+            left: 50px;
+            z-index: 11;
+            background-color: #fff;
+            border-right: 2px solid #dee2e6;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+            min-width: 140px;
+        }
+        
+        .points-table th.col-rank, 
+        .points-table th.col-name {
+            background-color: #f8f9fa;
+            z-index: 12;
+        }
+
+        .detail-row td { white-space: normal; }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <!-- ヘッダー情報 -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0">
-                            <i class="fas fa-trophy me-2"></i>{{ classroom.class_name }} - ポイント一覧
-                        </h4>
-                        <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-secondary">
+            <div class="header-info">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+                    <div class="class-title mb-0">
+                        <i class="fas fa-trophy me-2 text-warning"></i>{{ classroom.class_name }}
+                        <span class="text-muted fs-5 ms-2 fw-normal">- ポイント一覧</span>
+                    </div>
+                    <div class="action-buttons">
+                        <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary">
                             <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
                         </a>
                     </div>
                 </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <h5 class="text-primary">{{ class_stats.total_students }}</h5>
-                                <small class="text-muted">学生数</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <h5 class="text-success">{{ class_stats.class_average }}</h5>
-                                <small class="text-muted">クラス平均</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <h5 class="text-info">{{ class_stats.max_average }}</h5>
-                                <small class="text-muted">最高平均</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <h5 class="text-warning">{{ class_stats.min_average }}</h5>
-                                <small class="text-muted">最低平均</small>
-                            </div>
-                        </div>
+
+                <div class="class-stats">
+                    <div class="stat-item">
+                        <div class="stat-label">学生数</div>
+                        <div class="stat-value text-primary">{{ class_stats.total_students }}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">クラス平均</div>
+                        <div class="stat-value text-success">{{ class_stats.class_average }}</div>
                     </div>
                 </div>
             </div>
 
-            <!-- 学生成績一覧 -->
-            <div class="card">
-                <div class="card-body">
-                    {% if student_grades %}
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>順位</th>
-                                        <th>学籍番号</th>
-                                        <th>氏名</th>
-                                        <th>総ポイント</th>
-                                        <th>平均ポイント</th>
-                                        <th>参加回数</th>
-                                        <th>評価</th>
-                                        <th>全体ポイント</th>
-                                        <th>詳細</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for grade in student_grades %}
-                                    <tr>
-                                        <td>
-                                            <span class="badge bg-primary">{{ forloop.counter }}</span>
-                                        </td>
-                                        <td>{{ grade.student.student_number }}</td>
-                                        <td>
-                                            <strong>{{ grade.student.full_name }}</strong>
-                                            {% if grade.student.furigana %}
-                                                <br><small class="text-muted">{{ grade.student.furigana }}</small>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-success fs-6">{{ grade.total_points }}pt</span>
-                                        </td>
-                                        <td>
-                                            <strong class="text-primary">{{ grade.average_points }}</strong>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-info">{{ grade.session_count }}回</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-{{ grade.grade_color }} fs-6">{{ grade.grade_level }}</span>
-                                        </td>
-                                        <td>
-                                            <small class="text-muted">{{ grade.overall_points }}pt</small>
-                                        </td>
-                                        <td>
-                                            <button class="btn btn-outline-primary btn-sm" type="button"
-                                                    data-bs-toggle="collapse" data-bs-target="#details-{{ grade.student.id }}">
-                                                <i class="fas fa-list me-1"></i>詳細
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    <!-- 詳細表示 -->
-                                    <tr class="collapse" id="details-{{ grade.student.id }}">
-                                        <td colspan="9">
-                                            <div class="card">
-                                                <div class="card-body">
-                                                    <h6 class="card-title">
-                                                        {{ grade.student.full_name }} - 授業回別詳細
-                                                    </h6>
-                                                    {% if grade.lesson_points %}
-                                                        <div class="table-responsive">
-                                                            <table class="table table-sm">
-                                                                <thead>
-                                                                    <tr>
-                                                                        <th>回数</th>
-                                                                        <th>日付</th>
-                                                                        <th>ポイント</th>
-                                                                        <th>累計</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {% for point in grade.lesson_points %}
-                                                                    <tr>
-                                                                        <td>第{{ point.lesson_session.session_number }}回</td>
-                                                                        <td>{{ point.lesson_session.date }}</td>
-                                                                        <td>
-                                                                            <span class="badge bg-primary">{{ point.points }}pt</span>
-                                                                        </td>
-                                                                        <td>
-                                                                            <span class="text-muted">
-                                                                                {% with total=0 %}
-                                                                                    {% for p in grade.lesson_points %}
-                                                                                        {% if p.lesson_session.session_number <= point.lesson_session.session_number %}
-                                                                                            {% with total=total|add:p.points %}{% endwith %}
-                                                                                        {% endif %}
-                                                                                    {% endfor %}
-                                                                                    {{ total }}pt
-                                                                                {% endwith %}
-                                                                            </span>
-                                                                        </td>
-                                                                    </tr>
-                                                                    {% endfor %}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                    {% else %}
-                                                        <p class="text-muted">まだポイントがありません。</p>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
+            <div class="table-container">
+                <table class="points-table">
+                    <thead>
+                        <tr>
+                            <th class="col-rank text-center" style="width: 80px;">順位</th>
+                            <th class="col-name">氏名 / 学籍番号</th>
+                            <th class="text-center">総ポイント</th>
+                            <th class="text-center">評価</th>
+                            <th class="text-center" style="width: 100px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for grade in student_grades|dictsortreversed:"class_points" %}
+                        <tr>
+                            <td class="col-rank text-center">
+                                <span class="rank-badge rank-{{ forloop.counter }}">
+                                    {{ forloop.counter }}
+                                </span>
+                            </td>
+                            <td class="col-name">
+                                <div><strong>{{ grade.student.full_name }}</strong></div>
+                                <div class="text-muted small">{{ grade.student.student_number }}</div>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-success rounded-pill px-4 py-2 fs-6">
+                                    {# gradeオブジェクトが辞書かモデルか不明なため、両方の可能性を考慮して表示 #}
+                                    {% for cp in grade.student.class_points.all %}
+                                        {% if cp.classroom.id == classroom.id %}{{ cp.class_points }}pt{% endif %}
                                     {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-5">
-                            <i class="fas fa-user-slash fa-3x text-muted mb-3"></i>
-                            <h5 class="text-muted">このクラスに学生がいません</h5>
-                            <p class="text-muted">学生を追加してください。</p>
-                        </div>
-                    {% endif %}
-                </div>
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-{{ grade.grade_color }} px-3">{{ grade.grade_level }}</span>
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-outline-primary btn-sm rounded-pill px-3" type="button"
+                                        data-bs-toggle="collapse" data-bs-target="#details-{{ grade.student.id }}">
+                                    <i class="fas fa-chevron-down me-1"></i>詳細
+                                </button>
+                            </td>
+                        </tr>
+                        
+                        <tr class="detail-row collapse" id="details-{{ grade.student.id }}">
+                            <td colspan="5" class="p-0">
+                                <div class="detail-card">
+                                    <h6 class="mb-3 text-primary border-bottom pb-2">
+                                        <i class="fas fa-history me-2"></i>授業ポイント履歴
+                                    </h6>
+                                    {% if grade.lesson_points %}
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered detail-table mb-0 w-100">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th style="width: 20%;">回数</th>
+                                                        <th style="width: 20%;">日付</th>
+                                                        <th style="width: 30%;">獲得ポイント</th>
+                                                        <th style="width: 30%;">累計推移</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for point in grade.lesson_points %}
+                                                    <tr>
+                                                        <td>第{{ point.lesson_session.session_number }}回</td>
+                                                        <td>{{ point.lesson_session.date|date:"m/d" }}</td>
+                                                        <td class="fw-bold text-success">+{{ point.points }}pt</td>
+                                                        <td class="text-muted cumulative-calc" 
+                                                            data-session="{{ point.lesson_session.session_number|default:0 }}" 
+                                                            data-points="{{ point.points|default:0 }}">
+                                                            - pt
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-muted mb-0 small"><i class="fas fa-info-circle me-1"></i>授業でのポイント獲得履歴はありません。</p>
+                                    {% endif %}
+
+                                    <h6 class="mt-4 mb-3 text-success border-bottom pb-2">
+                                        <i class="fas fa-clipboard-check me-2"></i>小テスト履歴
+                                    </h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered detail-table mb-0 w-100">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width: 20%;">回数</th>
+                                                    <th style="width: 20%;">日付</th>
+                                                    <th style="width: 40%;">テスト名</th>
+                                                    <th style="width: 20%;">得点</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for score in grade.student.quiz_scores_as_student.all|dictsortreversed:"graded_at" %}
+                                                    {% if score.quiz.lesson_session.classroom.id == classroom.id and not score.is_cancelled %}
+                                                    <tr>
+                                                        <td>第{{ score.quiz.lesson_session.session_number }}回</td>
+                                                        <td>{{ score.quiz.lesson_session.date|date:"m/d" }}</td>
+                                                        <td>{{ score.quiz.quiz_name }}</td>
+                                                        <td class="fw-bold text-success">{{ score.score }}点</td>
+                                                    </tr>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5">
+                                <i class="fas fa-user-slash fa-3x text-muted mb-3 opacity-50"></i>
+                                <h5 class="text-muted">学生データがありません</h5>
+                                <p class="text-muted small">学生を追加して授業を開始してください。</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 各学生の詳細テーブルごとに累積ポイントを計算
+    document.querySelectorAll('.detail-table').forEach(table => {
+        // そのテーブル内の全行のデータを取得
+        const cells = Array.from(table.querySelectorAll('.cumulative-calc'));
+        const pointsData = cells.map(el => ({
+            session: parseInt(el.dataset.session),
+            points: parseFloat(el.dataset.points)
+        }));
+
+        // 各行について、自分以下のセッション番号を持つポイントを合計して表示
+        cells.forEach((cell, index) => {
+            const currentSession = pointsData[index].session;
+            const total = pointsData
+                .filter(p => p.session <= currentSession)
+                .reduce((sum, p) => sum + (p.points || 0), 0);
+            // 小数点以下があれば表示、なければ整数表示
+            cell.textContent = (Number.isInteger(total) ? total : total.toFixed(1)) + 'pt';
+        });
+    });
+});
+</script>
 {% endblock %}

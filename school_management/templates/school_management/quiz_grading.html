@@ -3,6 +3,14 @@
 {% block title %}{{ quiz.quiz_name }} - 採点 - 学校管理システム{% endblock %}
 {% block page_title %}{{ quiz.quiz_name }} - 採点{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' quiz.lesson_session.classroom.id %}">{{ quiz.lesson_session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:lesson_session_detail' quiz.lesson_session.id %}">第{{ quiz.lesson_session.session_number }}回</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:quiz_list' quiz.lesson_session.id %}">小テスト一覧</a></li>
+<li class="breadcrumb-item active" aria-current="page">{{ quiz.quiz_name }} - 採点</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <!-- 小テスト情報 -->

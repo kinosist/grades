@@ -3,6 +3,13 @@
 {% block title %}小テスト作成 - 学校管理システム{% endblock %}
 {% block page_title %}小テスト作成 - 第{{ session.session_number }}回{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' session.classroom.id %}">{{ session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:lesson_session_detail' session.id %}">第{{ session.session_number }}回</a></li>
+<li class="breadcrumb-item active" aria-current="page">小テスト作成</li>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-6">

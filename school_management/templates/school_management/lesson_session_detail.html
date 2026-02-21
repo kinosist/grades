@@ -3,9 +3,14 @@
 {% block title %}第{{ lesson_session.session_number }}回 - {{ lesson_session.classroom.class_name }}{% endblock %}
 {% block page_title %}授業回詳細{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' lesson_session.classroom.id %}">{{ lesson_session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">第{{ lesson_session.session_number }}回</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
-    <!-- 授業回情報 -->
     <div class="col-lg-8">
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -70,15 +75,16 @@
         </div>
     </div>
     
-    <!-- サイドバー統計 -->
     <div class="col-lg-4">
-        <!-- クイックアクション -->
         <div class="card mb-4">
             <div class="card-header">
                 <h6><i class="fas fa-bolt me-2"></i>クイックアクション</h6>
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
+                    <a href="{% url 'school_management:lesson_report_tab' lesson_session.id %}" class="btn btn-warning btn-sm">
+                        <i class="fas fa-book-open me-1"></i>日報入力
+                    </a>
                     <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-info btn-sm">
                         <i class="fas fa-users me-1"></i>グループ管理
                     </a>
@@ -96,7 +102,6 @@
             </div>
         </div>
 
-        <!-- 授業情報 -->
         <div class="card">
             <div class="card-header">
                 <h6><i class="fas fa-info-circle me-2"></i>授業情報</h6>

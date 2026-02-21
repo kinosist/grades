@@ -364,7 +364,7 @@
                                         <label class="form-label small fw-semibold">自己評価点 (0〜100)</label>
                                         <input type="number" name="student_score" class="form-control"
                                             min="0" max="100" placeholder="例: 75"
-                                            value="{{ self_eval.student_score|default:'' }}">
+                                            value="{{ self_eval.student_score }}">
                                     </div>
                                     <button type="submit" class="btn btn-outline-info btn-sm w-100">
                                         <i class="fas fa-save me-1"></i>学生評価を保存
@@ -400,7 +400,7 @@
                                         <label class="form-label small fw-semibold">教師評価点 (0〜100)</label>
                                         <input type="number" name="teacher_score" class="form-control"
                                             min="0" max="100" placeholder="例: 80"
-                                            value="{{ self_eval.teacher_score|default:'' }}">
+                                            value="{{ self_eval.teacher_score }}">
                                     </div>
                                     <button type="submit" class="btn btn-primary btn-sm w-100">
                                         <i class="fas fa-save me-1"></i>教師評価を保存

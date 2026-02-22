@@ -27,7 +27,7 @@ class ClassDetailViewTest(TestCase):
             email='student1@example.com',
             full_name='生徒 一郎',
             password='password123',
-            student_number='S2026001'  # ここが重要です！
+            student_number='S2026001'
         )
         
         # 3. ClassRoom作成
@@ -55,7 +55,6 @@ class ClassDetailViewTest(TestCase):
         
         self.url = reverse('school_management:class_detail', kwargs={'class_id': self.classroom.id})
 
-    # --- 以下、テストメソッドは変更なし ---
     def test_login_required(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 302)

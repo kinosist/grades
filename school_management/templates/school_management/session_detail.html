@@ -33,7 +33,6 @@
 <div class="row">
     <div class="col-12">
         {% with groups=groups|default:session.group_set.all %}
-        <!-- タブナビゲーション -->
         <ul class="nav nav-tabs mb-4" id="sessionTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="content-tab" data-bs-toggle="tab" data-bs-target="#content" type="button" role="tab" aria-controls="content" aria-selected="true">
@@ -56,13 +55,13 @@
                     {% endwith %}
                 </button>
             </li>
-            {% if session.has_quiz %}
+            
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="quiz-tab" data-bs-toggle="tab" data-bs-target="#quiz" type="button" role="tab" aria-controls="quiz" aria-selected="false">
-                    <i class="fas fa-clipboard-check me-2"></i>小テスト管理
+                <button class="nav-link" id="qr-tab" data-bs-toggle="tab" data-bs-target="#qr-grading" type="button" role="tab" aria-controls="qr-grading" aria-selected="false">
+                    <i class="fas fa-qrcode me-2"></i>QR巡回採点
                 </button>
             </li>
-            {% endif %}
+
             {% if session.has_peer_evaluation %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="peer-tab" data-bs-toggle="tab" data-bs-target="#peer" type="button" role="tab" aria-controls="peer" aria-selected="false">
@@ -72,17 +71,12 @@
             {% endif %}
         </ul>
 
-        <!-- タブコンテンツ -->
         <div class="tab-content" id="sessionTabsContent">
-            <!-- 授業内容タブ -->
             <div class="tab-pane fade show active" id="content" role="tabpanel" aria-labelledby="content-tab">
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5><i class="fas fa-info-circle me-2"></i>授業内容</h5>
                         <div>
-                            <a href="{{ '#' }}" class="btn btn-warning btn-sm me-2">
-                                <i class="fas fa-qrcode me-1"></i>QR巡回採点
-                            </a>
                             <a href="{% url 'school_management:session_delete' session.id %}" class="btn btn-outline-danger btn-sm me-2">
                                 <i class="fas fa-trash me-1"></i>削除
                             </a>
@@ -98,12 +92,8 @@
                         </div>
                         <div class="d-flex gap-4">
                             <div class="d-flex align-items-center">
-                                <strong class="me-2">小テスト:</strong>
-                                {% if session.has_quiz %}
-                                    <span class="badge bg-success">実施予定</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">なし</span>
-                                {% endif %}
+                                <strong class="me-2">QR採点:</strong>
+                                <span class="badge bg-warning text-dark"><i class="fas fa-qrcode me-1"></i>実施可能</span>
                             </div>
                             <div class="d-flex align-items-center">
                                 <strong class="me-2">ピア評価:</strong>
@@ -118,7 +108,6 @@
                 </div>
             </div>
 
-            <!-- グループ編成タブ -->
             <div class="tab-pane fade" id="group" role="tabpanel" aria-labelledby="group-tab">
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
@@ -177,7 +166,6 @@
                 </div>
             </div>
 
-            <!-- 日報タブ -->
             <div class="tab-pane fade" id="report" role="tabpanel" aria-labelledby="report-tab">
                 <div class="card mb-4">
                     <div class="card-header">
@@ -223,62 +211,27 @@
                 </div>
             </div>
 
-            {% if session.has_quiz %}
-            <div class="tab-pane fade" id="quiz" role="tabpanel" aria-labelledby="quiz-tab">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5><i class="fas fa-clipboard-check me-2"></i>小テスト管理</h5>
+            <div class="tab-pane fade" id="qr-grading" role="tabpanel" aria-labelledby="qr-tab">
+                <div class="card mb-4 border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>QR巡回採点</h5>
                     </div>
-                    <div class="card-body">
-                        {% if quizzes %}
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>小テスト名</th>
-                                            <th>満点</th>
-                                            <th>採点方式</th>
-                                            <th>作成日</th>
-                                            <th>操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for quiz in quizzes %}
-                                        <tr class="clickable-row" onclick="window.location=`{% url 'school_management:quiz_detail' quiz.id %}`">
-                                            <td><strong>{{ quiz.quiz_name }}</strong></td>
-                                            <td>{{ quiz.max_score }}点</td>
-                                            <td>
-                                                <span class="badge bg-secondary">{{ quiz.get_grading_method_display }}</span>
-                                            </td>
-                                            <td>{{ quiz.created_at|date:"m/d" }}</td>
-                                            <td>
-                                                <a href="{% url 'school_management:question_manage' quiz.id %}" class="btn btn-outline-info btn-sm" onclick="event.stopPropagation()">
-                                                    <i class="fas fa-clipboard-list me-1"></i>問題管理
-                                                </a>
-                                                <a href="{% url 'school_management:quiz_grading' quiz.id %}" class="btn btn-outline-success btn-sm" onclick="event.stopPropagation()">
-                                                    <i class="fas fa-qrcode me-1"></i>採点
-                                                </a>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <div class="text-center py-3">
-                                <i class="fas fa-clipboard-plus fa-2x text-muted mb-2"></i>
-                                <p class="text-muted">小テストがまだ作成されていません。</p>
-                                <a href="{% url 'school_management:quiz_create' session.id %}" class="btn btn-success">
-                                    <i class="fas fa-plus me-1"></i>小テストを作成
-                                </a>
-                            </div>
-                        {% endif %}
+                    <div class="card-body text-center py-5">
+                        <div class="mb-4">
+                            <i class="fas fa-mobile-alt fa-4x text-muted mb-3"></i>
+                            <h4 class="mb-3">口頭テストの加点</h4>
+                            <p class="text-muted">
+                                教室を巡回しながら問題を出題し、<br>
+                                正解した学生のQRコードをカメラで読み取ってポイントを加点します。
+                            </p>
+                        </div>
+                        <a href="{% url 'school_management:class_qr_codes' session.classroom.id %}" class="btn btn-lg btn-warning shadow-sm px-5 py-3 rounded-pill fw-bold">
+                            <i class="fas fa-camera me-2"></i>カメラを起動して採点を開始
+                        </a>
                     </div>
                 </div>
             </div>
-            {% endif %}
 
-            <!-- ピア評価管理タブ -->
             {% if session.has_peer_evaluation %}
             <div class="tab-pane fade" id="peer" role="tabpanel" aria-labelledby="peer-tab">
                 {% if groups %}
@@ -322,7 +275,7 @@
                                         <i class="fas fa-link fa-2x text-info mb-2"></i>
                                         <h6>匿名評価リンク共有</h6>
                                         <p class="text-muted small">SNS共有画面へ</p>
-                                        <a href="{% url 'school_management:peer_evaluation_link' session.id %}" class="btn btn-info btn-sm">
+                                        <a href="{% url 'school_management:peer_evaluation_link' session.id %}" class="btn btn-info btn-sm text-white">
                                             <i class="fas fa-share-alt me-1"></i>リンク共有
                                         </a>
                                     </div>

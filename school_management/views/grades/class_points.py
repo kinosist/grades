@@ -3,6 +3,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib import messages
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.db.models import Sum, Q, Count
@@ -291,6 +292,9 @@ def update_class_settings(request, class_id):
         if classroom.grading_system != grading_system:
             classroom.grading_system = grading_system
             recalculate_points = True
+            messages.success(request, '評価システムを更新しました。')
+        else:
+            messages.info(request, '評価システムは変更されていません。')
 
     # QRポイントの更新
     qr_point_value = request.POST.get('qr_point_value')
@@ -298,7 +302,11 @@ def update_class_settings(request, class_id):
         try:
             val = int(qr_point_value)
             if val > 0:
-                classroom.qr_point_value = val
+                if classroom.qr_point_value != val:
+                    classroom.qr_point_value = val
+                    messages.success(request, 'QRアクションポイントを更新しました。')
+                else:
+                    messages.info(request, 'QRアクションポイントは変更されていません。')
         except ValueError:
             pass
             
@@ -312,6 +320,9 @@ def update_class_settings(request, class_id):
                 if classroom.attendance_max_points != val:
                     classroom.attendance_max_points = val
                     recalculate_attendance = True
+                    messages.success(request, '出席点満点を更新しました。')
+                else:
+                    messages.info(request, '出席点満点は変更されていません。')
         except ValueError:
             pass
             

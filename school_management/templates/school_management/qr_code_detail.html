@@ -87,7 +87,7 @@
                                         </div>
                                         <div class="col-6">
                                             <div class="text-center">
-                                                <h3 class="text-success">{{ scans|length }}pt</h3>
+                                                <h3 class="text-success">{{ total_points }}pt</h3>
                                                 <p class="text-muted mb-0">QR獲得ポイント</p>
                                             </div>
                                         </div>
@@ -126,20 +126,35 @@
                                                 <thead>
                                                     <tr>
                                                         <th>スキャン者</th>
-                                                        <th>学籍番号</th>
+                                                        <th>授業回</th>
                                                         <th>付与ポイント</th>
                                                         <th>スキャン日時</th>
+                                                        <th>操作</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {% for scan in scans %}
                                                     <tr>
                                                         <td>{{ scan.scanned_by.full_name }}</td>
-                                                        <td>{{ scan.scanned_by.student_number }}</td>
+                                                        <td>
+                                                            {% if scan.lesson_session %}
+                                                                第{{ scan.lesson_session.session_number }}回
+                                                            {% else %}
+                                                                <span class="text-muted">-</span>
+                                                            {% endif %}
+                                                        </td>
                                                         <td>
                                                             <span class="badge bg-success">{{ scan.points_awarded }}点</span>
                                                         </td>
                                                         <td>{{ scan.scanned_at|date:"Y/m/d H:i" }}</td>
+                                                        <td>
+                                                            <form action="{% url 'school_management:delete_qr_scan' scan.id %}" method="post" onsubmit="return confirm('この履歴を削除しますか？\nポイントも自動的に減算されます。');" style="display:inline;">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-outline-danger btn-sm" title="削除">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        </td>
                                                     </tr>
                                                     {% endfor %}
                                                 </tbody>

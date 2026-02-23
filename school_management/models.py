@@ -838,53 +838,65 @@ def create_qr_quiz_for_session(sender, instance, created, **kwargs):
             is_qr_linked=True
         )
 
-@receiver(post_save, sender=QRCodeScan)
-def update_quiz_score_from_qr(sender, instance, created, **kwargs):
-    """QRスキャン時に連携小テストの点数を更新"""
-    if created and instance.lesson_session:
-        # 優先順位: 1. 既に連携済みの小テスト -> 2. 既存の小テスト（連携させる） -> 3. 新規作成
-        quiz = Quiz.objects.filter(lesson_session=instance.lesson_session, is_qr_linked=True).first()
-        
-        if not quiz:
-            # 連携済みがない場合、既存の小テストがあればそれを再利用する
-            quiz = Quiz.objects.filter(lesson_session=instance.lesson_session).first()
-            if quiz:
-                quiz.is_qr_linked = True
-                quiz.save()
-            else:
-                # 既存もなければ新規作成
-                quiz = Quiz.objects.create(
-                    lesson_session=instance.lesson_session,
-                    quiz_name="QRアクション点",
-                    max_score=100,
-                    grading_method='qr_mobile',
-                    is_qr_linked=True
-                )
-        
-        # QRコードの持ち主（生徒）
-        student = instance.qr_code.student
-        # スキャンした人（先生）
-        grader = instance.scanned_by
-        
-        # 重複対策: get_or_createの代わりにfilterを使用
-        # 最新のものを取得（IDの降順＝作成順）
-        scores = QuizScore.objects.filter(quiz=quiz, student=student).order_by('-id')
-        
-        if scores.exists():
-            score_obj = scores.first()
-            if scores.count() > 1:
-                # 重複がある場合は、最新以外を削除（合算せずリセット）
-                # ユーザー要望: "いっそのこと最新のやつ以外消したらよくないですか？" に対応
-                scores.exclude(id=score_obj.id).delete()
-        else:
-            score_obj = QuizScore.objects.create(
-                quiz=quiz,
-                student=student,
-                score=0,
-                graded_by=grader
-            )
+@receiver([post_save, post_delete], sender=QRCodeScan)
+def update_quiz_score_from_qr(sender, instance, **kwargs):
+    """QRスキャン履歴の変更時（追加・削除）に小テストの点数を再集計して更新"""
+    if not instance.lesson_session:
+        return
+
+    # 連携小テストを探す
+    quiz = Quiz.objects.filter(lesson_session=instance.lesson_session, is_qr_linked=True).first()
+    
+    # クイズがない場合
+    if not quiz:
+        # 削除時は何もしない（集計先がないため）
+        if kwargs.get('signal') == post_delete:
+            return
             
-        score_obj.score += instance.points_awarded
+        # 作成・更新時は既存を探すか新規作成
+        quiz = Quiz.objects.filter(lesson_session=instance.lesson_session).first()
+        if quiz:
+            quiz.is_qr_linked = True
+            quiz.save()
+        else:
+            quiz = Quiz.objects.create(
+                lesson_session=instance.lesson_session,
+                quiz_name="QRアクション点",
+                max_score=100,
+                grading_method='qr_mobile',
+                is_qr_linked=True
+            )
+    
+    try:
+        student = instance.qr_code.student
+    except Exception:
+        # 関連オブジェクトが削除されている場合はスキップ
+        return
+
+    # 合計ポイントを再集計（集計元をQRCodeScanに一本化）
+    total_points = QRCodeScan.objects.filter(
+        lesson_session=instance.lesson_session,
+        qr_code__student=student
+    ).aggregate(total=Sum('points_awarded'))['total'] or 0
+    
+    # QuizScoreを取得または作成
+    scores = QuizScore.objects.filter(quiz=quiz, student=student).order_by('-id')
+    
+    if scores.exists():
+        score_obj = scores.first()
+        if scores.count() > 1:
+            scores.exclude(id=score_obj.id).delete()
+    else:
+        score_obj = QuizScore.objects.create(
+            quiz=quiz,
+            student=student,
+            score=0,
+            graded_by=instance.scanned_by
+        )
+        
+    # 点数を更新（変更がある場合のみ保存して再計算シグナルを発火）
+    if score_obj.score != total_points:
+        score_obj.score = total_points
         score_obj.save()
 
 @receiver(pre_save, sender=QRCodeScan)

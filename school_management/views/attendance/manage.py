@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.db import models
 # モデルのインポート
-from ...models import ClassRoom, Student, StudentQRCode, StudentClassPoints, LessonSession
+from ...models import ClassRoom, Student, StudentQRCode, StudentClassPoints, LessonSession, QRCodeScan
 from .utils import generate_qr_code_image
 
 @login_required
@@ -113,3 +113,20 @@ def qr_code_detail(request, student_id):
         'classroom': classroom,
     }
     return render(request, 'school_management/qr_code_detail.html', context)
+
+@login_required
+def delete_qr_scan(request, scan_id):
+    """QRスキャン履歴の削除"""
+    if not request.user.is_teacher:
+        messages.error(request, '権限がありません。')
+        return redirect('school_management:dashboard')
+    
+    scan = get_object_or_404(QRCodeScan, id=scan_id)
+    student_id = scan.qr_code.student.id
+    
+    # 削除（シグナルによりポイント再計算が行われる）
+    scan.delete()
+    
+    messages.success(request, 'スキャン履歴を削除しました。ポイントが再計算されました。')
+    
+    return redirect('school_management:qr_code_detail', student_id=student_id)

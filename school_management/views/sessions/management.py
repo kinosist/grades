@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from ...models import ClassRoom, LessonSession, Quiz, QuizScore
+from ...models import ClassRoom, LessonSession, Quiz, QuizScore, QRCodeScan
 from django.db import IntegrityError
 
 @login_required
@@ -112,6 +112,10 @@ def session_reset_qr(request, session_id):
     session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
     
     if request.method == 'POST':
+        # 関連するQRコードスキャン履歴も削除（整合性を保つため）
+        scan_count = QRCodeScan.objects.filter(lesson_session=session).count()
+        QRCodeScan.objects.filter(lesson_session=session).delete()
+
         # 既存の小テストを全て削除
         # これにより紐づくQuizScoreもCASCADEで削除されます
         count = session.quiz_set.count()
@@ -126,7 +130,7 @@ def session_reset_qr(request, session_id):
             is_qr_linked=True
         )
         
-        messages.success(request, f'データをリセットしました。旧データ{count}件を削除し、新しいQRアクション点枠を作成しました。')
+        messages.success(request, f'データをリセットしました。旧データ{count}件とスキャン履歴{scan_count}件を削除し、新しいQRアクション点枠を作成しました。')
         
     return redirect('school_management:session_detail', session_id=session.id)
 

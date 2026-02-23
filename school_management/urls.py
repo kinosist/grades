@@ -109,6 +109,7 @@ urlpatterns = [
     path('qr-codes/', attendance.qr_code_list, name='qr_code_list'),
     path('qr-codes/student/<int:student_id>/', attendance.qr_code_detail, name='qr_code_detail'),
     path('qr-codes/scan/<uuid:qr_code_id>/', attendance.qr_code_scan, name='qr_code_scan'),
+    path('qr-codes/history/<int:scan_id>/delete/', attendance.delete_qr_scan, name='delete_qr_scan'),
     path('my-qr-code/', attendance.student_qr_code_view, name='student_qr_code'),
     path('classes/<int:class_id>/qr-codes/', attendance.class_qr_codes, name='class_qr_codes'),
 ]

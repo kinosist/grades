@@ -129,3 +129,16 @@ def session_reset_qr(request, session_id):
         messages.success(request, f'データをリセットしました。旧データ{count}件を削除し、新しいQRアクション点枠を作成しました。')
         
     return redirect('school_management:session_detail', session_id=session.id)
+
+@login_required
+def lesson_session_delete(request, session_id):
+    """授業回削除"""
+    session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
+    
+    if request.method == 'POST':
+        classroom_id = session.classroom.id
+        session.delete()
+        messages.success(request, '授業回を削除しました。')
+        return redirect('school_management:class_detail', class_id=classroom_id)
+    
+    return render(request, 'school_management/session_delete.html', {'session': session})

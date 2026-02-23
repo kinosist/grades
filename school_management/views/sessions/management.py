@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from ...models import ClassRoom, LessonSession, Quiz, QuizScore, QRCodeScan
+from ...models import ClassRoom, LessonSession, Quiz, QuizScore, QRCodeScan, PeerEvaluation, Group, Attendance, StudentLessonPoints, LessonReport
 from django.db import IntegrityError
 
 @login_required
@@ -141,8 +141,30 @@ def lesson_session_delete(request, session_id):
     
     if request.method == 'POST':
         classroom_id = session.classroom.id
+        
+        # 外部キー制約エラーを回避するため、関連データを明示的に全削除
+        # 削除順序が重要（依存される側を後に消すのが基本）
+        
+        # 1. ピア評価関連 (Groupに依存しているため先に削除)
+        PeerEvaluation.objects.filter(lesson_session=session).delete()
+        
+        # 2. グループ関連 (Sessionに依存)
+        Group.objects.filter(lesson_session=session).delete()
+        
+        # 3. 小テスト・QR関連
+        # Quizを消すとQuizScoreも消える
+        Quiz.objects.filter(lesson_session=session).delete()
+        # QRCodeScanを消す (QuizScore再計算シグナルが走るがQuizがないので安全にスキップされる)
+        QRCodeScan.objects.filter(lesson_session=session).delete()
+        
+        # 4. その他 (Attendance, StudentLessonPoints, LessonReport)
+        Attendance.objects.filter(lesson_session=session).delete()
+        StudentLessonPoints.objects.filter(lesson_session=session).delete()
+        LessonReport.objects.filter(lesson_session=session).delete()
+        
+        # 5. 本体削除
         session.delete()
         messages.success(request, '授業回を削除しました。')
         return redirect('school_management:class_detail', class_id=classroom_id)
     
-    return render(request, 'school_management/session_delete.html', {'session': session})
+    return redirect('school_management:session_detail', session_id=session.id)

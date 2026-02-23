@@ -76,10 +76,13 @@
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5><i class="fas fa-info-circle me-2"></i>授業内容</h5>
-                        <div>
-                            <a href="{% url 'school_management:session_delete' session.id %}" class="btn btn-outline-danger btn-sm me-2">
-                                <i class="fas fa-trash me-1"></i>削除
-                            </a>
+                        <div class="d-flex">
+                            <form action="{% url 'school_management:session_delete' session.id %}" method="post" onsubmit="return confirm('本当にこの授業回を削除しますか？\n\n※関連する出席データ、小テスト結果、ピア評価なども全て削除されます。\n※この操作は取り消せません。');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger btn-sm me-2">
+                                    <i class="fas fa-trash me-1"></i>削除
+                                </button>
+                            </form>
                             <a href="{% url 'school_management:class_detail' session.classroom.id %}" class="btn btn-outline-secondary btn-sm">
                                 <i class="fas fa-arrow-left me-1"></i>クラスに戻る
                             </a>

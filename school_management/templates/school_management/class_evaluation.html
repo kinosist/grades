@@ -257,7 +257,11 @@ body { background-color: #f8fafc; }
                             </th>
                             <th class="total-col">
                                 合計
-                                <span class="header-sub-text">( 出席点 + (授業点 * 2) )</span>
+                                {% if grading_system == 'goal' %}
+                                    <span class="header-sub-text">(講師評価点)</span>
+                                {% else %}
+                                    <span class="header-sub-text">((授業点 + 出席点) * 2)</span>
+                                {% endif %}
                             </th>
                         </tr>
                     </thead>
@@ -330,6 +334,7 @@ window.addEventListener('afterprint', function() {
 
 // 出席率の自動保存 & リアルタイム計算
 function saveAttendanceRate(input) {
+    const gradingSystem = "{{ grading_system }}";
     let attendanceRate = parseFloat(input.value);
     const studentId = input.dataset.studentId;
     const classId = input.dataset.classId;
@@ -348,14 +353,21 @@ function saveAttendanceRate(input) {
     const scoreCell = row.querySelector('.score-col');
     // 余分な空白や文字を除去して数値のみ抽出 (例: "10pt" -> 10)
     const classPoints = parseFloat(scoreCell.textContent.trim().replace(/[^0-9.-]/g, '')) || 0;
-    // 合計 = 出席点 + (授業点 * 2)
-    const newTotalPoints = newAttendancePoints + (classPoints * 2);
+    
+    // 合計 = (授業点 + 出席点) * 2
+    // ※目標管理モードの場合は自動計算しない（サーバー側の値を優先）
+    let newTotalPoints = 0;
+    if (gradingSystem !== 'goal') {
+        newTotalPoints = (classPoints + newAttendancePoints) * 2;
+    }
     
     // 画面更新
     const attendancePointsSpan = row.querySelector('.attendance-points');
     const totalPointsSpan = row.querySelector('.total-points');
     if (attendancePointsSpan) attendancePointsSpan.textContent = newAttendancePoints.toFixed(1);
-    if (totalPointsSpan) totalPointsSpan.textContent = newTotalPoints.toFixed(1);
+    if (totalPointsSpan && gradingSystem !== 'goal') {
+        totalPointsSpan.textContent = newTotalPoints.toFixed(1);
+    }
     
     // サーバー送信
     const url = "{% url 'school_management:update_attendance_rate' classroom.id %}";

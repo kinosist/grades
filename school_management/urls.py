@@ -31,6 +31,7 @@ urlpatterns = [
     path('classes/<int:class_id>/points/', grades.class_points_view, name='class_points'),
     path('classes/<int:class_id>/evaluation/', grades.class_evaluation_view, name='class_evaluation'),
     path('classes/<int:class_id>/attendance-rate/', grades.update_attendance_rate, name='update_attendance_rate'),
+    path('classes/<int:class_id>/settings/update/', grades.update_class_settings, name='update_class_settings'),
 
     # --- クラスへの学生追加・詳細 ---
     path('classes/<int:class_id>/students/select/', students.bulk_student_add, name='class_student_select'),

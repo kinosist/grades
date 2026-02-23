@@ -50,7 +50,11 @@
                                 <div class="card-body text-center">
                                     {% if qr_image %}
                                         <img src="{{ qr_image }}" alt="QRコード" class="img-fluid mb-3" style="max-width: 300px;">
-                                        <p class="text-muted">このQRコードを他の学生がスキャンすると、{{ student.full_name }}さんのポイントが1点増加します。</p>
+                                        <p class="text-muted">このQRコードを他の学生がスキャンすると、{{ student.full_name }}さんのポイントが
+                                            {% if classroom %}
+                                                {{ classroom.qr_point_value }}点
+                                            {% else %}ポイント{% endif %}
+                                        増加します。</p>
                                     {% else %}
                                         <div class="alert alert-warning">QRコード生成エラー</div>
                                     {% endif %}

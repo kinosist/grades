@@ -1,7 +1,8 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db import models
-from ...models import ClassRoom, LessonSession, StudentLessonPoints, Quiz, QuizScore, Group, StudentClassPoints, PeerEvaluation, ContributionEvaluation 
+from django.db.models import Sum
+from ...models import ClassRoom, LessonSession, StudentLessonPoints, Quiz, QuizScore, Group, GroupMember, StudentClassPoints, PeerEvaluation, ContributionEvaluation 
 
 @login_required
 def class_evaluation_view(request, class_id):
@@ -12,6 +13,9 @@ def class_evaluation_view(request, class_id):
     # 授業回の一覧を取得
     sessions = LessonSession.objects.filter(classroom=classroom).order_by('session_number')
     
+    # 評価システム（通常 or 目標管理）
+    grading_system = classroom.grading_system
+
     # 各学生の評価データを取得
     student_evaluations = []
     
@@ -54,35 +58,31 @@ def class_evaluation_view(request, class_id):
                 print(f"小テストスコア取得エラー: {e}")
                 pass
             
-            # ピア評価スコアを取得（1位=5点、2位=3点）
+            # ピア評価スコアを取得（貢献度 + 投票ポイント）
             peer_evaluation_score = 0
             try:
-                # この学生が所属するグループを取得
-                student_groups = Group.objects.filter(
-                    lesson_session=session,
-                    groupmember__student=student
-                )
-                
-                if student_groups.exists() and session.has_peer_evaluation:
-                    # この学生のグループが1位に選ばれた回数
-                    first_place_count = PeerEvaluation.objects.filter(
-                        lesson_session=session,
-                        first_place_group__in=student_groups
-                    ).count()
+                if session.has_peer_evaluation:
+                    # 1. 貢献度評価 (5段階評価の合計)
+                    contrib_score = ContributionEvaluation.objects.filter(
+                        peer_evaluation__lesson_session=session,
+                        evaluatee=student
+                    ).aggregate(total=Sum('contribution_score'))['total'] or 0
                     
-                    # この学生のグループが2位に選ばれた回数
-                    second_place_count = PeerEvaluation.objects.filter(
-                        lesson_session=session,
-                        second_place_group__in=student_groups
-                    ).count()
+                    # 2. 投票ポイント (1位=2点, 2位=1点)
+                    vote_score = 0
+                    # この授業回での学生のグループを取得
+                    membership = GroupMember.objects.filter(
+                        student=student,
+                        group__lesson_session=session
+                    ).first()
                     
-                    # 1位=5点、2位=3点（複数票があっても最大値のみ付与）
-                    if first_place_count > 0:
-                        peer_evaluation_score = 5
-                    elif second_place_count > 0:
-                        peer_evaluation_score = 3
-                    else:
-                        peer_evaluation_score = 0
+                    if membership:
+                        group = membership.group
+                        first_votes = PeerEvaluation.objects.filter(first_place_group=group).count()
+                        second_votes = PeerEvaluation.objects.filter(second_place_group=group).count()
+                        vote_score = (first_votes * 2) + (second_votes * 1)
+
+                    peer_evaluation_score = contrib_score + vote_score
             except Exception as e:
                 print(f"ピア評価スコア取得エラー: {e}")
                 pass
@@ -120,18 +120,24 @@ def class_evaluation_view(request, class_id):
         total_quiz_score = sum(data.get('quiz_score', 0) for data in session_data.values())
         total_combined_score = sum(data['total_score'] for data in session_data.values())
         
-        # 小テスト以外のスコアに倍率を適用し、小テストは等倍で加算
-        session_base_score = max(total_combined_score - total_quiz_score, 0)
-        multiplier_value = 2
-        class_points_value = saved_class_points + (session_base_score * multiplier_value) + total_quiz_score
-        
-        average_points = round(total_qr_points / session_count, 1) if session_count > 0 else 0
-        
         # 出席点を使用（保存されたものがあればそれを使う）
         attendance_points_value = saved_attendance_points if saved_attendance_points > 0 else 0
+
+        # 合計計算ロジックの変更
+        # 授業点 = (小テスト(QR含む) + ピア評価 + 出席点 + 授業内ポイント) * 倍率
+        multiplier_value = 2
         
-        # 合計点は出席点 + クラスポイントの2倍
-        total_points_calculated = attendance_points_value + (class_points_value * multiplier_value)
+        # total_combined_score には (QR + Quiz + Peer) が含まれている
+        # ここに Attendance を足して倍率を掛ける
+        base_points = total_combined_score + attendance_points_value
+        
+        # 目標管理モードの場合は、DBに保存されているポイント（講師評価点）を優先
+        if grading_system == 'goal':
+            total_points_calculated = saved_class_points
+        else:
+            total_points_calculated = int(base_points * multiplier_value)
+        
+        average_points = round(total_qr_points / session_count, 1) if session_count > 0 else 0
         
         student_evaluations.append({
             'student': student,
@@ -141,12 +147,12 @@ def class_evaluation_view(request, class_id):
             'total_combined_score': total_combined_score,
             'attendance_points': attendance_points_value,  # 出席点（保存された値または0）
             'attendance_rate': attendance_rate,
-            'multiplied_points': class_points_value,  # 倍率適用済みの点数
+            'multiplied_points': total_points_calculated,  # 倍率適用済みの点数
             'multiplier': multiplier_value,
             'session_data': session_data,
             'session_count': session_count,
             'average_points': average_points,
-            'class_points': class_points_value,  # クラスのポイント（手動加算分 + 倍率適用済み + 小テスト点）
+            'class_points': total_points_calculated,  # クラスのポイント
             'student_points': student.points,  # 学生の全体ポイント
             'qr_points': total_qr_points,  # クラスのQRコードポイントの合計
         })
@@ -177,5 +183,6 @@ def class_evaluation_view(request, class_id):
         'sessions': sessions,  # 日付情報も渡す
         'session_peer_averages': session_peer_averages,  # ピア評価平均値
         'total_sessions': len(session_list),
+        'grading_system': grading_system, # テンプレート側で表示切り替えに使用
     }
     return render(request, 'school_management/class_evaluation.html', context)

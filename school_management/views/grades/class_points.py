@@ -1,10 +1,11 @@
 import json
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
-from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPoints
+from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPoints, SelfEvaluation
 
 @login_required
 @require_POST
@@ -52,9 +53,47 @@ def update_attendance_rate(request, class_id):
     return JsonResponse({'success': True, 'message': '出席率を保存しました'})
 
 @login_required
+@require_POST
+def update_goal_score(request, class_id):
+    """目標管理モード時の講師評価点を更新するAPI"""
+    import json
+    
+    # JSONリクエストを受け取る
+    data = json.loads(request.body)
+    student_id = data.get('student_id')
+    score = data.get('score')
+    
+    if not student_id or score is None:
+        return JsonResponse({'success': False, 'error': 'パラメータが不足しています'})
+        
+    try:
+        score = int(score)
+    except ValueError:
+        return JsonResponse({'success': False, 'error': '点数は数値で入力してください'})
+
+    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+    student = get_object_or_404(CustomUser, id=student_id)
+
+    # 1. SelfEvaluation（自己評価・講師評価）を更新
+    self_eval, _ = SelfEvaluation.objects.get_or_create(
+        student=student,
+        classroom=classroom
+    )
+    self_eval.teacher_score = score
+    self_eval.save()
+
+    # 2. StudentClassPointsを更新（再計算トリガー）
+    # models.pyのロジックにより、grading_system='goal'ならteacher_scoreがpointsに反映される
+    scp, _ = StudentClassPoints.objects.get_or_create(student=student, classroom=classroom)
+    scp.save()
+
+    return JsonResponse({'success': True, 'message': '評価点を保存しました'})
+
+@login_required
 def class_points_view(request, class_id):
     """クラスごとのポイント一覧"""
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+    grading_system = classroom.grading_system
     students = classroom.students.all().order_by('student_number')
     
     # 各学生のクラス内成績を取得
@@ -70,7 +109,7 @@ def class_points_view(request, class_id):
         # クラス単位の合計ポイントを取得（StudentClassPoints から純粋なポイントを取得）
         try:
             scp = StudentClassPoints.objects.get(student=student, classroom=classroom)
-            current_points = scp.class_points
+            current_points = scp.points
         except StudentClassPoints.DoesNotExist:
             current_points = 0
 
@@ -121,6 +160,7 @@ def class_points_view(request, class_id):
     
     context = {
         'classroom': classroom,
+        'grading_system': grading_system,
         'student_grades': student_grades,
         'class_stats': {
             'total_students': total_students,
@@ -130,3 +170,28 @@ def class_points_view(request, class_id):
         }
     }
     return render(request, 'school_management/class_points.html', context)
+
+@login_required
+@require_POST
+def update_class_settings(request, class_id):
+    """クラス設定（QRポイントなど）を更新"""
+    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+    
+    # QRポイントの更新
+    qr_point_value = request.POST.get('qr_point_value')
+    if qr_point_value:
+        try:
+            val = int(qr_point_value)
+            if val > 0:
+                classroom.qr_point_value = val
+        except ValueError:
+            pass
+            
+    classroom.save()
+    
+    # リファラ（元のページ）に応じてリダイレクト先を調整
+    referer = request.META.get('HTTP_REFERER', '')
+    if 'qr-codes' in referer:
+        return redirect(referer)
+    
+    return redirect(f"{reverse('school_management:class_detail', args=[class_id])}?active_tab=settings")

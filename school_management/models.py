@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
 import uuid
 from django.db.models import Sum
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 
 
@@ -108,10 +108,21 @@ class ClassRoom(models.Model):
         ('first', '前期'),
         ('second', '後期'),
     ]
+    GRADING_SYSTEM_CHOICES = [
+        ('standard', '通常評価（積み上げ）'),
+        ('goal', '目標管理（講師評価）'),
+    ]
     
     class_name = models.CharField(max_length=100, verbose_name='クラス名')
     year = models.IntegerField(verbose_name='年度')
     semester = models.CharField(max_length=10, choices=SEMESTER_CHOICES, verbose_name='学期')
+    grading_system = models.CharField(
+        max_length=20, 
+        choices=GRADING_SYSTEM_CHOICES, 
+        default='standard',
+        verbose_name='評価システム'
+    )
+    qr_point_value = models.IntegerField(default=1, verbose_name='QRアクションポイント')
     teachers = models.ManyToManyField(Teacher, verbose_name='担当教員', related_name='classrooms')
     students = models.ManyToManyField(Student, blank=True, verbose_name='学生')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -258,6 +269,7 @@ class Quiz(models.Model):
         verbose_name='採点方式'
     )
     quick_buttons = models.JSONField(null=True, blank=True, verbose_name='クイックボタン設定')
+    is_qr_linked = models.BooleanField(default=False, verbose_name='QR連携')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -502,6 +514,18 @@ class StudentClassPoints(models.Model):
 
     def calculate_points_internal(self):
         """内部計算用: 各種スコアを集計してpointsフィールドを更新する"""
+        # 目標管理モードの場合
+        if self.classroom.grading_system == 'goal':
+            # 遅延インポートで循環参照を回避
+            from django.apps import apps
+            SelfEvaluation = apps.get_model('school_management', 'SelfEvaluation')
+            self_eval = SelfEvaluation.objects.filter(student=self.student, classroom=self.classroom).first()
+            if self_eval and self_eval.teacher_score is not None:
+                self.points = self_eval.teacher_score
+            else:
+                self.points = 0
+            return
+
         # 小テストの合計
         # 重複データ対策: 同一クイズのスコアが複数ある場合は最新のみ採用
         all_quiz_scores = QuizScore.objects.filter(
@@ -519,17 +543,32 @@ class StudentClassPoints(models.Model):
             lesson_session__classroom=self.classroom
         ).aggregate(total=Sum('points'))['total'] or 0
         
-        # QRコードスキャンの合計
-        qr_total = QRCodeScan.objects.filter(
-            scanned_by=self.student,
-            lesson_session__classroom=self.classroom
-        ).aggregate(total=Sum('points_awarded'))['total'] or 0
+        # ピア評価ポイント (貢献度 + 投票)
+        peer_total = 0
         
-        # 授業点 = 小テスト + 授業内ポイント + QRコード
-        class_points_val = quiz_total + lesson_total + qr_total
+        # 1. 貢献度評価 (5段階評価の合計)
+        contrib_evals = ContributionEvaluation.objects.filter(
+            evaluatee=self.student,
+            peer_evaluation__lesson_session__classroom=self.classroom
+        )
+        peer_total += contrib_evals.aggregate(total=Sum('contribution_score'))['total'] or 0
         
-        # 合計を計算 (出席点 + 授業点 * 2)
-        self.points = int(self.attendance_points + (class_points_val * 2))
+        # 2. 投票ポイント (1位=2点, 2位=1点)
+        student_groups = GroupMember.objects.filter(
+            student=self.student,
+            group__lesson_session__classroom=self.classroom
+        )
+        for membership in student_groups:
+            group = membership.group
+            first_votes = PeerEvaluation.objects.filter(first_place_group=group).count()
+            second_votes = PeerEvaluation.objects.filter(second_place_group=group).count()
+            peer_total += (first_votes * 2) + (second_votes * 1)
+
+        # 合計を計算
+        # 式: (小テスト(QR含む) + ピア評価 + 出席点) * 倍率(2)
+        # ※授業内ポイント(lesson_total)も加算対象に含める
+        base_points = quiz_total + peer_total + self.attendance_points + lesson_total
+        self.points = int(base_points * 2)
 
     @property
     def quiz_stats(self):
@@ -557,6 +596,10 @@ class StudentClassPoints(models.Model):
 
     @property
     def class_points(self):
+        # 目標管理モードの場合はpointsをそのまま返す
+        if self.classroom.grading_system == 'goal':
+            return self.points
+
         """授業点: 小テストの合計点 + 授業内獲得ポイントの合計 + QRコード"""
         # 合計点からの逆算ではなく、純粋な合計値を再計算して返す
         # 小テスト (重複対策)
@@ -571,19 +614,30 @@ class StudentClassPoints(models.Model):
             student=self.student,
             lesson_session__classroom=self.classroom
         ).aggregate(total=Sum('points'))['total'] or 0
-
-        qr_total = QRCodeScan.objects.filter(
-            scanned_by=self.student,
-            lesson_session__classroom=self.classroom
-        ).aggregate(total=Sum('points_awarded'))['total'] or 0
         
-        return int(quiz_total + lesson_total + qr_total)
+        # ピア評価
+        peer_total = 0
+        contrib_evals = ContributionEvaluation.objects.filter(
+            evaluatee=self.student,
+            peer_evaluation__lesson_session__classroom=self.classroom
+        )
+        peer_total += contrib_evals.aggregate(total=Sum('contribution_score'))['total'] or 0
+        
+        student_groups = GroupMember.objects.filter(student=self.student, group__lesson_session__classroom=self.classroom)
+        for membership in student_groups:
+            group = membership.group
+            peer_total += (PeerEvaluation.objects.filter(first_place_group=group).count() * 2)
+            peer_total += (PeerEvaluation.objects.filter(second_place_group=group).count() * 1)
+        
+        return int(quiz_total + lesson_total + peer_total)
 
     @property
     def total_points(self):
+        if self.classroom.grading_system == 'goal':
+            return self.points
         """総合ポイント"""
         # 表示用に、出席点(float)を含めた正確な値を返す
-        return self.attendance_points + (self.class_points * 2)
+        return (self.class_points + self.attendance_points) * 2
 
     def save(self, *args, **kwargs):
         """保存時に自動的にポイントを再計算する"""
@@ -677,3 +731,41 @@ def update_class_points_from_lesson(sender, instance, **kwargs):
             classroom=instance.lesson_session.classroom
         )
         scp.recalculate_total()
+
+@receiver(post_save, sender=LessonSession)
+def create_qr_quiz_for_session(sender, instance, created, **kwargs):
+    """授業回作成時にQR連携用小テストを自動作成"""
+    if created:
+        Quiz.objects.create(
+            lesson_session=instance,
+            quiz_name="QRアクション点",
+            max_score=100,
+            grading_method='qr_mobile',
+            is_qr_linked=True
+        )
+
+@receiver(post_save, sender=QRCodeScan)
+def update_quiz_score_from_qr(sender, instance, created, **kwargs):
+    """QRスキャン時に連携小テストの点数を更新"""
+    if created and instance.lesson_session:
+        # 連携小テストを探す
+        quiz = Quiz.objects.filter(lesson_session=instance.lesson_session, is_qr_linked=True).first()
+        if quiz:
+            # QRコードの持ち主（生徒）
+            student = instance.qr_code.student
+            # スキャンした人（先生）
+            grader = instance.scanned_by
+            
+            score_obj, _ = QuizScore.objects.get_or_create(
+                quiz=quiz,
+                student=student,
+                defaults={'score': 0, 'graded_by': grader}
+            )
+            score_obj.score += instance.points_awarded
+            score_obj.save()
+
+@receiver(pre_save, sender=QRCodeScan)
+def set_qr_points_from_class_settings(sender, instance, **kwargs):
+    """QRスキャン時にクラス設定のポイント値を適用"""
+    if not instance.pk and instance.lesson_session and instance.lesson_session.classroom:
+        instance.points_awarded = instance.lesson_session.classroom.qr_point_value

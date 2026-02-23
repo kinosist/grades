@@ -264,6 +264,14 @@ def update_class_settings(request, class_id):
     """クラス設定（QRポイントなど）を更新"""
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
     
+    # 評価システムの更新
+    grading_system = request.POST.get('grading_system')
+    recalculate_points = False
+    if grading_system in ['standard', 'goal']:
+        if classroom.grading_system != grading_system:
+            classroom.grading_system = grading_system
+            recalculate_points = True
+
     # QRポイントの更新
     qr_point_value = request.POST.get('qr_point_value')
     if qr_point_value:
@@ -289,6 +297,12 @@ def update_class_settings(request, class_id):
             
     classroom.save()
     
+    # 評価システムが変更された場合、全学生のポイントを再計算（モード切替）
+    if recalculate_points:
+        scps = StudentClassPoints.objects.filter(classroom=classroom)
+        for scp in scps:
+            scp.save() # save()時に calculate_points_internal が走り、モードに応じた計算が行われる
+
     # 出席点満点が変更された場合、全学生の出席点を再計算
     if recalculate_attendance:
         scps = StudentClassPoints.objects.filter(classroom=classroom)

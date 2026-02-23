@@ -280,6 +280,22 @@ class Quiz(models.Model):
     def __str__(self):
         return f"{self.lesson_session} - {self.quiz_name}"
 
+    def get_student_scores(self):
+        """クラスの全学生のスコアリストを返す（学籍番号順）"""
+        # クラスの全学生を取得
+        students = self.lesson_session.classroom.students.all().order_by('student_number')
+        # 既存のスコアを取得（キャンセルされたものは除外）
+        scores = {qs.student_id: qs.score for qs in self.quizscore_set.filter(is_cancelled=False)}
+        
+        results = []
+        for student in students:
+            results.append({
+                'student': student,
+                'score': scores.get(student.id, 0),
+                'has_score': student.id in scores
+            })
+        return results
+
 
 class QuizScore(models.Model):
     """小テスト採点結果"""
@@ -749,21 +765,31 @@ def create_qr_quiz_for_session(sender, instance, created, **kwargs):
 def update_quiz_score_from_qr(sender, instance, created, **kwargs):
     """QRスキャン時に連携小テストの点数を更新"""
     if created and instance.lesson_session:
-        # 連携小テストを探す
-        quiz = Quiz.objects.filter(lesson_session=instance.lesson_session, is_qr_linked=True).first()
-        if quiz:
-            # QRコードの持ち主（生徒）
-            student = instance.qr_code.student
-            # スキャンした人（先生）
-            grader = instance.scanned_by
-            
-            score_obj, _ = QuizScore.objects.get_or_create(
-                quiz=quiz,
-                student=student,
-                defaults={'score': 0, 'graded_by': grader}
-            )
-            score_obj.score += instance.points_awarded
-            score_obj.save()
+        # 連携小テストを探す、なければ作成する（既存セッション対応）
+        # これにより、過去に作成した授業回でもQRポイントが利用可能になり、
+        # かつ既存の手動作成小テストとは別枠で管理されるためデータが競合せず合算される
+        quiz, _ = Quiz.objects.get_or_create(
+            lesson_session=instance.lesson_session,
+            is_qr_linked=True,
+            defaults={
+                'quiz_name': "QRアクション点",
+                'max_score': 100,
+                'grading_method': 'qr_mobile'
+            }
+        )
+        
+        # QRコードの持ち主（生徒）
+        student = instance.qr_code.student
+        # スキャンした人（先生）
+        grader = instance.scanned_by
+        
+        score_obj, _ = QuizScore.objects.get_or_create(
+            quiz=quiz,
+            student=student,
+            defaults={'score': 0, 'graded_by': grader}
+        )
+        score_obj.score += instance.points_awarded
+        score_obj.save()
 
 @receiver(pre_save, sender=QRCodeScan)
 def set_qr_points_from_class_settings(sender, instance, **kwargs):

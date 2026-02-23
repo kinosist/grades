@@ -28,18 +28,18 @@ def class_evaluation_view(request, class_id):
         for session in sessions:
             session_key = f"第{session.session_number}回"
             
-            # QRコードポイントを取得
-            qr_points = 0
+            # 授業内手動ポイントを取得（StudentLessonPoints）
+            # ※QRコードのポイントはQuizScoreに含まれるため、ここは手動付与分などの「その他」扱い
+            manual_points = 0
             lesson_point = StudentLessonPoints.objects.filter(
                 lesson_session=session,
                 student=student
             ).first()
             if lesson_point:
-                qr_points = lesson_point.points
+                manual_points = lesson_point.points
                 session_count += 1
-                total_qr_points += qr_points
             
-            # 小テストスコアを取得
+            # 小テストスコアを取得（QRアクション点もここに含まれる）
             quiz_score = 0
             has_quiz = False
             try:
@@ -88,10 +88,10 @@ def class_evaluation_view(request, class_id):
                 pass
             
             session_data[session_key] = {
-                'qr_points': qr_points,
+                'manual_points': manual_points,
                 'quiz_score': quiz_score,
                 'peer_score': peer_evaluation_score,
-                'total_score': qr_points + quiz_score + peer_evaluation_score,
+                'total_score': manual_points + quiz_score + peer_evaluation_score,
                 'date': session.date,
                 'has_peer_evaluation': session.has_peer_evaluation,
                 'has_quiz': has_quiz
@@ -124,10 +124,10 @@ def class_evaluation_view(request, class_id):
         attendance_points_value = saved_attendance_points if saved_attendance_points > 0 else 0
 
         # 合計計算ロジックの変更
-        # 授業点 = (小テスト(QR含む) + ピア評価 + 出席点 + 授業内ポイント) * 倍率
+        # 授業点 = (小テスト(QR含む) + ピア評価 + 出席点 + 手動ポイント) * 倍率
         multiplier_value = 2
         
-        # total_combined_score には (QR + Quiz + Peer) が含まれている
+        # total_combined_score には (Manual + Quiz(QR含む) + Peer) が含まれている
         # ここに Attendance を足して倍率を掛ける
         base_points = total_combined_score + attendance_points_value
         
@@ -137,7 +137,8 @@ def class_evaluation_view(request, class_id):
         else:
             total_points_calculated = int(base_points * multiplier_value)
         
-        average_points = round(total_qr_points / session_count, 1) if session_count > 0 else 0
+        # 平均点の計算（小テスト/QRの平均）
+        average_points = round(total_quiz_score / session_count, 1) if session_count > 0 else 0
         
         student_evaluations.append({
             'student': student,
@@ -154,7 +155,7 @@ def class_evaluation_view(request, class_id):
             'average_points': average_points,
             'class_points': total_points_calculated,  # クラスのポイント
             'student_points': student.points,  # 学生の全体ポイント
-            'qr_points': total_qr_points,  # クラスのQRコードポイントの合計
+            'qr_points': total_quiz_score,  # QRコードポイント（小テストスコア）の合計
         })
     
     session_list = [f"第{session.session_number}回" for session in sessions]

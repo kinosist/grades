@@ -123,6 +123,7 @@ class ClassRoom(models.Model):
         verbose_name='評価システム'
     )
     qr_point_value = models.IntegerField(default=1, verbose_name='QRアクションポイント')
+    attendance_max_points = models.IntegerField(default=20, verbose_name='出席点満点')
     teachers = models.ManyToManyField(Teacher, verbose_name='担当教員', related_name='classrooms')
     students = models.ManyToManyField(Student, blank=True, verbose_name='学生')
     created_at = models.DateTimeField(auto_now_add=True)

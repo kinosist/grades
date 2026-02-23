@@ -187,11 +187,34 @@ def update_class_settings(request, class_id):
         except ValueError:
             pass
             
+    # 出席点満点の更新
+    attendance_max_points = request.POST.get('attendance_max_points')
+    recalculate_attendance = False
+    if attendance_max_points:
+        try:
+            val = int(attendance_max_points)
+            if val >= 0:
+                if classroom.attendance_max_points != val:
+                    classroom.attendance_max_points = val
+                    recalculate_attendance = True
+        except ValueError:
+            pass
+            
     classroom.save()
     
+    # 出席点満点が変更された場合、全学生の出席点を再計算
+    if recalculate_attendance:
+        scps = StudentClassPoints.objects.filter(classroom=classroom)
+        for scp in scps:
+            # 出席点 = 出席率 * 満点 / 100
+            scp.attendance_points = (scp.attendance_rate * classroom.attendance_max_points) / 100
+            scp.save()  # save()で合計点も再計算される
+
     # リファラ（元のページ）に応じてリダイレクト先を調整
     referer = request.META.get('HTTP_REFERER', '')
     if 'qr-codes' in referer:
+        return redirect(referer)
+    if 'evaluation' in referer:
         return redirect(referer)
     
     return redirect(f"{reverse('school_management:class_detail', args=[class_id])}?active_tab=settings")

@@ -5,7 +5,8 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
-from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPoints, SelfEvaluation
+from django.db.models import Sum
+from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPoints, SelfEvaluation, QuizScore, ContributionEvaluation, GroupMember, PeerEvaluation
 
 @login_required
 @require_POST
@@ -100,25 +101,101 @@ def class_points_view(request, class_id):
     student_grades = []
     
     for student in students:
-        # このクラスの授業回でのポイントを取得
-        lesson_points = StudentLessonPoints.objects.filter(
+        # 1. 授業内手動ポイント (StudentLessonPoints)
+        lesson_points_qs = StudentLessonPoints.objects.filter(
             student=student,
             lesson_session__classroom=classroom
         ).select_related('lesson_session').order_by('lesson_session__session_number')
+        lesson_total = sum(p.points for p in lesson_points_qs)
         
-        # クラス単位の合計ポイントを取得（StudentClassPoints から純粋なポイントを取得）
+        # 2. 小テスト/QRポイント (QuizScore)
+        all_quiz_scores = QuizScore.objects.filter(
+            student=student,
+            quiz__lesson_session__classroom=classroom,
+            is_cancelled=False
+        ).select_related('quiz', 'quiz__lesson_session').order_by('quiz__lesson_session__session_number')
+        
+        # 重複対策: 同一クイズは最新のみ
+        quiz_score_dict = {}
+        for qs in all_quiz_scores:
+            quiz_score_dict[qs.quiz.id] = qs
+        unique_quiz_scores = list(quiz_score_dict.values())
+        unique_quiz_scores.sort(key=lambda x: x.quiz.lesson_session.session_number)
+        
+        quiz_total = sum(qs.score for qs in unique_quiz_scores)
+        
+        # 3. ピア評価ポイント
+        peer_total = 0
+        peer_details = []
+        
+        # 貢献度
+        contrib_evals = ContributionEvaluation.objects.filter(
+            evaluatee=student,
+            peer_evaluation__lesson_session__classroom=classroom
+        ).select_related('peer_evaluation__lesson_session')
+        
+        session_peer_map = {}
+        for ce in contrib_evals:
+            sess_id = ce.peer_evaluation.lesson_session.id
+            if sess_id not in session_peer_map:
+                session_peer_map[sess_id] = {
+                    'session': ce.peer_evaluation.lesson_session,
+                    'contrib': 0, 'vote': 0
+                }
+            session_peer_map[sess_id]['contrib'] += ce.contribution_score
+            
+        # 投票
+        student_groups = GroupMember.objects.filter(
+            student=student, 
+            group__lesson_session__classroom=classroom
+        ).select_related('group', 'group__lesson_session')
+        
+        for membership in student_groups:
+            group = membership.group
+            sess = group.lesson_session
+            first_votes = PeerEvaluation.objects.filter(first_place_group=group).count()
+            second_votes = PeerEvaluation.objects.filter(second_place_group=group).count()
+            vote_points = (first_votes * 2) + (second_votes * 1)
+            
+            if vote_points > 0:
+                if sess.id not in session_peer_map:
+                    session_peer_map[sess.id] = {
+                        'session': sess,
+                        'contrib': 0, 'vote': 0
+                    }
+                session_peer_map[sess.id]['vote'] += vote_points
+        
+        for data in session_peer_map.values():
+            p_sum = data['contrib'] + data['vote']
+            peer_total += p_sum
+            peer_details.append({
+                'session': data['session'],
+                'contrib': data['contrib'],
+                'vote': data['vote'],
+                'total': p_sum
+            })
+        peer_details.sort(key=lambda x: x['session'].session_number)
+
+        # 純粋な合計ポイント (QR + ピア + その他)
+        raw_total_points = lesson_total + quiz_total + peer_total
+
+        # DB保存値（目標管理モード用）
         try:
             scp = StudentClassPoints.objects.get(student=student, classroom=classroom)
-            current_points = scp.points
+            db_points = scp.points
         except StudentClassPoints.DoesNotExist:
-            current_points = 0
+            db_points = 0
 
-        # 授業ポイントのみの集計（バッジ判定用）
-        lesson_total = sum(point.points for point in lesson_points)
-        session_count = lesson_points.count()
+        # 表示用ポイント: 目標管理モードならDB値、通常なら計算したRaw Total
+        if grading_system == 'goal':
+            display_points = db_points
+        else:
+            display_points = raw_total_points
+
+        # 評価レベル判定（仮: 授業回あたりの平均などで判定していたロジックを維持）
+        session_count = lesson_points_qs.count()
         lesson_average = round(lesson_total / session_count, 1) if session_count > 0 else 0
         
-        # 成績評価
         if lesson_average >= 5:
             grade_level = '優秀'
             grade_color = 'success'
@@ -134,14 +211,20 @@ def class_points_view(request, class_id):
 
         student_grades.append({
             'student': student,
-            'total_points': current_points,  # 純粋な合計ポイント（統計・ソート用）
+            'total_points': display_points,  # 一覧の「総ポイント」列に使用
+            'raw_total_points': raw_total_points,
+            'quiz_total': quiz_total,
+            'peer_total': peer_total,
+            'lesson_total': lesson_total,
             'average_points': lesson_average,
             'session_count': session_count,
-            'lesson_points': lesson_points,
+            'lesson_points': lesson_points_qs,
+            'quiz_scores': unique_quiz_scores,
+            'peer_details': peer_details,
             'grade_level': grade_level,
             'grade_color': grade_color,
             'overall_points': student.points,  # 全体のポイント（参考用）
-            'class_points': current_points,  # クラス単位のポイント
+            'class_points': display_points,
         })
     
     # 合計ポイント順でソート

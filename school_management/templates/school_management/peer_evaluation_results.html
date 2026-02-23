@@ -28,6 +28,12 @@
                                 </p>
                             </div>
                             <div class="col-md-4 text-md-end">
+                                <form action="{% url 'school_management:delete_all_peer_evaluations' lesson_session.id %}" method="post" class="d-inline" onsubmit="return confirm('本当に全ての評価データを削除しますか？\nこの操作は取り消せません。\n\n※ポイントも自動的に減算されます。');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger me-2">
+                                        <i class="fas fa-trash-alt me-1"></i>全削除
+                                    </button>
+                                </form>
                                 <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}" class="btn btn-secondary">
                                     <i class="fas fa-arrow-left me-1"></i>戻る
                                 </a>

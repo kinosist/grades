@@ -90,6 +90,7 @@ urlpatterns = [
     path('lesson-sessions/<int:session_id>/peer-evaluation/close/', peer_eval.close_peer_evaluation, name='close_peer_evaluation'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/reopen/', peer_eval.reopen_peer_evaluation, name='reopen_peer_evaluation'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results, name='peer_evaluation_results'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/delete-all/', peer_eval.delete_all_peer_evaluations, name='delete_all_peer_evaluations'),
     
     # 従来版（Original）
     path('sessions/<int:session_id>/peer-evaluation/', peer_eval.peer_evaluation_list_view, name='peer_evaluation_list'),

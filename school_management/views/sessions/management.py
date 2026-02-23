@@ -105,3 +105,27 @@ def merge_duplicate_quizzes(request, session_id):
             messages.info(request, "重複した小テストはありません。")
             
     return redirect('school_management:session_detail', session_id=session.id)
+
+@login_required
+def session_reset_qr(request, session_id):
+    """授業回の小テスト・QRデータをリセット（全削除して再作成）"""
+    session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
+    
+    if request.method == 'POST':
+        # 既存の小テストを全て削除
+        # これにより紐づくQuizScoreもCASCADEで削除されます
+        count = session.quiz_set.count()
+        session.quiz_set.all().delete()
+        
+        # 新しいQR用小テストを作成
+        Quiz.objects.create(
+            lesson_session=session,
+            quiz_name="QRアクション点",
+            max_score=100,
+            grading_method='qr_mobile',
+            is_qr_linked=True
+        )
+        
+        messages.success(request, f'データをリセットしました。旧データ{count}件を削除し、新しいQRアクション点枠を作成しました。')
+        
+    return redirect('school_management:session_detail', session_id=session.id)

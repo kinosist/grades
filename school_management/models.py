@@ -866,11 +866,24 @@ def update_quiz_score_from_qr(sender, instance, created, **kwargs):
         # スキャンした人（先生）
         grader = instance.scanned_by
         
-        score_obj, _ = QuizScore.objects.get_or_create(
-            quiz=quiz,
-            student=student,
-            defaults={'score': 0, 'graded_by': grader}
-        )
+        # 重複対策: get_or_createの代わりにfilterを使用
+        # 最新のものを取得（IDの降順＝作成順）
+        scores = QuizScore.objects.filter(quiz=quiz, student=student).order_by('-id')
+        
+        if scores.exists():
+            score_obj = scores.first()
+            if scores.count() > 1:
+                # 重複がある場合は、最新以外を削除（合算せずリセット）
+                # ユーザー要望: "いっそのこと最新のやつ以外消したらよくないですか？" に対応
+                scores.exclude(id=score_obj.id).delete()
+        else:
+            score_obj = QuizScore.objects.create(
+                quiz=quiz,
+                student=student,
+                score=0,
+                graded_by=grader
+            )
+            
         score_obj.score += instance.points_awarded
         score_obj.save()
 

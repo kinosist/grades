@@ -48,12 +48,18 @@ def class_qr_codes(request, class_id):
         return redirect('school_management:dashboard')
     
     students = classroom.students.all()
+    session_id = request.GET.get('session_id')
+    
     qr_codes = []
     for student in students:
         qr_code, created = StudentQRCode.objects.get_or_create(student=student, defaults={'is_active': True})
-        scan_url = request.build_absolute_uri(
-            reverse('school_management:qr_code_scan', kwargs={'qr_code_id': qr_code.qr_code_id})
-        ) + f'?class_id={class_id}'
+        
+        base_url = reverse('school_management:qr_code_scan', kwargs={'qr_code_id': qr_code.qr_code_id})
+        params = f'?class_id={class_id}'
+        if session_id:
+            params += f'&session_id={session_id}'
+            
+        scan_url = request.build_absolute_uri(base_url) + params
         
         try:
             class_points = StudentClassPoints.objects.get(student=student, classroom=classroom).points

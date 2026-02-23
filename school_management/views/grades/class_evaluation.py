@@ -43,17 +43,15 @@ def class_evaluation_view(request, class_id):
             quiz_score = 0
             has_quiz = False
             try:
-                quiz = Quiz.objects.filter(lesson_session=session).first()
-                if quiz:
+                # その授業回の全ての小テストスコアを合算する（重複枠対策）
+                session_quiz_scores = QuizScore.objects.filter(
+                    quiz__lesson_session=session,
+                    student=student,
+                    is_cancelled=False
+                )
+                if session_quiz_scores.exists():
                     has_quiz = True
-                    quiz_score_obj = QuizScore.objects.filter(
-                        quiz=quiz,
-                        student=student,
-                        is_cancelled=False
-                    ).first()
-                    if quiz_score_obj:
-                        # 小テストのスコア（0-100点）をそのまま使用
-                        quiz_score = quiz_score_obj.score
+                    quiz_score = sum(qs.score for qs in session_quiz_scores)
             except Exception as e:
                 print(f"小テストスコア取得エラー: {e}")
                 pass

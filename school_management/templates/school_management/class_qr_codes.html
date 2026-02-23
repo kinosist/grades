@@ -221,10 +221,20 @@ function showScanResult(data) {
     document.getElementById('scan-result').style.display = 'block';
     document.getElementById('scan-error').style.display = 'none';
     
+    // URLパラメータからsession_idを取得
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    
     // QRコードのURLを処理
     if (data.includes('qr-codes/scan/')) {
+        let targetUrl = data;
+        // session_idがある場合は付与して遷移
+        if (sessionId) {
+            const separator = targetUrl.includes('?') ? '&' : '?';
+            targetUrl += `${separator}session_id=${sessionId}`;
+        }
         // スキャンページに移動
-        window.location.href = data;
+        window.location.href = targetUrl;
     } else {
         showError('無効なQRコードです。正しいQRコードをスキャンしてください。');
     }

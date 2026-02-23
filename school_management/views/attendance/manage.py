@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.db import models
 # モデルのインポート
-from ...models import ClassRoom, Student, StudentQRCode, StudentClassPoints
+from ...models import ClassRoom, Student, StudentQRCode, StudentClassPoints, LessonSession
 from .utils import generate_qr_code_image
 
 @login_required
@@ -49,6 +49,10 @@ def class_qr_codes(request, class_id):
     
     students = classroom.students.all()
     session_id = request.GET.get('session_id')
+    lesson_session = None
+    
+    if session_id:
+        lesson_session = get_object_or_404(LessonSession, id=session_id)
     
     qr_codes = []
     for student in students:
@@ -74,7 +78,7 @@ def class_qr_codes(request, class_id):
             'class_points': class_points
         })
     
-    context = {'classroom': classroom, 'qr_codes': qr_codes}
+    context = {'classroom': classroom, 'qr_codes': qr_codes, 'lesson_session': lesson_session}
     return render(request, 'school_management/class_qr_codes.html', context)
 
 @login_required

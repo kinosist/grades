@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
+from django.http import JsonResponse
 from ...models import ClassRoom, StudentQRCode, QRCodeScan, LessonSession, StudentLessonPoints, StudentClassPoints, Quiz, QuizScore
 
 @login_required
@@ -12,6 +13,8 @@ def qr_code_scan(request, qr_code_id):
         qr_code = get_object_or_404(StudentQRCode, qr_code_id=qr_code_id, is_active=True)
         
         if not request.user.is_teacher:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': '権限がありません'})
             messages.error(request, 'QRコードのスキャンは先生のみ可能です。')
             return redirect('school_management:student_dashboard')
         
@@ -70,6 +73,16 @@ def qr_code_scan(request, qr_code_id):
                 if score_obj:
                     current_quiz_points = score_obj.score
         
+        # AJAXリクエスト（連続スキャン）の場合はJSONを返す
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'student_name': qr_code.student.full_name,
+                'points_added': bool(current_session),
+                'points_awarded': scan.points_awarded,
+                'current_quiz_points': current_quiz_points,
+            })
+
         context = {
             'qr_code': qr_code,
             'lesson_session': current_session,
@@ -84,5 +97,7 @@ def qr_code_scan(request, qr_code_id):
         return render(request, 'school_management/qr_code_scan.html', context)
         
     except Exception as e:
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': str(e)})
         context = {'qr_code': None, 'error_message': f'QRコードのスキャンに失敗しました: {str(e)}'}
         return render(request, 'school_management/qr_code_scan.html', context)

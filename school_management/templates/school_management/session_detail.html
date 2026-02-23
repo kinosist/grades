@@ -220,7 +220,7 @@
                                 教室を巡回してQRコードを読み取り、ポイントを付与します。
                             </p>
                         </div>
-                        <a href="{% url 'school_management:class_qr_codes' session.classroom.id %}?session_id={{ session.id }}" class="btn btn-warning shadow-sm fw-bold">
+                        <a href="{% url 'school_management:class_qr_codes' session.classroom.id %}?session_id={{ session.id }}&auto_start=true" class="btn btn-warning shadow-sm fw-bold">
                             <i class="fas fa-camera me-2"></i>カメラ起動
                         </a>
                     </div>

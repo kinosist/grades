@@ -842,18 +842,24 @@ def create_qr_quiz_for_session(sender, instance, created, **kwargs):
 def update_quiz_score_from_qr(sender, instance, created, **kwargs):
     """QRスキャン時に連携小テストの点数を更新"""
     if created and instance.lesson_session:
-        # 連携小テストを探す、なければ作成する（既存セッション対応）
-        # これにより、過去に作成した授業回でもQRポイントが利用可能になり、
-        # かつ既存の手動作成小テストとは別枠で管理されるためデータが競合せず合算される
-        quiz, _ = Quiz.objects.get_or_create(
-            lesson_session=instance.lesson_session,
-            is_qr_linked=True,
-            defaults={
-                'quiz_name': "QRアクション点",
-                'max_score': 100,
-                'grading_method': 'qr_mobile'
-            }
-        )
+        # 優先順位: 1. 既に連携済みの小テスト -> 2. 既存の小テスト（連携させる） -> 3. 新規作成
+        quiz = Quiz.objects.filter(lesson_session=instance.lesson_session, is_qr_linked=True).first()
+        
+        if not quiz:
+            # 連携済みがない場合、既存の小テストがあればそれを再利用する
+            quiz = Quiz.objects.filter(lesson_session=instance.lesson_session).first()
+            if quiz:
+                quiz.is_qr_linked = True
+                quiz.save()
+            else:
+                # 既存もなければ新規作成
+                quiz = Quiz.objects.create(
+                    lesson_session=instance.lesson_session,
+                    quiz_name="QRアクション点",
+                    max_score=100,
+                    grading_method='qr_mobile',
+                    is_qr_linked=True
+                )
         
         # QRコードの持ち主（生徒）
         student = instance.qr_code.student

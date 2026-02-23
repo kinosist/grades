@@ -32,9 +32,15 @@
                         </div>
                         {% endif %}
                         <div class="d-flex gap-2">
-                            <button class="btn btn-primary" onclick="openCameraScanner()">
-                                <i class="fas fa-camera me-2"></i>カメラでスキャン
-                            </button>
+                            {% if lesson_session %}
+                                <button class="btn btn-primary" onclick="openCameraScanner()">
+                                    <i class="fas fa-camera me-2"></i>カメラでスキャン
+                                </button>
+                            {% else %}
+                                <button class="btn btn-secondary" disabled title="授業回詳細からアクセスしてください">
+                                    <i class="fas fa-camera me-2"></i>カメラでスキャン
+                                </button>
+                            {% endif %}
                             <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary">
                                 <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
                             </a>
@@ -44,6 +50,11 @@
                         <p class="text-muted mb-0 me-3">
                             {{ classroom.year }}年度 {{ classroom.get_semester_display }} - 在籍学生数: {{ qr_codes|length }}名
                         </p>
+                        {% if not lesson_session %}
+                            <div class="alert alert-warning py-1 px-2 mb-0 me-3 small">
+                                <i class="fas fa-exclamation-circle me-1"></i>授業回が指定されていません。スキャンするには授業詳細からアクセスしてください。
+                            </div>
+                        {% endif %}
                         <div class="d-flex align-items-center bg-light rounded px-2 py-1 border">
                             <span class="text-muted me-2 small">QRアクション: <strong>{{ classroom.qr_point_value }}pt/回</strong></span>
                             <button class="btn btn-sm btn-link p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#settingsModal">

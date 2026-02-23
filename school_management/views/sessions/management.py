@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from ...models import ClassRoom, LessonSession
+from django.db import IntegrityError
 
 @login_required
 def session_create_view(request, class_id):
@@ -26,6 +27,8 @@ def session_create_view(request, class_id):
                 )
                 messages.success(request, f'第{session_number}回授業を作成しました。')
                 return redirect('school_management:session_detail', session_id=session.id)
+            except IntegrityError:
+                messages.warning(request, f'第{session_number}回は既に作成されています。別の回番号を指定してください。')
             except (ValueError, Exception) as e:
                 messages.error(request, f'作成に失敗しました: {str(e)}')
         else:

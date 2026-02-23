@@ -128,14 +128,15 @@ def class_student_detail_view(request, class_id, student_number):
     ).select_related('lesson_session').order_by('-created_at')
     
     # 統計情報を計算
-    # 重複排除した全スコアで計算（quiz_scoresはリスト化されているためQuerySetメソッドは使えない）
-    unique_scores_map = {}
-    for score in all_quiz_scores:
-        if score.quiz.id not in unique_scores_map:
-            unique_scores_map[score.quiz.id] = score.score
-            
-    total_quizzes = len(unique_scores_map)
-    avg_score = sum(unique_scores_map.values()) / total_quizzes if total_quizzes > 0 else 0
+    # StudentClassPointsのメソッドを使用して一貫性を保つ
+    try:
+        scp = StudentClassPoints.objects.get(student=student, classroom=classroom)
+        quiz_stats = scp.quiz_stats
+        total_quizzes = quiz_stats['count']
+        avg_score = quiz_stats['average']
+    except StudentClassPoints.DoesNotExist:
+        total_quizzes = 0
+        avg_score = 0
     
     attendance_count = attendance_records.filter(status='present').count()
     total_sessions = class_sessions.count()

@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
-from ...models import ClassRoom, StudentQRCode, QRCodeScan, LessonSession, StudentLessonPoints, StudentClassPoints
+from ...models import ClassRoom, StudentQRCode, QRCodeScan, LessonSession, StudentLessonPoints, StudentClassPoints, Quiz, QuizScore
 
 @login_required
 def qr_code_scan(request, qr_code_id):
@@ -60,13 +60,15 @@ def qr_code_scan(request, qr_code_id):
         qr_code.save()
         
         user_scan_count = QRCodeScan.objects.filter(scanned_by=request.user).count()
-        student_class_points = 0
-        if update_classroom:
-            try:
-                # 評価一覧と同じ「総合ポイント（total_points）」を表示する
-                student_class_points = StudentClassPoints.objects.get(student=qr_code.student, classroom=update_classroom).total_points
-            except StudentClassPoints.DoesNotExist:
-                pass
+        
+        # その授業回のQRアクション点（小テスト点）の合計を取得
+        current_quiz_points = 0
+        if current_session:
+            quiz = Quiz.objects.filter(lesson_session=current_session, is_qr_linked=True).first()
+            if quiz:
+                score_obj = QuizScore.objects.filter(quiz=quiz, student=qr_code.student).order_by('-id').first()
+                if score_obj:
+                    current_quiz_points = score_obj.score
         
         context = {
             'qr_code': qr_code,
@@ -74,7 +76,7 @@ def qr_code_scan(request, qr_code_id):
             'scan_time': timezone.now().strftime('%Y年%m月%d日 %H:%M'),
             'user_scan_count': user_scan_count,
             'classroom': update_classroom,
-            'student_class_points': student_class_points,
+            'current_quiz_points': current_quiz_points,
             # ポイント加算は「授業回」が特定できた場合のみ行われる（models.pyのシグナル仕様）
             'points_added': bool(current_session),
             'points_awarded': scan.points_awarded,

@@ -88,7 +88,7 @@
                     <p class="text-muted mb-2">{{ student.furigana|default:"-" }}</p>
                     {% for cp in student.class_points.all %}
                         {% if cp.classroom.id == classroom.id %}
-                            <span id="student-total-badge" class="badge bg-{% if cp.points >= 80 %}success{% elif cp.points >= 60 %}warning{% else %}secondary{% endif %} fs-6">
+                            <span id="student-total-badge" class="badge bg-{% if cp.class_points >= 80 %}success{% elif cp.class_points >= 60 %}warning{% else %}secondary{% endif %} fs-6">
                                 {{ cp.class_points }}pt
                             </span>
                         {% endif %}
@@ -115,9 +115,7 @@
                     <div class="col-6">
                         <div class="stat-item">
                             <div class="stat-value text-primary">
-                                {% for cp in student.class_points.all %}
-                                    {% if cp.classroom.id == classroom.id %}{{ cp.quiz_stats.count }}{% endif %}
-                                {% endfor %}
+                                {{ stats.total_quizzes }}
                             </div>
                             <div class="stat-label">クイズ回数</div>
                         </div>
@@ -125,9 +123,7 @@
                     <div class="col-6">
                         <div class="stat-item">
                             <div class="stat-value text-success">
-                                {% for cp in student.class_points.all %}
-                                    {% if cp.classroom.id == classroom.id %}{{ cp.quiz_stats.average }}{% endif %}
-                                {% endfor %}点
+                                {{ stats.avg_score }}点
                             </div>
                             <div class="stat-label">平均点</div>
                         </div>
@@ -182,26 +178,20 @@
                         <table class="table table-sm table-hover">
                             <thead>
                                 <tr>
-                                    <th>日付</th>
-                                    <th>クイズ名</th>
-                                    <th>得点</th>
-                                    <th>満点</th>
-                                    <th>正答率</th>
+                                    <th>授業回</th>
+                                    <th>獲得ポイント</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for score in quiz_scores %}
                                 {% if not score.is_cancelled %}
                                 <tr>
-                                    <td>{{ score.quiz.lesson_session.date|date:"m/d" }}</td>
-                                    <td>{{ score.quiz.quiz_name|truncatechars:20 }}</td>
+                                    <td>第{{ score.quiz.lesson_session.session_number }}回</td>
                                     <td>
-                                        <span class="badge bg-{% if score.percentage >= 80 %}success{% elif score.percentage >= 60 %}warning{% else %}danger{% endif %} quiz-score-value" data-score="{{ score.score }}">
-                                            {{ score.score }}
+                                        <span class="badge bg-success quiz-score-value" data-score="{{ score.score }}">
+                                            {{ score.score }}pt
                                         </span>
                                     </td>
-                                    <td>{{ score.quiz.max_score }}</td>
-                                    <td>{{ score.percentage|floatformat:0 }}%</td>
                                 </tr>
                                 {% endif %}
                                 {% endfor %}

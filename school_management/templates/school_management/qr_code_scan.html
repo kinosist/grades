@@ -51,12 +51,10 @@
                                         {{ qr_code.student.full_name }}さんのクラスポイントが <span class="badge bg-success fs-6">+{{ points_awarded }}</span> 増加しました！
                                     </strong>
                                 </p>
-                                {% if student_class_points is not None %}
-                                    <p class="mb-0">
-                                        <strong>現在の総合ポイント:</strong> 
-                                        <span class="badge bg-primary fs-6">{{ student_class_points }}pt</span>
-                                    </p>
-                                {% endif %}
+                                <p class="mb-0">
+                                    <strong>この授業の獲得ポイント:</strong> 
+                                    <span class="badge bg-primary fs-6">{{ current_quiz_points }}pt</span>
+                                </p>
                             {% else %}
                                 <div class="alert alert-warning mt-2">
                                     <i class="fas fa-exclamation-triangle me-2"></i>

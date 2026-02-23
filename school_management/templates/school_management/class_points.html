@@ -353,10 +353,9 @@
                     <table class="table table-sm table-bordered detail-table mb-0 w-100">
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 20%;">回数</th>
-                                <th style="width: 20%;">日付</th>
-                                <th style="width: 40%;">テスト名</th>
-                                <th style="width: 20%;">得点</th>
+                                <th style="width: 30%;">回数</th>
+                                <th style="width: 30%;">日付</th>
+                                <th style="width: 40%;">得点</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -364,7 +363,6 @@
                                 <tr>
                                     <td>第{{ score.quiz.lesson_session.session_number }}回</td>
                                     <td>{{ score.quiz.lesson_session.date|date:"m/d" }}</td>
-                                    <td>{{ score.quiz.quiz_name }}</td>
                                     <td class="fw-bold text-success">{{ score.score }}点</td>
                                 </tr>
                             {% endfor %}
@@ -379,10 +377,10 @@
                     <table class="table table-sm table-bordered detail-table mb-0 w-100">
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 20%;">回数</th>
+                                <th style="width: 30%;">回数</th>
                                 <th style="width: 20%;">日付</th>
-                                <th style="width: 20%;">貢献度</th>
-                                <th style="width: 20%;">投票点</th>
+                                <th style="width: 15%;">貢献度</th>
+                                <th style="width: 15%;">投票点</th>
                                 <th style="width: 20%;">合計</th>
                             </tr>
                         </thead>

@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
-from django.db.models import Sum
+from django.db.models import Sum, Q, Count
 from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPoints, SelfEvaluation, QuizScore, ContributionEvaluation, GroupMember, PeerEvaluation
 
 @login_required
@@ -153,11 +153,31 @@ def class_points_view(request, class_id):
         for membership in student_groups:
             group = membership.group
             sess = group.lesson_session
-            first_votes = PeerEvaluation.objects.filter(first_place_group=group).count()
-            second_votes = PeerEvaluation.objects.filter(second_place_group=group).count()
-            vote_points = (first_votes * 2) + (second_votes * 1)
             
-            if vote_points > 0:
+            # ランキング判定
+            # セッション内の全グループのスコアを計算
+            # 注意: ループ内でクエリを発行するため学生数が多いと重くなる可能性がありますが、正確性を優先します
+            from ...models import Group
+            session_groups = Group.objects.filter(lesson_session=sess)
+            group_scores = []
+            for g in session_groups:
+                f = PeerEvaluation.objects.filter(Q(first_place_group=g) | Q(lesson_session=sess, first_place_group_number=g.group_number)).distinct().count()
+                s = PeerEvaluation.objects.filter(Q(second_place_group=g) | Q(lesson_session=sess, second_place_group_number=g.group_number)).distinct().count()
+                group_scores.append((f * 2) + (s * 1))
+            
+            unique_scores = sorted(list(set(group_scores)), reverse=True)
+            top_2_scores = unique_scores[:2]
+            
+            # 自分のスコア
+            first_votes = PeerEvaluation.objects.filter(Q(first_place_group=group) | Q(lesson_session=sess, first_place_group_number=group.group_number)).distinct().count()
+            second_votes = PeerEvaluation.objects.filter(Q(second_place_group=group) | Q(lesson_session=sess, second_place_group_number=group.group_number)).distinct().count()
+            my_score = (first_votes * 2) + (second_votes * 1)
+            
+            # 上位2位のみポイント付与
+            vote_points = my_score if (my_score > 0 and my_score in top_2_scores) else 0
+            
+            # 表示用に記録（0点でも履歴には残す場合は条件を調整、ここではポイントがある場合のみマップに追加）
+            if vote_points > 0 or my_score > 0: # 順位外でもスコアがあれば履歴には表示したい場合
                 if sess.id not in session_peer_map:
                     session_peer_map[sess.id] = {
                         'session': sess,

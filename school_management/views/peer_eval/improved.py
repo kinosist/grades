@@ -3,6 +3,7 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db.models import Q
 from ...models import LessonSession, Group, GroupMember, PeerEvaluation, ContributionEvaluation
 
 # ---------------------------------------------------------
@@ -217,9 +218,20 @@ def peer_evaluation_results(request, session_id):
     group_stats = {}
     
     for group in groups:
-        first_place_votes = evaluations.filter(first_place_group=group).count()
-        second_place_votes = evaluations.filter(second_place_group=group).count()
-        evaluations_given = evaluations.filter(evaluator_group=group).count()
+        first_place_votes = evaluations.filter(
+            Q(first_place_group=group) | 
+            Q(first_place_group_number=group.group_number)
+        ).distinct().count()
+        
+        second_place_votes = evaluations.filter(
+            Q(second_place_group=group) | 
+            Q(second_place_group_number=group.group_number)
+        ).distinct().count()
+        
+        evaluations_given = evaluations.filter(
+            Q(evaluator_group=group) |
+            Q(evaluator_group_number=group.group_number)
+        ).distinct().count()
         
         group_stats[group.id] = {
             'group': group,

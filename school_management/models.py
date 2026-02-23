@@ -3,7 +3,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
 import uuid
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 
@@ -371,24 +371,34 @@ class PeerEvaluation(models.Model):
     evaluator_token = models.UUIDField(verbose_name='評価者トークン（匿名化）')
     evaluator_group = models.ForeignKey(
         Group, 
-        on_delete=models.CASCADE, 
+        on_delete=models.SET_NULL, 
         null=True, 
         blank=True, 
         related_name='peer_evaluations_as_evaluator',
         verbose_name='評価者グループ'
     )
+    evaluator_group_number = models.IntegerField(verbose_name='評価者グループ番号', null=True, blank=True)
+    
     first_place_group = models.ForeignKey(
         Group, 
-        on_delete=models.CASCADE, 
+        on_delete=models.SET_NULL, 
+        null=True,
+        blank=True,
         related_name='first_place_votes', 
         verbose_name='1位グループ'
     )
+    first_place_group_number = models.IntegerField(verbose_name='1位グループ番号', null=True, blank=True)
+    
     second_place_group = models.ForeignKey(
         Group, 
-        on_delete=models.CASCADE, 
+        on_delete=models.SET_NULL, 
+        null=True,
+        blank=True,
         related_name='second_place_votes', 
         verbose_name='2位グループ'
     )
+    second_place_group_number = models.IntegerField(verbose_name='2位グループ番号', null=True, blank=True)
+    
     first_place_reason = models.TextField(blank=True, verbose_name='1位選択理由')
     second_place_reason = models.TextField(blank=True, verbose_name='2位選択理由')
     class_comment = models.TextField(blank=True, verbose_name='授業コメント')
@@ -401,6 +411,16 @@ class PeerEvaluation(models.Model):
 
     def __str__(self):
         return f"{self.lesson_session} - 匿名評価 ({self.created_at.strftime('%m/%d %H:%M')})"
+
+    def save(self, *args, **kwargs):
+        # グループ番号を自動保存（グループ再編時のリンク切れ防止）
+        if self.evaluator_group:
+            self.evaluator_group_number = self.evaluator_group.group_number
+        if self.first_place_group:
+            self.first_place_group_number = self.first_place_group.group_number
+        if self.second_place_group:
+            self.second_place_group_number = self.second_place_group.group_number
+        super().save(*args, **kwargs)
 
 
 class ContributionEvaluation(models.Model):
@@ -577,9 +597,41 @@ class StudentClassPoints(models.Model):
         )
         for membership in student_groups:
             group = membership.group
-            first_votes = PeerEvaluation.objects.filter(first_place_group=group).count()
-            second_votes = PeerEvaluation.objects.filter(second_place_group=group).count()
-            peer_total += (first_votes * 2) + (second_votes * 1)
+            session = group.lesson_session
+            
+            # --- ランキング判定ロジック ---
+            # この授業回の全グループのスコアを計算して順位を決定する
+            session_groups = Group.objects.filter(lesson_session=session)
+            group_scores = []
+            
+            for g in session_groups:
+                f_votes = PeerEvaluation.objects.filter(
+                    Q(first_place_group=g) | 
+                    Q(lesson_session=session, first_place_group_number=g.group_number)
+                ).distinct().count()
+                s_votes = PeerEvaluation.objects.filter(
+                    Q(second_place_group=g) | 
+                    Q(lesson_session=session, second_place_group_number=g.group_number)
+                ).distinct().count()
+                score = (f_votes * 2) + (s_votes * 1)
+                group_scores.append(score)
+            
+            # スコアの降順でソートし、上位2つのユニークなスコアを取得（同点対応）
+            unique_scores = sorted(list(set(group_scores)), reverse=True)
+            top_2_scores = unique_scores[:2] # 1位と2位のスコア
+            
+            # 自分のグループのスコアを計算
+            my_first_votes = PeerEvaluation.objects.filter(
+                Q(first_place_group=group) | Q(lesson_session=session, first_place_group_number=group.group_number)
+            ).distinct().count()
+            my_second_votes = PeerEvaluation.objects.filter(
+                Q(second_place_group=group) | Q(lesson_session=session, second_place_group_number=group.group_number)
+            ).distinct().count()
+            my_score = (my_first_votes * 2) + (my_second_votes * 1)
+            
+            # 上位2位以内（スコアがtop_2_scoresに含まれる）かつ0点より大きい場合のみ加算
+            if my_score > 0 and my_score in top_2_scores:
+                peer_total += my_score
 
         # 合計を計算
         # 式: (小テスト(QR含む) + ピア評価 + 出席点) * 倍率(2)
@@ -643,8 +695,33 @@ class StudentClassPoints(models.Model):
         student_groups = GroupMember.objects.filter(student=self.student, group__lesson_session__classroom=self.classroom)
         for membership in student_groups:
             group = membership.group
-            peer_total += (PeerEvaluation.objects.filter(first_place_group=group).count() * 2)
-            peer_total += (PeerEvaluation.objects.filter(second_place_group=group).count() * 1)
+            session = group.lesson_session
+            
+            # ランキング判定（calculate_points_internalと同様）
+            session_groups = Group.objects.filter(lesson_session=session)
+            group_scores = []
+            for g in session_groups:
+                f_votes = PeerEvaluation.objects.filter(
+                    Q(first_place_group=g) | Q(lesson_session=session, first_place_group_number=g.group_number)
+                ).distinct().count()
+                s_votes = PeerEvaluation.objects.filter(
+                    Q(second_place_group=g) | Q(lesson_session=session, second_place_group_number=g.group_number)
+                ).distinct().count()
+                group_scores.append((f_votes * 2) + (s_votes * 1))
+            
+            unique_scores = sorted(list(set(group_scores)), reverse=True)
+            top_2_scores = unique_scores[:2]
+            
+            my_first_votes = PeerEvaluation.objects.filter(
+                Q(first_place_group=group) | Q(lesson_session=session, first_place_group_number=group.group_number)
+            ).distinct().count()
+            my_second_votes = PeerEvaluation.objects.filter(
+                Q(second_place_group=group) | Q(lesson_session=session, second_place_group_number=group.group_number)
+            ).distinct().count()
+            my_score = (my_first_votes * 2) + (my_second_votes * 1)
+            
+            if my_score > 0 and my_score in top_2_scores:
+                peer_total += my_score
         
         return int(quiz_total + lesson_total + peer_total)
 
@@ -797,6 +874,16 @@ def set_qr_points_from_class_settings(sender, instance, **kwargs):
     if not instance.pk and instance.lesson_session and instance.lesson_session.classroom:
         instance.points_awarded = instance.lesson_session.classroom.qr_point_value
 
+@receiver(pre_save, sender=PeerEvaluation)
+def set_peer_evaluation_group_numbers(sender, instance, **kwargs):
+    """ピア評価保存時にグループ番号を自動設定（リンク切れ防止）"""
+    if instance.evaluator_group:
+        instance.evaluator_group_number = instance.evaluator_group.group_number
+    if instance.first_place_group:
+        instance.first_place_group_number = instance.first_place_group.group_number
+    if instance.second_place_group:
+        instance.second_place_group_number = instance.second_place_group.group_number
+
 @receiver([post_save, post_delete], sender=ContributionEvaluation)
 def update_class_points_from_contribution(sender, instance, **kwargs):
     """貢献度評価更新時に成績を再計算"""
@@ -815,14 +902,16 @@ def update_class_points_from_peer_vote(sender, instance, **kwargs):
             # 1位・2位のグループメンバーのポイントを再計算
             groups = []
             # 削除時などリレーションが切れている可能性を考慮してIDチェックとtry-except
-            if instance.first_place_group_id:
+            if instance.first_place_group_id or instance.first_place_group_number:
                 try:
-                    groups.append(instance.first_place_group)
+                    # グループ番号から現在のグループを取得するロジックが必要だが、
+                    # 簡易的に全グループを再計算対象にするか、ここでは既存ロジックを維持しつつエラー回避
+                    if instance.first_place_group: groups.append(instance.first_place_group)
                 except:
                     pass
-            if instance.second_place_group_id:
+            if instance.second_place_group_id or instance.second_place_group_number:
                 try:
-                    groups.append(instance.second_place_group)
+                    if instance.second_place_group: groups.append(instance.second_place_group)
                 except:
                     pass
             

@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db import models
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from ...models import ClassRoom, LessonSession, StudentLessonPoints, Quiz, QuizScore, Group, GroupMember, StudentClassPoints, PeerEvaluation, ContributionEvaluation 
 
 @login_required
@@ -78,9 +78,26 @@ def class_evaluation_view(request, class_id):
                     
                     if membership:
                         group = membership.group
-                        first_votes = PeerEvaluation.objects.filter(first_place_group=group).count()
-                        second_votes = PeerEvaluation.objects.filter(second_place_group=group).count()
-                        vote_score = (first_votes * 2) + (second_votes * 1)
+                        
+                        # ランキング判定
+                        session_groups = Group.objects.filter(lesson_session=session)
+                        group_scores = []
+                        for g in session_groups:
+                            f = PeerEvaluation.objects.filter(Q(first_place_group=g) | Q(lesson_session=session, first_place_group_number=g.group_number)).distinct().count()
+                            s = PeerEvaluation.objects.filter(Q(second_place_group=g) | Q(lesson_session=session, second_place_group_number=g.group_number)).distinct().count()
+                            group_scores.append((f * 2) + (s * 1))
+                        
+                        unique_scores = sorted(list(set(group_scores)), reverse=True)
+                        top_2_scores = unique_scores[:2]
+                        
+                        my_f = PeerEvaluation.objects.filter(Q(first_place_group=group) | Q(lesson_session=session, first_place_group_number=group.group_number)).distinct().count()
+                        my_s = PeerEvaluation.objects.filter(Q(second_place_group=group) | Q(lesson_session=session, second_place_group_number=group.group_number)).distinct().count()
+                        my_score = (my_f * 2) + (my_s * 1)
+                        
+                        if my_score > 0 and my_score in top_2_scores:
+                            vote_score = my_score
+                        else:
+                            vote_score = 0
 
                     peer_evaluation_score = contrib_score + vote_score
             except Exception as e:

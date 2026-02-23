@@ -183,13 +183,16 @@ def class_points_view(request, class_id):
         try:
             scp = StudentClassPoints.objects.get(student=student, classroom=classroom)
             db_points = scp.points
+            attendance_points = scp.attendance_points
         except StudentClassPoints.DoesNotExist:
             db_points = 0
+            attendance_points = 0
 
-        # 表示用ポイント: 目標管理モードならDB値、通常なら計算したRaw Total
+        # 表示用ポイント: 目標管理モードならDB値、通常なら計算式 (QR+ピア+その他+出席)*2
         if grading_system == 'goal':
             display_points = db_points
         else:
+            # ポイント一覧では純粋な獲得ポイントのみを表示（出席点や倍率は含めない）
             display_points = raw_total_points
 
         # 評価レベル判定（仮: 授業回あたりの平均などで判定していたロジックを維持）
@@ -216,6 +219,7 @@ def class_points_view(request, class_id):
             'quiz_total': quiz_total,
             'peer_total': peer_total,
             'lesson_total': lesson_total,
+            'attendance_points': attendance_points,
             'average_points': lesson_average,
             'session_count': session_count,
             'lesson_points': lesson_points_qs,

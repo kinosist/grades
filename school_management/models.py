@@ -770,3 +770,56 @@ def set_qr_points_from_class_settings(sender, instance, **kwargs):
     """QRスキャン時にクラス設定のポイント値を適用"""
     if not instance.pk and instance.lesson_session and instance.lesson_session.classroom:
         instance.points_awarded = instance.lesson_session.classroom.qr_point_value
+
+@receiver([post_save, post_delete], sender=ContributionEvaluation)
+def update_class_points_from_contribution(sender, instance, **kwargs):
+    """貢献度評価更新時に成績を再計算"""
+    if instance.peer_evaluation.lesson_session.classroom:
+        scp, _ = StudentClassPoints.objects.get_or_create(
+            student=instance.evaluatee,
+            classroom=instance.peer_evaluation.lesson_session.classroom
+        )
+        scp.recalculate_total()
+
+@receiver([post_save, post_delete], sender=PeerEvaluation)
+def update_class_points_from_peer_vote(sender, instance, **kwargs):
+    """ピア評価（投票）更新時に成績を再計算"""
+    try:
+        if instance.lesson_session.classroom:
+            # 1位・2位のグループメンバーのポイントを再計算
+            groups = []
+            # 削除時などリレーションが切れている可能性を考慮してIDチェックとtry-except
+            if instance.first_place_group_id:
+                try:
+                    groups.append(instance.first_place_group)
+                except:
+                    pass
+            if instance.second_place_group_id:
+                try:
+                    groups.append(instance.second_place_group)
+                except:
+                    pass
+            
+            for group in groups:
+                members = GroupMember.objects.filter(group=group)
+                for member in members:
+                    scp, _ = StudentClassPoints.objects.get_or_create(
+                        student=member.student,
+                        classroom=instance.lesson_session.classroom
+                    )
+                    scp.recalculate_total()
+    except Exception:
+        pass
+
+@receiver([post_save, post_delete], sender=GroupMember)
+def update_class_points_from_group_member(sender, instance, **kwargs):
+    """グループメンバー変更時に成績を再計算"""
+    try:
+        if instance.group.lesson_session.classroom:
+            scp, _ = StudentClassPoints.objects.get_or_create(
+                student=instance.student,
+                classroom=instance.group.lesson_session.classroom
+            )
+            scp.recalculate_total()
+    except Exception:
+        pass

@@ -48,9 +48,11 @@ def update_attendance_rate(request, class_id):
         # 既存のレコードの出席率、出席点を更新（ポイントは更新しない）
         student_class_points.attendance_rate = attendance_rate
         student_class_points.attendance_points = attendance_points
-        student_class_points.save(update_fields=['attendance_rate', 'attendance_points'])
+        # save()メソッド内でcalculate_points_internalが呼ばれ、points(合計点)も再計算されるため
+        # update_fieldsを指定せずに保存して、pointsの変更もDBに反映させる
+        student_class_points.save()
     else:
-        student_class_points.save(update_fields=['attendance_rate', 'attendance_points'])
+        student_class_points.save()
     
     return JsonResponse({'success': True, 'message': '出席率を保存しました'})
 

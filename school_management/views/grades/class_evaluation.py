@@ -124,11 +124,16 @@ def class_evaluation_view(request, class_id):
             saved_attendance_points = student_class_points.attendance_points
             saved_class_points = student_class_points.points
             # 旧データ互換: total値として保存されている場合は出席点を差し引く
-            if saved_class_points and saved_attendance_points and saved_class_points >= saved_attendance_points:
+            if saved_class_points >= saved_attendance_points:
                 saved_class_points -= saved_attendance_points
+            else:
+                saved_class_points = 0
         except StudentClassPoints.DoesNotExist:
             # 保存されていない場合は自動計算
             attendance_rate = (session_count / total_sessions * 100) if total_sessions > 0 else 0
+            # 未保存でも出席点は計算して表示する
+            saved_attendance_points = (attendance_rate / 100) * classroom.attendance_max_points
+            saved_class_points = 0
         
         # 各種スコアの合計を計算
         total_peer_score = sum(data['peer_score'] for data in session_data.values())
@@ -136,7 +141,7 @@ def class_evaluation_view(request, class_id):
         total_combined_score = sum(data['total_score'] for data in session_data.values())
         
         # 出席点を使用（保存されたものがあればそれを使う）
-        attendance_points_value = saved_attendance_points if saved_attendance_points > 0 else 0
+        attendance_points_value = saved_attendance_points
 
         # 合計計算ロジックの変更
         # 授業点 = (小テスト(QR含む) + ピア評価 + 手動ポイント) * 倍率 + 出席点

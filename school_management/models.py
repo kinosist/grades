@@ -557,10 +557,14 @@ class StudentClassPoints(models.Model):
             from django.apps import apps
             SelfEvaluation = apps.get_model('school_management', 'SelfEvaluation')
             self_eval = SelfEvaluation.objects.filter(student=self.student, classroom=self.classroom).first()
+            
+            # 講師評価点を取得（なければ0）
+            teacher_score = 0
             if self_eval and self_eval.teacher_score is not None:
-                self.points = int(self_eval.teacher_score + self.attendance_points)
-            else:
-                self.points = int(self.attendance_points)
+                teacher_score = self_eval.teacher_score
+            
+            # 合計 = 講師評価点 + 出席点
+            self.points = int(teacher_score + self.attendance_points)
             return
 
         # 小テストの合計

@@ -88,9 +88,11 @@
                     <p class="text-muted mb-2">{{ student.furigana|default:"-" }}</p>
                     {% for cp in student.class_points.all %}
                         {% if cp.classroom.id == classroom.id %}
-                            <span id="student-total-badge" class="badge bg-{% if cp.total_activity_points >= 80 %}success{% elif cp.total_activity_points >= 60 %}warning{% else %}secondary{% endif %} fs-6">
-                                {{ cp.total_activity_points|floatformat:0 }}pt
+                            {% with points=cp.get_activity_points %}
+                            <span id="student-total-badge" class="badge bg-{% if points >= 80 %}success{% elif points >= 60 %}warning{% else %}secondary{% endif %} fs-6" title="（QR + ピア評価 + その他）">
+                                {{ points }}pt
                             </span>
+                            {% endwith %}
                         {% endif %}
                     {% endfor %}
                 </div>

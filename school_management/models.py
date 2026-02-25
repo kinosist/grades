@@ -558,9 +558,9 @@ class StudentClassPoints(models.Model):
             SelfEvaluation = apps.get_model('school_management', 'SelfEvaluation')
             self_eval = SelfEvaluation.objects.filter(student=self.student, classroom=self.classroom).first()
             if self_eval and self_eval.teacher_score is not None:
-                self.points = self_eval.teacher_score
+                self.points = int(self_eval.teacher_score + self.attendance_points)
             else:
-                self.points = 0
+                self.points = int(self.attendance_points)
             return
 
         # 小テストの合計
@@ -664,9 +664,9 @@ class StudentClassPoints(models.Model):
 
     @property
     def class_points(self):
-        # 目標管理モードの場合はpointsをそのまま返す
+        # 目標管理モードの場合はpoints(合計)から出席点を引いた値を返す
         if self.classroom.grading_system == 'goal':
-            return self.points
+            return max(0, self.points - int(self.attendance_points))
 
         """授業点: 小テストの合計点 + 授業内獲得ポイントの合計 + QRコード"""
         # 合計点からの逆算ではなく、純粋な合計値を再計算して返す
@@ -822,6 +822,16 @@ def update_class_points_from_lesson(sender, instance, **kwargs):
         scp, _ = StudentClassPoints.objects.get_or_create(
             student=instance.student,
             classroom=instance.lesson_session.classroom
+        )
+        scp.recalculate_total()
+
+@receiver([post_save, post_delete], sender=SelfEvaluation)
+def update_class_points_from_self_eval(sender, instance, **kwargs):
+    """自己評価・教師評価更新時に成績を再計算"""
+    if instance.classroom:
+        scp, _ = StudentClassPoints.objects.get_or_create(
+            student=instance.student,
+            classroom=instance.classroom
         )
         scp.recalculate_total()
 

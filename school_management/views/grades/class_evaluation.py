@@ -146,7 +146,8 @@ def class_evaluation_view(request, class_id):
         
         # 目標管理モードの場合は、DBに保存されているポイント（講師評価点）を優先
         if grading_system == 'goal':
-            total_points_calculated = saved_class_points
+            # saved_class_points は出席点が引かれた状態（授業点）なので、出席点を足して合計にする
+            total_points_calculated = int(saved_class_points + attendance_points_value)
         else:
             # (授業点 * 2) + 出席点
             total_points_calculated = int((total_combined_score * multiplier_value) + attendance_points_value)

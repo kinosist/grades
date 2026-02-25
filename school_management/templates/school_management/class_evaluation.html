@@ -263,7 +263,7 @@ body { background-color: #f8fafc; }
                             <th class="total-col">
                                 合計
                                 {% if grading_system == 'goal' %}
-                                    <span class="header-sub-text">(講師評価点)</span>
+                                    <span class="header-sub-text">(講師評価点 + 出席点)</span>
                                 {% else %}
                                     <span class="header-sub-text">((授業点 × 2) + 出席点)</span>
                                 {% endif %}
@@ -386,17 +386,19 @@ function saveAttendanceRate(input) {
     const classPoints = parseFloat(scoreCell.textContent.trim().replace(/[^0-9.-]/g, '')) || 0;
     
     // 合計 = (授業点 * 2) + 出席点
-    // ※目標管理モードの場合は自動計算しない（サーバー側の値を優先）
+    // 目標管理モードの場合は (授業点 + 出席点)
     let newTotalPoints = 0;
     if (gradingSystem !== 'goal') {
         newTotalPoints = (classPoints * 2) + newAttendancePoints;
+    } else {
+        newTotalPoints = classPoints + newAttendancePoints;
     }
     
     // 画面更新
     const attendancePointsSpan = row.querySelector('.attendance-points');
     const totalPointsSpan = row.querySelector('.total-points');
     if (attendancePointsSpan) attendancePointsSpan.textContent = newAttendancePoints.toFixed(1);
-    if (totalPointsSpan && gradingSystem !== 'goal') {
+    if (totalPointsSpan) {
         totalPointsSpan.textContent = newTotalPoints.toFixed(1);
     }
     

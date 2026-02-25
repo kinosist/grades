@@ -265,7 +265,7 @@ body { background-color: #f8fafc; }
                                 {% if grading_system == 'goal' %}
                                     <span class="header-sub-text">(講師評価点)</span>
                                 {% else %}
-                                    <span class="header-sub-text">((授業点 + 出席点) × 2)</span>
+                                    <span class="header-sub-text">((授業点 × 2) + 出席点)</span>
                                 {% endif %}
                             </th>
                         </tr>
@@ -385,11 +385,11 @@ function saveAttendanceRate(input) {
     // 余分な空白や文字を除去して数値のみ抽出 (例: "10pt" -> 10)
     const classPoints = parseFloat(scoreCell.textContent.trim().replace(/[^0-9.-]/g, '')) || 0;
     
-    // 合計 = (授業点 + 出席点) * 2
+    // 合計 = (授業点 * 2) + 出席点
     // ※目標管理モードの場合は自動計算しない（サーバー側の値を優先）
     let newTotalPoints = 0;
     if (gradingSystem !== 'goal') {
-        newTotalPoints = (classPoints + newAttendancePoints) * 2;
+        newTotalPoints = (classPoints * 2) + newAttendancePoints;
     }
     
     // 画面更新

@@ -139,18 +139,17 @@ def class_evaluation_view(request, class_id):
         attendance_points_value = saved_attendance_points if saved_attendance_points > 0 else 0
 
         # 合計計算ロジックの変更
-        # 授業点 = (小テスト(QR含む) + ピア評価 + 出席点 + 手動ポイント) * 倍率
+        # 授業点 = (小テスト(QR含む) + ピア評価 + 手動ポイント) * 倍率 + 出席点
         multiplier_value = 2
         
         # total_combined_score には (Manual + Quiz(QR含む) + Peer) が含まれている
-        # ここに Attendance を足して倍率を掛ける
-        base_points = total_combined_score + attendance_points_value
         
         # 目標管理モードの場合は、DBに保存されているポイント（講師評価点）を優先
         if grading_system == 'goal':
             total_points_calculated = saved_class_points
         else:
-            total_points_calculated = int(base_points * multiplier_value)
+            # (授業点 * 2) + 出席点
+            total_points_calculated = int((total_combined_score * multiplier_value) + attendance_points_value)
         
         # 平均点の計算（小テスト/QRの平均）
         average_points = round(total_quiz_score / session_count, 1) if session_count > 0 else 0

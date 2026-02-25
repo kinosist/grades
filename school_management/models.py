@@ -634,10 +634,9 @@ class StudentClassPoints(models.Model):
                 peer_total += my_score
 
         # 合計を計算
-        # 式: (小テスト(QR含む) + ピア評価 + 出席点) * 倍率(2)
-        # ※授業内ポイント(lesson_total)も加算対象に含める
-        base_points = quiz_total + peer_total + self.attendance_points + lesson_total
-        self.points = int(base_points * 2)
+        # 式: (小テスト(QR含む) + ピア評価 + 授業内ポイント) * 倍率(2) + 出席点
+        class_only_points = quiz_total + peer_total + lesson_total
+        self.points = int((class_only_points * 2) + self.attendance_points)
 
     @property
     def quiz_stats(self):
@@ -731,7 +730,7 @@ class StudentClassPoints(models.Model):
             return self.points
         """総合ポイント"""
         # 表示用に、出席点(float)を含めた正確な値を返す
-        return (self.class_points + self.attendance_points) * 2
+        return (self.class_points * 2) + self.attendance_points
 
     def save(self, *args, **kwargs):
         """保存時に自動的にポイントを再計算する"""

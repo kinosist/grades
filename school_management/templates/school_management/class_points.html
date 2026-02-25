@@ -192,9 +192,6 @@
                     <div class="class-title mb-0">
                         <i class="fas fa-trophy me-2 text-warning"></i>{{ classroom.class_name }}
                         <span class="text-muted fs-5 ms-2 fw-normal">- ポイント一覧
-                            {% if grading_system == 'goal' %}
-                                <span class="badge bg-info ms-2" style="font-size: 0.6em; vertical-align: middle;">目標管理モード</span>
-                            {% endif %}
                         </span>
                     </div>
                     <div class="action-buttons">
@@ -283,12 +280,6 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                {% if grading_system == 'goal' %}
-                <div class="alert alert-info mb-4">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>目標管理モード</strong>: 以下の活動ポイントは参考情報です。総ポイントは講師評価によって決定されるため、これらの合計とは一致しません。
-                </div>
-                {% endif %}
 
                 <!-- ポイント内訳サマリー -->
                 <div class="row mb-4">

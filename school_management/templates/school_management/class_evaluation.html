@@ -209,6 +209,9 @@ body { background-color: #f8fafc; }
                 <div class="class-title">
                     <div><i class="fas fa-chalkboard me-2 text-primary"></i>{{ classroom.class_name }}</div>
                     <span class="text-muted fs-5 ms-2 fw-normal">- 評価一覧</span>
+                    {% if grading_system == 'goal' %}
+                        <span class="badge bg-info ms-2" style="font-size: 0.6em; vertical-align: middle;">目標管理モード</span>
+                    {% endif %}
                 </div>
                 <div class="class-stats">
                     <div class="stat-item">

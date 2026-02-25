@@ -209,12 +209,9 @@ def class_points_view(request, class_id):
             db_points = 0
             attendance_points = 0
 
-        # 表示用ポイント: 目標管理モードならDB値、通常なら計算式 (QR+ピア+その他+出席)*2
-        if grading_system == 'goal':
-            display_points = db_points
-        else:
-            # ポイント一覧では純粋な獲得ポイントのみを表示（出席点や倍率は含めない）
-            display_points = raw_total_points
+        # ポイント一覧では、モードに関わらず純粋な獲得ポイント（積み上げ）を表示する
+        # これにより、目標管理モードでも日々の活動量（QRやピア評価）を確認できる
+        display_points = raw_total_points
 
         # 評価レベル判定（仮: 授業回あたりの平均などで判定していたロジックを維持）
         session_count = lesson_points_qs.count()

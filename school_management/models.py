@@ -662,14 +662,8 @@ class StudentClassPoints(models.Model):
         self.calculate_points_internal()
         return self.points
 
-    @property
-    def class_points(self):
-        # 目標管理モードの場合はpoints(合計)から出席点を引いた値を返す
-        if self.classroom.grading_system == 'goal':
-            return max(0, self.points - int(self.attendance_points))
-
-        """授業点: 小テストの合計点 + 授業内獲得ポイントの合計 + QRコード"""
-        # 合計点からの逆算ではなく、純粋な合計値を再計算して返す
+    def get_activity_points(self):
+        """モードに関係なく、純粋な積み上げポイント（授業点相当）を計算して返す"""
         # 小テスト (重複対策)
         all_quiz_scores = QuizScore.objects.filter(
             student=self.student,
@@ -725,12 +719,27 @@ class StudentClassPoints(models.Model):
         return int(quiz_total + lesson_total + peer_total)
 
     @property
+    def class_points(self):
+        """評価一覧用: モードに応じた授業点を返す"""
+        # 目標管理モードの場合はpoints(合計)から出席点を引いた値を返す
+        if self.classroom.grading_system == 'goal':
+            return max(0, self.points - int(self.attendance_points))
+        
+        # 通常モードは積み上げ値を返す
+        return self.get_activity_points()
+
+    @property
     def total_points(self):
+        """評価一覧用: モードに応じた総合ポイントを返す"""
         if self.classroom.grading_system == 'goal':
             return self.points
-        """総合ポイント"""
         # 表示用に、出席点(float)を含めた正確な値を返す
-        return (self.class_points * 2) + self.attendance_points
+        return (self.get_activity_points() * 2) + self.attendance_points
+
+    @property
+    def total_activity_points(self):
+        """活動量表示用: モードに関係なく、積み上げポイントに基づいた合計（倍率適用 + 出席点）を返す"""
+        return (self.get_activity_points() * 2) + self.attendance_points
 
     def save(self, *args, **kwargs):
         """保存時に自動的にポイントを再計算する"""

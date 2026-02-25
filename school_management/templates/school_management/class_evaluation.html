@@ -261,7 +261,11 @@ body { background-color: #f8fafc; }
                             </th>
                             <th class="score-col">
                                 授業点
-                                <span class="header-sub-text">(QRアクション + ピア)</span>
+                                {% if grading_system == 'goal' %}
+                                    <span class="header-sub-text">(講師評価点)</span>
+                                {% else %}
+                                    <span class="header-sub-text">(QRアクション + ピア)</span>
+                                {% endif %}
                             </th>
                             <th class="total-col">
                                 合計

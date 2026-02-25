@@ -300,12 +300,14 @@ def update_class_settings(request, class_id):
     if qr_point_value:
         try:
             val = int(qr_point_value)
-            if val > 0:
+            if 0 < val <= 100:
                 if classroom.qr_point_value != val:
                     classroom.qr_point_value = val
                     messages.success(request, 'QRアクションポイントを更新しました。')
                 else:
                     messages.info(request, 'QRアクションポイントは変更されていません。')
+            else:
+                messages.error(request, 'QRアクションポイントは1〜100の間で設定してください。')
         except ValueError:
             pass
             
@@ -315,13 +317,15 @@ def update_class_settings(request, class_id):
     if attendance_max_points:
         try:
             val = int(attendance_max_points)
-            if val >= 0:
+            if 0 <= val <= 1000:
                 if classroom.attendance_max_points != val:
                     classroom.attendance_max_points = val
                     recalculate_attendance = True
                     messages.success(request, '出席点満点を更新しました。')
                 else:
                     messages.info(request, '出席点満点は変更されていません。')
+            else:
+                messages.error(request, '出席点満点は0〜1000の間で設定してください。')
         except ValueError:
             pass
             

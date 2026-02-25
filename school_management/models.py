@@ -122,8 +122,16 @@ class ClassRoom(models.Model):
         default='standard',
         verbose_name='評価システム'
     )
-    qr_point_value = models.IntegerField(default=1, verbose_name='QRアクションポイント')
-    attendance_max_points = models.IntegerField(default=20, verbose_name='出席点満点')
+    qr_point_value = models.IntegerField(
+        default=1, 
+        verbose_name='QRアクションポイント',
+        validators=[MinValueValidator(1), MaxValueValidator(100)]
+    )
+    attendance_max_points = models.IntegerField(
+        default=20, 
+        verbose_name='出席点満点',
+        validators=[MinValueValidator(0), MaxValueValidator(1000)]
+    )
     teachers = models.ManyToManyField(Teacher, verbose_name='担当教員', related_name='classrooms')
     students = models.ManyToManyField(Student, blank=True, verbose_name='学生')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -753,6 +761,64 @@ class StudentClassPoints(models.Model):
     def recalculate_total(self):
         """外部呼び出し用互換メソッド（シグナル等から呼ばれる）"""
         self.save()
+
+    def get_peer_history(self):
+        """ピア評価の獲得ポイント履歴（貢献度、投票点、合計）を返す"""
+        # 循環参照回避のためメソッド内でインポート
+        from .models import ContributionEvaluation, GroupMember, PeerEvaluation, Group
+        from django.db.models import Q, Sum
+
+        history = []
+        
+        # このクラスのピア評価ありの授業回を取得（新しい順）
+        sessions = self.classroom.lessonsession_set.filter(has_peer_evaluation=True).order_by('-session_number')
+        
+        for session in sessions:
+            # 1. 貢献度評価 (5段階評価の合計)
+            contrib_score = ContributionEvaluation.objects.filter(
+                evaluatee=self.student,
+                peer_evaluation__lesson_session=session
+            ).aggregate(total=Sum('contribution_score'))['total'] or 0
+            
+            # 2. 投票ポイント (1位=2点, 2位=1点)
+            vote_score = 0
+            membership = GroupMember.objects.filter(
+                student=self.student,
+                group__lesson_session=session
+            ).first()
+            
+            if membership:
+                group = membership.group
+                
+                # ランキング判定（calculate_points_internalと同様のロジック）
+                session_groups = Group.objects.filter(lesson_session=session)
+                group_scores = []
+                for g in session_groups:
+                    f = PeerEvaluation.objects.filter(Q(first_place_group=g) | Q(lesson_session=session, first_place_group_number=g.group_number)).distinct().count()
+                    s = PeerEvaluation.objects.filter(Q(second_place_group=g) | Q(lesson_session=session, second_place_group_number=g.group_number)).distinct().count()
+                    group_scores.append((f * 2) + (s * 1))
+                
+                unique_scores = sorted(list(set(group_scores)), reverse=True)
+                top_2_scores = unique_scores[:2]
+                
+                my_f = PeerEvaluation.objects.filter(Q(first_place_group=group) | Q(lesson_session=session, first_place_group_number=group.group_number)).distinct().count()
+                my_s = PeerEvaluation.objects.filter(Q(second_place_group=group) | Q(lesson_session=session, second_place_group_number=group.group_number)).distinct().count()
+                my_score = (my_f * 2) + (my_s * 1)
+                
+                if my_score > 0 and my_score in top_2_scores:
+                    vote_score = my_score
+            
+            # 履歴に追加
+            total_score = contrib_score + vote_score
+            if total_score > 0:
+                history.append({
+                    'session': session,
+                    'contrib': contrib_score,
+                    'vote': vote_score,
+                    'total': total_score
+                })
+                
+        return history[:10] # 最新10件
 
 
 class StudentGoal(models.Model):

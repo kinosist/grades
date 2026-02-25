@@ -289,7 +289,7 @@
                                 {% csrf_token %}
                                 <label for="qr_point_value" class="form-label fw-bold"><i class="fas fa-qrcode me-2 text-warning"></i>QRアクションポイント (pt/回)</label>
                                 <div class="input-group">
-                                    <input type="number" class="form-control" id="qr_point_value" name="qr_point_value" value="{{ classroom.qr_point_value }}" min="1">
+                                    <input type="number" class="form-control" id="qr_point_value" name="qr_point_value" value="{{ classroom.qr_point_value }}" min="1" max="100">
                                     <button class="btn btn-outline-primary" type="submit">更新</button>
                                 </div>
                                 <div class="form-text text-muted small mt-2">QRコードスキャン1回あたりに付与されるポイント数です。</div>
@@ -302,7 +302,7 @@
                                 {% csrf_token %}
                                 <label for="attendance_max_points" class="form-label fw-bold"><i class="fas fa-user-check me-2 text-success"></i>出席点満点</label>
                                 <div class="input-group">
-                                    <input type="number" class="form-control" id="attendance_max_points" name="attendance_max_points" value="{{ classroom.attendance_max_points }}" min="0">
+                                    <input type="number" class="form-control" id="attendance_max_points" name="attendance_max_points" value="{{ classroom.attendance_max_points }}" min="0" max="1000">
                                     <button class="btn btn-outline-primary" type="submit">更新</button>
                                 </div>
                                 <div class="form-text text-muted small mt-2">出席率100%のときに付与される最大ポイント数です。</div>

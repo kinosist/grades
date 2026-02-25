@@ -345,7 +345,7 @@ body { background-color: #f8fafc; }
                     {% csrf_token %}
                     <div class="mb-3">
                         <label for="attendance_max_points" class="form-label fw-bold">出席点満点</label>
-                        <input type="number" class="form-control" id="attendance_max_points" name="attendance_max_points" value="{{ classroom.attendance_max_points }}" min="0">
+                        <input type="number" class="form-control" id="attendance_max_points" name="attendance_max_points" value="{{ classroom.attendance_max_points }}" min="0" max="1000">
                         <div class="form-text">出席率100%のときに付与される最大ポイント数です。</div>
                     </div>
                 </div>

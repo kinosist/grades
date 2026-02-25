@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.db import models
 # モデルのインポート
-from ...models import ClassRoom, Student, StudentQRCode, StudentClassPoints
+from school_management.models import ClassRoom, Student, StudentQRCode, StudentClassPoints
 from .utils import generate_qr_code_image
 
 @login_required

@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from ...models import ClassRoom
+from school_management.models import ClassRoom
 
 @login_required
 def class_list_view(request):

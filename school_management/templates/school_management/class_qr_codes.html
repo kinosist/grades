@@ -55,11 +55,8 @@
                                 <i class="fas fa-exclamation-circle me-1"></i>授業回が指定されていません。スキャンするには授業詳細からアクセスしてください。
                             </div>
                         {% endif %}
-                        <div class="d-flex align-items-center bg-light rounded px-2 py-1 border">
-                            <span class="text-muted me-2 small">QRアクション: <strong>{{ classroom.qr_point_value }}pt/回</strong></span>
-                            <button class="btn btn-sm btn-link p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#settingsModal">
-                                <i class="fas fa-cog"></i> 変更
-                            </button>
+                        <div class="bg-light rounded px-2 py-1 border">
+                            <span class="text-muted small">QRアクション: <strong>{{ classroom.qr_point_value }}pt/回</strong></span>
                         </div>
                     </div>
                 </div>
@@ -139,32 +136,6 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
                 <button type="button" class="btn btn-primary" id="manualInputBtn">手動でURL入力</button>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- 設定変更モーダル -->
-<div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-cog me-2"></i>設定変更</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="{% url 'school_management:update_class_settings' classroom.id %}" method="post">
-                <div class="modal-body">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="qr_point_value_modal" class="form-label fw-bold">QRアクションポイント (pt/回)</label>
-                        <input type="number" class="form-control" id="qr_point_value_modal" name="qr_point_value" value="{{ classroom.qr_point_value }}" min="1">
-                        <div class="form-text">QRコードスキャン1回あたりに付与されるポイント数です。</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                    <button type="button" class="btn btn-primary" onclick="this.form.submit()">保存する</button>
-                </div>
-            </form>
         </div>
     </div>
 </div>

@@ -94,7 +94,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for lesson in lessons %}
+                                {% for lesson in lessons|dictsortreversed:"session_number" %}
                                 <tr class="clickable-row" onclick="window.location=`{% url 'school_management:lesson_session_detail' lesson.id %}`">
                                     <td><strong>第{{ lesson.session_number }}回</strong></td>
                                     <td>{{ lesson.date|date:"m/d" }}</td>

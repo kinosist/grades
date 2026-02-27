@@ -3,7 +3,7 @@
 {% block title %}{{ session.classroom.class_name }} 第{{ session.session_number }}回 - 学校管理システム{% endblock %}
 {% block page_title %}
     {{ session.classroom.class_name }} 第{{ session.session_number }}回詳細
-    <span class="fs-6 text-muted">
+    <span class="fs-6 text-muted d-block d-md-inline mt-1 mt-md-0">
         （実施日: {{ session.date|date:"Y年m月d日" }}（{{ session.date|date:"l" }}））
     </span>
 {% endblock %}
@@ -17,6 +17,45 @@
 {% block extra_css %}
 <style>
     body { background-color: #f8fafc; }
+
+    /* --- 【修正】タブを絶対に一列にして青いバーを出す --- */
+    .nav-tabs-wrapper {
+        overflow-x: auto; /* 横スクロールを許可 */
+        overflow-y: hidden;
+        white-space: nowrap; /* テキストの折り返しを禁止 */
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 12px; /* バーを表示するための余白 */
+        margin-bottom: 1rem;
+    }
+
+    /* スクロールバーのデザイン（常に青く表示） */
+    .nav-tabs-wrapper::-webkit-scrollbar {
+        height: 6px; /* 少し太めにして見やすく */
+        display: block !important;
+    }
+    .nav-tabs-wrapper::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    .nav-tabs-wrapper::-webkit-scrollbar-thumb {
+        background: #0d6efd; /* 青いバー */
+        border-radius: 10px;
+    }
+
+    .nav-tabs {
+        display: flex;
+        flex-wrap: nowrap !important; /* 絶対に改行させない */
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .nav-tabs .nav-item {
+        flex: 0 0 auto; /* 各タブの幅を自動に保ち、縮ませない */
+    }
+
+    .nav-link {
+        white-space: nowrap;
+    }
+    /* ------------------------------------------- */
 
     .nav-tabs .nav-link.active {
         font-weight: bold;
@@ -33,43 +72,46 @@
 <div class="row">
     <div class="col-12">
         {% with groups=groups|default:session.group_set.all %}
-        <ul class="nav nav-tabs mb-4" id="sessionTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {% if not request.GET.active_tab or request.GET.active_tab == 'content' %}active{% endif %}" id="content-tab" data-bs-toggle="tab" data-bs-target="#content" type="button" role="tab" aria-controls="content" aria-selected="{% if not request.GET.active_tab or request.GET.active_tab == 'content' %}true{% else %}false{% endif %}">
-                    <i class="fas fa-info-circle me-2"></i>授業内容
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {% if request.GET.active_tab == 'group' %}active{% endif %}" id="group-tab" data-bs-toggle="tab" data-bs-target="#group" type="button" role="tab" aria-controls="group" aria-selected="{% if request.GET.active_tab == 'group' %}true{% else %}false{% endif %}">
-                    <i class="fas fa-users me-2"></i>グループ編成
-                    {% if groups %}
-                        <span class="badge bg-secondary ms-1">{{ groups.count }}</span>
-                    {% endif %}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {% if request.GET.active_tab == 'report' %}active{% endif %}" id="report-tab" data-bs-toggle="tab" data-bs-target="#report" type="button" role="tab" aria-controls="report" aria-selected="{% if request.GET.active_tab == 'report' %}true{% else %}false{% endif %}">
-                    <i class="fas fa-book-open me-2"></i>日報
-                    {% with report_count=session.lesson_reports.count %}
-                        {% if report_count > 0 %}<span class="badge bg-success ms-1">{{ report_count }}</span>{% endif %}
-                    {% endwith %}
-                </button>
-            </li>
-            
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {% if request.GET.active_tab == 'qr' %}active{% endif %}" id="qr-tab" data-bs-toggle="tab" data-bs-target="#qr-grading" type="button" role="tab" aria-controls="qr-grading" aria-selected="{% if request.GET.active_tab == 'qr' %}true{% else %}false{% endif %}">
-                    <i class="fas fa-qrcode me-2"></i>QR巡回採点
-                </button>
-            </li>
+        
+        <div class="nav-tabs-wrapper">
+            <ul class="nav nav-tabs" id="sessionTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if not request.GET.active_tab or request.GET.active_tab == 'content' %}active{% endif %}" id="content-tab" data-bs-toggle="tab" data-bs-target="#content" type="button" role="tab" aria-controls="content" aria-selected="{% if not request.GET.active_tab or request.GET.active_tab == 'content' %}true{% else %}false{% endif %}">
+                        <i class="fas fa-info-circle me-2"></i>授業内容
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if request.GET.active_tab == 'group' %}active{% endif %}" id="group-tab" data-bs-toggle="tab" data-bs-target="#group" type="button" role="tab" aria-controls="group" aria-selected="{% if request.GET.active_tab == 'group' %}true{% else %}false{% endif %}">
+                        <i class="fas fa-users me-2"></i>グループ編成
+                        {% if groups %}
+                            <span class="badge bg-secondary ms-1">{{ groups.count }}</span>
+                        {% endif %}
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if request.GET.active_tab == 'report' %}active{% endif %}" id="report-tab" data-bs-toggle="tab" data-bs-target="#report" type="button" role="tab" aria-controls="report" aria-selected="{% if request.GET.active_tab == 'report' %}true{% else %}false{% endif %}">
+                        <i class="fas fa-book-open me-2"></i>日報
+                        {% with report_count=session.lesson_reports.count %}
+                            {% if report_count > 0 %}<span class="badge bg-success ms-1">{{ report_count }}</span>{% endif %}
+                        {% endwith %}
+                    </button>
+                </li>
+                
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if request.GET.active_tab == 'qr' %}active{% endif %}" id="qr-tab" data-bs-toggle="tab" data-bs-target="#qr-grading" type="button" role="tab" aria-controls="qr-grading" aria-selected="{% if request.GET.active_tab == 'qr' %}true{% else %}false{% endif %}">
+                        <i class="fas fa-qrcode me-2"></i>QR巡回採点
+                    </button>
+                </li>
 
-            {% if session.has_peer_evaluation %}
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {% if request.GET.active_tab == 'peer' %}active{% endif %}" id="peer-tab" data-bs-toggle="tab" data-bs-target="#peer" type="button" role="tab" aria-controls="peer" aria-selected="{% if request.GET.active_tab == 'peer' %}true{% else %}false{% endif %}">
-                    <i class="fas fa-user-friends me-2"></i>ピア評価管理
-                </button>
-            </li>
-            {% endif %}
-        </ul>
+                {% if session.has_peer_evaluation %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if request.GET.active_tab == 'peer' %}active{% endif %}" id="peer-tab" data-bs-toggle="tab" data-bs-target="#peer" type="button" role="tab" aria-controls="peer" aria-selected="{% if request.GET.active_tab == 'peer' %}true{% else %}false{% endif %}">
+                        <i class="fas fa-user-friends me-2"></i>ピア評価管理
+                    </button>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
 
         <div class="tab-content" id="sessionTabsContent">
             <div class="tab-pane fade {% if not request.GET.active_tab or request.GET.active_tab == 'content' %}show active{% endif %}" id="content" role="tabpanel" aria-labelledby="content-tab">
@@ -254,7 +296,6 @@
                 </div>
                 {% endif %}
 
-                <!-- テスト用スキャン（PC開発用） -->
                 <div class="card mb-4">
                     <div class="card-header bg-light">
                         <h6 class="mb-0 text-muted"><i class="fas fa-vial me-2"></i>テスト用スキャン（カメラなし）</h6>
@@ -276,7 +317,6 @@
                     </div>
                 </div>
 
-                <!-- ポイント獲得履歴（小テスト・QRアクション結果） -->
                 <div class="card">
                     <div class="card-header">
                         <h5 class="mb-0"><i class="fas fa-users me-2"></i>各生徒の獲得ポイント</h5>

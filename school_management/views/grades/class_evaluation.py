@@ -1,8 +1,11 @@
 from django.shortcuts import render, get_object_or_404
+import logging
 from django.contrib.auth.decorators import login_required
 from django.db import models
 from django.db.models import Sum, Q
-from ...models import ClassRoom, LessonSession, StudentLessonPoints, Quiz, QuizScore, Group, GroupMember, StudentClassPoints, PeerEvaluation, ContributionEvaluation 
+from ...models import ClassRoom, LessonSession, StudentLessonPoints, Quiz, QuizScore, Group, GroupMember, StudentClassPoints, PeerEvaluation, ContributionEvaluation, SelfEvaluation
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def class_evaluation_view(request, class_id):
@@ -53,7 +56,7 @@ def class_evaluation_view(request, class_id):
                     has_quiz = True
                     quiz_score = sum(qs.score for qs in session_quiz_scores)
             except Exception as e:
-                print(f"小テストスコア取得エラー: {e}")
+                logger.error(f"小テストスコア取得エラー: {e}", exc_info=True)
                 pass
             
             # ピア評価スコアを取得（貢献度 + 投票ポイント）
@@ -99,7 +102,7 @@ def class_evaluation_view(request, class_id):
 
                     peer_evaluation_score = contrib_score + vote_score
             except Exception as e:
-                print(f"ピア評価スコア取得エラー: {e}")
+                logger.error(f"ピア評価スコア取得エラー: {e}", exc_info=True)
                 pass
             
             session_data[session_key] = {
@@ -122,18 +125,11 @@ def class_evaluation_view(request, class_id):
             student_class_points = StudentClassPoints.objects.get(student=student, classroom=classroom)
             attendance_rate = student_class_points.attendance_rate
             saved_attendance_points = student_class_points.attendance_points
-            saved_class_points = student_class_points.points
-            # 旧データ互換: total値として保存されている場合は出席点を差し引く
-            if saved_class_points >= saved_attendance_points:
-                saved_class_points -= saved_attendance_points
-            else:
-                saved_class_points = 0
         except StudentClassPoints.DoesNotExist:
             # 保存されていない場合は自動計算
             attendance_rate = (session_count / total_sessions * 100) if total_sessions > 0 else 0
             # 未保存でも出席点は計算して表示する
             saved_attendance_points = (attendance_rate / 100) * classroom.attendance_max_points
-            saved_class_points = 0
         
         # 各種スコアの合計を計算
         total_peer_score = sum(data['peer_score'] for data in session_data.values())
@@ -151,18 +147,26 @@ def class_evaluation_view(request, class_id):
         
         # 目標管理モードの場合は、DBに保存されているポイント（講師評価点）を優先
         if grading_system == 'goal':
-            # saved_class_points は出席点が引かれた状態（授業点）なので、出席点を足して合計にする
-            total_points_calculated = int(saved_class_points + attendance_points_value)
+            # 目標管理モード: SelfEvaluationから取得（DB保存値からの逆算は誤差が出るため避ける）
+            self_eval = SelfEvaluation.objects.filter(student=student, classroom=classroom).first()
+            score_points = self_eval.teacher_score if self_eval and self_eval.teacher_score is not None else 0
+            
+            # 合計 = 授業点 + 出席点
+            total_points_calculated = score_points + attendance_points_value
         else:
-            # (授業点 * 2) + 出席点
-            total_points_calculated = int((total_combined_score * multiplier_value) + attendance_points_value)
+            # 通常モード: 積み上げ計算結果を使用
+            score_points = total_combined_score
+            
+            # 合計 = (授業点 * 2) + 出席点
+            total_points_calculated = (score_points * multiplier_value) + attendance_points_value
         
         # 平均点の計算（小テスト/QRの平均）
         average_points = round(total_quiz_score / session_count, 1) if session_count > 0 else 0
-        
+
         student_evaluations.append({
             'student': student,
             'total_points': total_points_calculated,  # 合計点は出席点 + 点数
+            'score_points': score_points,             # 授業点（表示用）
             'total_peer_score': total_peer_score,
             'total_quiz_score': total_quiz_score,  # 小テストスコアの合計
             'total_combined_score': total_combined_score,
@@ -190,12 +194,8 @@ def class_evaluation_view(request, class_id):
             
             avg_score = round(peer_scores['avg_score'] or 0, 1)
             session_peer_averages[session.id] = avg_score
-            print(f"Session {session.session_number}: PE average = {avg_score}")
         else:
             session_peer_averages[session.id] = None
-            print(f"Session {session.session_number}: No peer evaluation")
-    
-    print(f"Session peer averages: {session_peer_averages}")
     
     context = {
         'classroom': classroom,

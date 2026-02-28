@@ -1,10 +1,13 @@
 from datetime import date
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from django.http import JsonResponse
 from ...models import ClassRoom, StudentQRCode, QRCodeScan, LessonSession, StudentLessonPoints, StudentClassPoints, Quiz, QuizScore
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def qr_code_scan(request, qr_code_id):
@@ -97,6 +100,7 @@ def qr_code_scan(request, qr_code_id):
         return render(request, 'school_management/qr_code_scan.html', context)
         
     except Exception as e:
+        logger.error(f"QRコードスキャンエラー: {e}", exc_info=True)
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({'success': False, 'error': str(e)})
         context = {'qr_code': None, 'error_message': f'QRコードのスキャンに失敗しました: {str(e)}'}

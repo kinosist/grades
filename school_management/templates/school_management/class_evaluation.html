@@ -70,6 +70,7 @@ body { background-color: #f8fafc; }
         font-size: 1.1em;
     }
     .evaluation-table .attendance-point-col { min-width: 80px; }
+    .evaluation-table .session-col { min-width: 60px; background-color: #fff; }
     .evaluation-table .score-col { min-width: 70px; }
     
     .header-sub-text {
@@ -304,7 +305,12 @@ body { background-color: #f8fafc; }
                             </td>
 
                             <td class="score-col">
-                                {{ evaluation.score_points|floatformat:1 }}
+                                <div class="d-flex flex-column align-items-center">
+                                    <span class="fw-bold">{{ evaluation.score_points|floatformat:1 }}</span>
+                                    <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#detailModal-{{ evaluation.student.id }}">
+                                        <small style="font-size: 0.75em;"><i class="fas fa-list-ul"></i> 詳細</small>
+                                    </button>
+                                </div>
                             </td>
 
                             <td class="total-col">
@@ -327,6 +333,99 @@ body { background-color: #f8fafc; }
         </div>
     </div>
 </div>
+
+<!-- 詳細モーダル群 -->
+{% for evaluation in student_evaluations %}
+<div class="modal fade" id="detailModal-{{ evaluation.student.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-graduate me-2"></i>{{ evaluation.student.full_name }}
+                    <span class="text-muted fs-6 ms-2">授業点詳細</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <small class="text-muted d-block">授業点合計</small>
+                            <strong class="fs-5 text-primary">{{ evaluation.score_points|floatformat:1 }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <small class="text-muted d-block">小テスト/QR</small>
+                            <strong class="fs-5">{{ evaluation.total_quiz_score }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <small class="text-muted d-block">ピア評価</small>
+                            <strong class="fs-5">{{ evaluation.total_peer_score }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover table-bordered text-center align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 15%;">回</th>
+                                <th style="width: 15%;">日付</th>
+                                <th style="width: 20%;">小テスト/QR</th>
+                                <th style="width: 20%;">ピア評価</th>
+                                <th style="width: 15%;">その他</th>
+                                <th style="width: 15%;">計</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for data in evaluation.session_scores %}
+                            <tr>
+                                <td>第{{ data.session.session_number }}回</td>
+                                <td>{{ data.date|date:"m/d" }}</td>
+                                <td>
+                                    {% if data.quiz_score > 0 %}
+                                        <span class="text-success fw-bold">{{ data.quiz_score }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if data.peer_score > 0 %}
+                                        <span class="text-info fw-bold">{{ data.peer_score }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if data.manual_points > 0 %}
+                                        <span>{{ data.manual_points }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="bg-light fw-bold">
+                                    {% if data.total_score > 0 %}
+                                        {{ data.total_score }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 
 <!-- 設定変更モーダル -->
 <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">

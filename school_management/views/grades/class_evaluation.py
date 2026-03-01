@@ -112,7 +112,8 @@ def class_evaluation_view(request, class_id):
                 'total_score': manual_points + quiz_score + peer_evaluation_score,
                 'date': session.date,
                 'has_peer_evaluation': session.has_peer_evaluation,
-                'has_quiz': has_quiz
+                'has_quiz': has_quiz,
+                'session': session
             }
         
         # 出席率と平均ポイントを計算
@@ -163,6 +164,12 @@ def class_evaluation_view(request, class_id):
         # 平均点の計算（小テスト/QRの平均）
         average_points = round(total_quiz_score / session_count, 1) if session_count > 0 else 0
 
+        # セッションごとのスコアをリスト化（テンプレート表示用）
+        ordered_session_scores = []
+        for session in sessions:
+            session_key = f"第{session.session_number}回"
+            ordered_session_scores.append(session_data[session_key])
+
         student_evaluations.append({
             'student': student,
             'total_points': total_points_calculated,  # 合計点は出席点 + 点数
@@ -175,6 +182,7 @@ def class_evaluation_view(request, class_id):
             'multiplied_points': total_points_calculated,  # 倍率適用済みの点数
             'multiplier': multiplier_value,
             'session_data': session_data,
+            'session_scores': ordered_session_scores,
             'session_count': session_count,
             'average_points': average_points,
             'class_points': total_points_calculated,  # クラスのポイント

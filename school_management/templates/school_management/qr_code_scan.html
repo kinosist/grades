@@ -106,9 +106,15 @@
                         
                         <div class="mt-4">
                             {% if classroom %}
-                                <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-primary me-2">
-                                    <i class="fas fa-arrow-left me-1"></i>{{ classroom.class_name }}の詳細に戻る
-                                </a>
+                                {% if lesson_session %}
+                                    <a href="{% url 'school_management:session_detail' lesson_session.id %}?active_tab=qr" class="btn btn-outline-primary me-2">
+                                        <i class="fas fa-arrow-left me-1"></i>授業回詳細（QR採点）に戻る
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-primary me-2">
+                                        <i class="fas fa-arrow-left me-1"></i>{{ classroom.class_name }}の詳細に戻る
+                                    </a>
+                                {% endif %}
                                 <a href="{% url 'school_management:class_qr_codes' classroom.id %}{% if lesson_session %}?session_id={{ lesson_session.id }}{% endif %}" class="btn btn-success">
                                     <i class="fas fa-qrcode me-1"></i>続けてスキャンする（QR一覧へ）
                                 </a>

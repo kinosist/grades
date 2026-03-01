@@ -307,9 +307,11 @@ body { background-color: #f8fafc; }
                             <td class="score-col">
                                 <div class="d-flex flex-column align-items-center">
                                     <span class="fw-bold">{{ evaluation.score_points|floatformat:1 }}</span>
+                                    {% if grading_system != 'goal' %}
                                     <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#detailModal-{{ evaluation.student.id }}">
                                         <small style="font-size: 0.75em;"><i class="fas fa-list-ul"></i> 詳細</small>
                                     </button>
+                                    {% endif %}
                                 </div>
                             </td>
 
@@ -335,6 +337,7 @@ body { background-color: #f8fafc; }
 </div>
 
 <!-- 詳細モーダル群 -->
+{% if grading_system != 'goal' %}
 {% for evaluation in student_evaluations %}
 <div class="modal fade" id="detailModal-{{ evaluation.student.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -426,6 +429,7 @@ body { background-color: #f8fafc; }
     </div>
 </div>
 {% endfor %}
+{% endif %}
 
 <!-- 設定変更モーダル -->
 <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">

@@ -52,8 +52,7 @@
                     <div class="mb-3">
                         <label class="form-label"><strong>評価フォームURL</strong></label>
                         <div class="input-group">
-                            <input type="text" class="form-control" id="evaluation-url" 
-                                   value="{{ request.scheme }}://{{ request.get_host }}{% url 'school_management:peer_evaluation_common' session.id %}" readonly>
+                            <input type="text" class="form-control" id="evaluation-url" value="{{ common_evaluation_url }}" readonly>
                             <button class="btn btn-outline-secondary" type="button" onclick="copyUrl(this)">
                                 <i class="fas fa-copy"></i> コピー
                             </button>
@@ -62,7 +61,9 @@
                     
                     <!-- QRコード表示エリア -->
                     <div class="text-center mb-3">
-                        <div id="qrcode" class="d-inline-block"></div>
+                        <div id="qrcode" class="d-inline-block">
+                            <img src="{{ qr_image }}" alt="QRコード" style="max-width: 200px; height: auto;">
+                        </div>
                         <p class="text-muted mt-2">QRコードをスキャンして評価フォームにアクセス</p>
                     </div>
                     
@@ -158,23 +159,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // QRコード生成
-    const qrCodeDiv = document.getElementById('qrcode');
-    const evaluationUrl = document.getElementById('evaluation-url').value;
-    
-    QRCode.toCanvas(qrCodeDiv, evaluationUrl, {
-        width: 200,
-        margin: 2,
-        color: {
-            dark: '#000000',
-            light: '#FFFFFF'
-        }
-    }, function (error) {
-        if (error) {
-            console.error('QRコード生成エラー:', error);
-            qrCodeDiv.innerHTML = '<p class="text-danger">QRコードの生成に失敗しました</p>';
-        }
-    });
 });
 
 function copyUrl(btnElement) {

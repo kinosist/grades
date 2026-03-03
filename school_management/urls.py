@@ -29,6 +29,7 @@ urlpatterns = [
     
     # --- 成績・評価（Grades） ---
     path('classes/<int:class_id>/points/', grades.class_points_view, name='class_points'),
+    path('classes/<int:class_id>/points/table/', grades.class_session_points_view, name='class_session_points'),
     path('classes/<int:class_id>/evaluation/', grades.class_evaluation_view, name='class_evaluation'),
     path('classes/<int:class_id>/attendance-rate/', grades.update_attendance_rate, name='update_attendance_rate'),
     path('classes/<int:class_id>/settings/update/', grades.update_class_settings, name='update_class_settings'),

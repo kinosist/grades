@@ -80,6 +80,38 @@
         box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
         border-color: #0d6efd;
     }
+    
+    /* ポイントテーブル用スタイル */
+    .points-table-container {
+        overflow-x: auto;
+        max-height: 80vh;
+    }
+    .points-matrix-table th, .points-matrix-table td {
+        vertical-align: middle;
+        text-align: center;
+        white-space: nowrap;
+        padding: 1rem;
+    }
+    .points-matrix-table th.sticky-col, .points-matrix-table td.sticky-col {
+        position: sticky;
+        left: 0;
+        background-color: #fff;
+        z-index: 1;
+        border-right: 2px solid #dee2e6;
+    }
+    .points-matrix-table th.sticky-col {
+        z-index: 2;
+        background-color: #f8f9fa;
+    }
+    .points-matrix-table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 1;
+    }
+    .points-matrix-table thead th.sticky-col {
+        z-index: 3;
+    }
 </style>
 {% endblock %}
 
@@ -89,7 +121,7 @@
 <div class="nav-tabs-wrapper">
     <ul class="nav nav-tabs" id="classTabs" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link {% if not request.GET.active_tab or request.GET.active_tab == 'lessons' %}active{% endif %}" id="lessons-tab" data-bs-toggle="tab" data-bs-target="#lessons" type="button" role="tab" aria-controls="lessons" aria-selected="{% if not request.GET.active_tab or request.GET.active_tab == 'lessons' %}true{% else %}false{% endif %}">
+            <button class="nav-link {% if not active_tab and not request.GET.active_tab or not active_tab and request.GET.active_tab == 'lessons' %}active{% endif %}" id="lessons-tab" data-bs-toggle="tab" data-bs-target="#lessons" type="button" role="tab" aria-controls="lessons" aria-selected="{% if not active_tab and not request.GET.active_tab or not active_tab and request.GET.active_tab == 'lessons' %}true{% else %}false{% endif %}">
                 <i class="fas fa-calendar me-2"></i>授業一覧 ({{ sessions.count }})
             </button>
         </li>
@@ -97,6 +129,17 @@
             <button class="nav-link {% if request.GET.active_tab == 'students' %}active{% endif %}" id="students-tab" data-bs-toggle="tab" data-bs-target="#students" type="button" role="tab" aria-controls="students" aria-selected="{% if request.GET.active_tab == 'students' %}true{% else %}false{% endif %}">
                 <i class="fas fa-users me-2"></i>学生名簿 ({{ students.count }})
             </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            {% if active_tab == 'points_table' %}
+                <button class="nav-link active" id="points-table-tab" data-bs-toggle="tab" data-bs-target="#points-table" type="button" role="tab" aria-controls="points-table" aria-selected="true">
+                    <i class="fas fa-table me-2"></i>授業点一覧
+                </button>
+            {% else %}
+                <a class="nav-link" href="{% url 'school_management:class_session_points' classroom.id %}">
+                    <i class="fas fa-table me-2"></i>授業点一覧
+                </a>
+            {% endif %}
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link {% if request.GET.active_tab == 'grades' %}active{% endif %}" id="grades-tab" data-bs-toggle="tab" data-bs-target="#grades" type="button" role="tab" aria-controls="grades" aria-selected="{% if request.GET.active_tab == 'grades' %}true{% else %}false{% endif %}">
@@ -112,7 +155,7 @@
 </div>
 
 <div class="tab-content" id="classTabsContent">
-    <div class="tab-pane fade {% if not request.GET.active_tab or request.GET.active_tab == 'lessons' %}show active{% endif %}" id="lessons" role="tabpanel" aria-labelledby="lessons-tab">
+    <div class="tab-pane fade {% if not active_tab and not request.GET.active_tab or not active_tab and request.GET.active_tab == 'lessons' %}show active{% endif %}" id="lessons" role="tabpanel" aria-labelledby="lessons-tab">
         <div class="card shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-calendar me-2"></i>授業回一覧</h5>
@@ -220,6 +263,90 @@
             </div>
         </div>
     </div>
+
+    {% if active_tab == 'points_table' %}
+    <div class="tab-pane fade show active" id="points-table" role="tabpanel" aria-labelledby="points-table-tab">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5><i class="fas fa-table me-2"></i>授業点一覧</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="points-table-container">
+                    <table class="table table-bordered table-hover points-matrix-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="sticky-col" style="min-width: 150px;">学生 / 授業回</th>
+                                {% for session in sessions %}
+                                    <th style="min-width: 80px;">
+                                        第{{ session.session_number }}回<br>
+                                        <small class="fw-normal">{{ session.date|date:"m/d" }}</small>
+                                    </th>
+                                {% endfor %}
+                                <th style="min-width: 80px;" class="bg-light">合計</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for data in session_points_data %}
+                            <tr>
+                                <td class="sticky-col text-start">
+                                    <strong>{{ data.student.full_name }}</strong><br>
+                                    <small class="text-muted">{{ data.student.student_number }}</small>
+                                </td>
+                                {% for session_data in data.sessions %}
+                                    <td>
+                                        {% if session_data.points > 0 %}
+                                            <div class="d-flex flex-column align-items-center">
+                                                <span class="fw-bold text-primary fs-5">{{ session_data.points }}</span>
+                                                <div class="point-breakdown text-muted mt-1" style="font-size: 0.85rem;">
+                                                    ({% spaceless %}
+                                                        {% if session_data.manual > 0 %}
+                                                            手動 <span class="fw-bold text-dark">{{ session_data.manual }}</span>
+                                                        {% endif %}
+                                                        {% if session_data.manual > 0 and session_data.quiz > 0 or session_data.manual > 0 and session_data.peer > 0 %} / {% endif %}
+                                                        {% if session_data.quiz > 0 %}
+                                                            QR <span class="fw-bold text-dark">{{ session_data.quiz }}</span>
+                                                        {% endif %}
+                                                        {% if session_data.quiz > 0 and session_data.peer > 0 %} / {% endif %}
+                                                        {% if session_data.peer > 0 %}
+                                                            ピア <span class="fw-bold text-dark">{{ session_data.peer }}</span>
+                                                        {% endif %}
+                                                    {% endspaceless %})
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+                                <td class="bg-light fw-bold">
+                                    <div class="d-flex flex-column align-items-center">
+                                        <span class="fs-5">{{ data.total_points }}</span>
+                                        <div class="point-breakdown text-muted fw-normal mt-1" style="font-size: 0.85rem;">
+                                            ({% spaceless %}
+                                                {% if data.total_manual > 0 %}
+                                                    手動 <span class="fw-bold text-dark">{{ data.total_manual }}</span>
+                                                {% endif %}
+                                                {% if data.total_manual > 0 and data.total_quiz > 0 or data.total_manual > 0 and data.total_peer > 0 %} / {% endif %}
+                                                {% if data.total_quiz > 0 %}
+                                                    QR <span class="fw-bold text-dark">{{ data.total_quiz }}</span>
+                                                {% endif %}
+                                                {% if data.total_quiz > 0 and data.total_peer > 0 %} / {% endif %}
+                                                {% if data.total_peer > 0 %}
+                                                    ピア <span class="fw-bold text-dark">{{ data.total_peer }}</span>
+                                                {% endif %}
+                                            {% endspaceless %})
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <div class="tab-pane fade {% if request.GET.active_tab == 'grades' %}show active{% endif %}" id="grades" role="tabpanel" aria-labelledby="grades-tab">
         <div class="row">

@@ -73,13 +73,13 @@
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <strong>1位グループ:</strong> {{ first_place_group.group_name|default:first_place_group.group_number }}グループ
+                            <strong>1位グループ:</strong> {{ first_place_group.group_name|default:first_place_group.group_number }}
                             {% if first_place_reason %}
                                 <div class="small text-muted mt-1">理由: {{ first_place_reason }}</div>
                             {% endif %}
                         </div>
                         <div class="mb-3">
-                            <strong>2位グループ:</strong> {{ second_place_group.group_name|default:second_place_group.group_number }}グループ
+                            <strong>2位グループ:</strong> {{ second_place_group.group_name|default:second_place_group.group_number }}
                             {% if second_place_reason %}
                                 <div class="small text-muted mt-1">理由: {{ second_place_reason }}</div>
                             {% endif %}

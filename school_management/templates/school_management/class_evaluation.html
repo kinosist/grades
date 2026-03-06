@@ -1,6 +1,5 @@
 {% extends 'school_management/base.html' %}
 {% load static %}
-{% load evaluation_filters %}
 
 {% block title %}{{ classroom.class_name }} - 評価一覧{% endblock %}
 {% block page_title %}評価一覧{% endblock %}
@@ -58,29 +57,103 @@ body { background-color: #f8fafc; }
     }
     
     /* 列ごとの設定 */
-    .evaluation-table .number-col { width: 40px; background-color: #f8f9fa; }
-    .evaluation-table .name-col { text-align: left; min-width: 120px; font-weight: 600; color: #212529; }
-    .evaluation-table .furigana-col { text-align: left; min-width: 120px; color: #6c757d; font-size: 0.9em; }
-    .evaluation-table .input-col { background-color: #f0f7ff; width: 100px; }
+    .evaluation-table .number-col { 
+        width: 50px; 
+        min-width: 50px;
+        background-color: #f8f9fa; 
+        position: sticky;
+        left: 0;
+        z-index: 11;
+        border-right: 1px solid #dee2e6;
+    }
+    .evaluation-table .name-col { 
+        text-align: left; 
+        width: 160px;
+        min-width: 160px; 
+        font-weight: 600; 
+        color: #212529; 
+        background-color: #fff;
+        position: sticky;
+        left: 50px;
+        z-index: 11;
+        border-right: 1px solid #dee2e6;
+    }
+    .evaluation-table .furigana-col { 
+        text-align: left; 
+        width: 160px;
+        min-width: 160px; 
+        color: #6c757d; 
+        font-size: 0.9em; 
+        background-color: #fff;
+        position: sticky;
+        left: 210px;
+        z-index: 11;
+        border-right: 2px solid #dee2e6;
+        box-shadow: 4px 0 5px -2px rgba(0,0,0,0.1);
+    }
+    .evaluation-table .input-col { background-color: #f0f7ff; width: 100px; min-width: 100px; }
     .evaluation-table .total-col {
-        min-width: 80px;
+        width: 100px;
+        min-width: 100px;
         background-color: #e9ecef;
         font-weight: bold;
         color: #0d6efd;
         font-size: 1.1em;
     }
     .evaluation-table .attendance-point-col { min-width: 80px; }
-    .evaluation-table .session-col { min-width: 60px; background-color: #fff; }
-    .evaluation-table .score-col { min-width: 70px; }
+    .evaluation-table .session-col { min-width: 80px; background-color: #fff; }
+    .evaluation-table .breakdown-col { min-width: 140px; background-color: #fff; font-size: 0.85em; }
+    .evaluation-table .score-col { min-width: 120px; }
     
     .header-sub-text {
         display: block;
-        font-size: 0.8em;
+        font-size: 0.75em;
         font-weight: normal;
         color: #6c757d;
+        line-height: 1.2;
         margin-top: 2px;
     }
     
+    /* ヘッダーのz-indexを上げる */
+    .evaluation-table thead th.number-col,
+    .evaluation-table thead th.name-col,
+    .evaluation-table thead th.furigana-col {
+        z-index: 12;
+    }
+
+    /* 2段ヘッダー用の調整 */
+    .evaluation-table.mode-detail thead tr:first-child th {
+        height: 50px; /* 1行目の高さ固定 */
+    }
+    .evaluation-table.mode-detail thead tr:last-child th {
+        top: 50px; /* 1行目の高さ分下げる */
+        z-index: 9;
+        height: 30px;
+        padding: 4px;
+        font-weight: normal;
+        font-size: 0.85em;
+        background-color: #f1f3f5;
+    }
+
+    /* モード切替ボタンのホバー無効化 */
+    .btn-group a.btn-outline-secondary:hover {
+        background-color: #fff;
+        color: #6c757d;
+    }
+
+    /* アクションボタンエリアのレイアウト */
+    .action-layout {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .right-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
     /* テーブルコンテナ（スクロール用） */
     .table-container {
         overflow-x: auto;
@@ -143,6 +216,12 @@ body { background-color: #f8fafc; }
         font-weight: bold;
         color: #0d6efd;
     }
+    
+    .session-detail-text {
+        font-size: 0.7rem;
+        color: #6c757d;
+        white-space: nowrap;
+    }
 
     /* --- 📱 レスポンス対応 --- */
     @media (max-width: 768px) {
@@ -154,37 +233,65 @@ body { background-color: #f8fafc; }
         .stat-item { min-width: auto; padding: 8px 12px; }
         .stat-value { font-size: 16px; }
 
-        .action-buttons { flex-direction: column; gap: 10px; }
-        .action-buttons .btn { width: 100%; }
+        /* アクションボタンのグリッドレイアウト */
+        .action-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .back-btn {
+            grid-column: 1;
+            grid-row: 1;
+            width: 100%;
+        }
+        
+        .right-actions {
+            display: contents; /* ラッパーを無視してグリッド配置 */
+        }
+        
+        .print-btn {
+            grid-column: 2;
+            grid-row: 1;
+            width: 100%;
+        }
+        
+        .mode-switch {
+            grid-column: 1 / span 2;
+            grid-row: 2;
+            width: 100%;
+            display: flex;
+        }
+        
+        .mode-switch .btn {
+            flex: 1;
+            padding: 6px 0;
+        }
 
         .evaluation-table th, .evaluation-table td { padding: 8px 4px; font-size: 12px; }
         .input-group-text { padding: 2px 6px; font-size: 12px; }
         
         .evaluation-table .number-col {
-            position: sticky;
+            width: 40px;
+            min-width: 40px;
             left: 0;
-            z-index: 11;
-            border-right: 1px solid #dee2e6;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
         }
         .evaluation-table .name-col {
-            position: sticky;
             left: 40px;
-            z-index: 11;
-            border-right: 2px solid #dee2e6;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
-            min-width: 100px;
-            max-width: 120px;
+            width: 120px;
+            min-width: 120px;
+            max-width: none;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .evaluation-table th.number-col,
-        .evaluation-table th.name-col {
-            z-index: 12;
-        }
-
         .furigana-col { display: none; }
+        
+        .evaluation-table .total-col {
+            width: 80px;
+            min-width: 80px;
+            font-size: 1em;
+        }
     }
     
     @media print {
@@ -224,7 +331,7 @@ body { background-color: #f8fafc; }
                         <div class="stat-value">{{ total_sessions }}回</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">平均点</div>
+                        <div class="stat-label">中央値</div>
                         <div class="stat-value">
                             {{ classroom.get_average_points }}
                         </div>
@@ -232,51 +339,80 @@ body { background-color: #f8fafc; }
                 </div>
             </div>
 
-            <div class="d-flex justify-content-between align-items-center mb-3 no-print action-buttons">
-                <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
-                </a>
-                <button class="btn btn-success" onclick="window.print()">
-                    <i class="fas fa-print me-1"></i>印刷 / PDF保存
-                </button>
+            <div class="mb-3 no-print action-area">
+                <div class="action-layout">
+                    <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary back-btn">
+                        <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
+                    </a>
+                    
+                    <div class="right-actions">
+                        <div class="btn-group mode-switch" role="group">
+                            <a href="?mode=simple" class="btn btn-sm {% if view_mode == 'simple' %}btn-primary{% else %}btn-outline-secondary bg-white{% endif %}">
+                                <i class="fas fa-list me-1"></i>簡易
+                            </a>
+                            <a href="?mode=detail" class="btn btn-sm {% if view_mode == 'detail' %}btn-primary{% else %}btn-outline-secondary bg-white{% endif %}">
+                                <i class="fas fa-th me-1"></i>詳細
+                            </a>
+                        </div>
+                        <button class="btn btn-success print-btn" onclick="window.print()">
+                            <i class="fas fa-print me-1"></i>印刷 / PDF保存
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="table-container">
-                <table class="evaluation-table">
+                <table class="evaluation-table mode-{{ view_mode }}">
                     <thead>
                         <tr>
-                            <th class="number-col">No.</th>
-                            <th class="name-col">氏名</th>
-                            <th class="furigana-col">フリガナ</th>
-                            <th class="input-col">
+                            <th class="number-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>No.</th>
+                            <th class="name-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>氏名</th>
+                            <th class="furigana-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>フリガナ</th>
+                            <th class="total-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
+                                合計
+                                {% if grading_system == 'goal' %}
+                                    <span class="header-sub-text">(講師評価 + 出席)</span>
+                                {% else %}
+                                    <span class="header-sub-text">((授業点×2) + 出席)</span>
+                                {% endif %}
+                            </th>
+                            <th class="input-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
                                 出席率
                                 <span class="header-sub-text">入力(%)</span>
                             </th>
-                            <th class="attendance-point-col">
+                            <th class="attendance-point-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
                                 <div class="d-flex flex-column align-items-center">
                                     <span>出席点</span>
                                     <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 text-muted" data-bs-toggle="modal" data-bs-target="#settingsModal" title="満点を変更">
-                                        <small style="font-size: 0.85em;">(MAX {{ classroom.attendance_max_points }} <i class="fas fa-edit"></i>)</small>
+                                        <small style="font-size: 0.85em; white-space: nowrap;">(MAX {{ classroom.attendance_max_points }} <i class="fas fa-edit"></i>)</small>
                                     </button>
                                 </div>
                             </th>
-                            <th class="score-col">
+                            <th class="score-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
                                 授業点
                                 {% if grading_system == 'goal' %}
-                                    <span class="header-sub-text">(講師評価点)</span>
+                                    <span class="header-sub-text">(講師評価)</span>
                                 {% else %}
-                                    <span class="header-sub-text">(QRアクション + ピア)</span>
+                                    <span class="header-sub-text">(QR + ピア + 他)</span>
                                 {% endif %}
                             </th>
-                            <th class="total-col">
-                                合計
-                                {% if grading_system == 'goal' %}
-                                    <span class="header-sub-text">(講師評価点 + 出席点)</span>
-                                {% else %}
-                                    <span class="header-sub-text">((授業点 × 2) + 出席点)</span>
-                                {% endif %}
-                            </th>
+                            {% if view_mode == 'detail' %}
+                                {% for session in sessions %}
+                                    <th class="session-col text-center" colspan="2">
+                                        第{{ session.session_number }}回 <small class="fw-normal">{{ session.date|date:"m/d" }}</small>
+                                    </th>
+                                {% endfor %}
+                            {% endif %}
                         </tr>
+                        {% if view_mode == 'detail' %}
+                        <!-- 2段目ヘッダー -->
+                        <tr>
+                            {% for session in sessions %}
+                                <th class="text-center">点数</th>
+                                <th class="text-center">内訳</th>
+                            {% endfor %}
+                        </tr>
+                        {% endif %}
                     </thead>
                     <tbody>
                         {% for evaluation in student_evaluations %}
@@ -284,9 +420,18 @@ body { background-color: #f8fafc; }
                             <td class="number-col">{{ forloop.counter }}</td>
                             <td class="name-col">
                                 {{ evaluation.student.full_name }}
+                                {% if view_mode == 'detail' %}
+                                    <div class="text-muted" style="font-size: 0.75em;">{{ evaluation.student.student_number }}</div>
+                                {% endif %}
                             </td>
                             <td class="furigana-col">{{ evaluation.student.furigana|default:"-" }}</td>
                             
+                            <td class="total-col">
+                                <span class="total-points">
+                                    {{ evaluation.total_points|floatformat:1 }}
+                                </span>
+                            </td>
+
                             <td class="input-col">
                                 <div class="input-group input-group-sm">
                                     <input type="number" 
@@ -307,23 +452,46 @@ body { background-color: #f8fafc; }
                             <td class="score-col">
                                 <div class="d-flex flex-column align-items-center">
                                     <span class="fw-bold">{{ evaluation.score_points|floatformat:1 }}</span>
-                                    {% if grading_system != 'goal' %}
-                                    <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#detailModal-{{ evaluation.student.id }}">
-                                        <small style="font-size: 0.75em;"><i class="fas fa-list-ul"></i> 詳細</small>
-                                    </button>
+                                    {% if grading_system != 'goal' and view_mode == 'detail' %}
+                                    <div class="header-sub-text mt-1" style="font-size: 0.7rem; white-space: nowrap;">
+                                        QR{{ evaluation.total_quiz_score }} / ピア{{ evaluation.total_peer_score }}
+                                    </div>
                                     {% endif %}
                                 </div>
                             </td>
 
-                            <td class="total-col">
-                                <span class="total-points">
-                                    {{ evaluation.total_points|floatformat:1 }}
-                                </span>
-                            </td>
+                            {% if view_mode == 'detail' %}
+                                {% for session_data in evaluation.session_scores %}
+                                    <td class="text-center">
+                                        {% if session_data.total_score > 0 %}
+                                            <span class="fw-bold text-primary fs-6">{{ session_data.total_score }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-start breakdown-col">
+                                        {% if session_data.total_score > 0 %}
+                                            <div style="line-height: 1.3;">
+                                                {% if session_data.quiz_score > 0 %}
+                                                    <div><span class="text-muted">QR:</span> {{ session_data.quiz_score }}</div>
+                                                {% endif %}
+                                                {% if session_data.peer_score > 0 %}
+                                                    <div><span class="text-muted">ピア:</span> {{ session_data.peer_score }} <span class="text-muted" style="font-size: 0.9em;">(貢献{{ session_data.peer_contrib }}/投票{{ session_data.peer_vote }})</span></div>
+                                                {% endif %}
+                                                {% if session_data.manual_points > 0 %}
+                                                    <div><span class="text-muted">他:</span> {{ session_data.manual_points }}</div>
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+                            {% endif %}
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center py-5">
+                            <td colspan="{{ table_colspan }}" class="text-center py-5">
                                 <i class="fas fa-user-slash fa-3x text-muted mb-3 opacity-50"></i>
                                 <h5 class="text-muted">データがありません</h5>
                             </td>
@@ -335,101 +503,6 @@ body { background-color: #f8fafc; }
         </div>
     </div>
 </div>
-
-<!-- 詳細モーダル群 -->
-{% if grading_system != 'goal' %}
-{% for evaluation in student_evaluations %}
-<div class="modal fade" id="detailModal-{{ evaluation.student.id }}" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title">
-                    <i class="fas fa-user-graduate me-2"></i>{{ evaluation.student.full_name }}
-                    <span class="text-muted fs-6 ms-2">授業点詳細</span>
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <div class="p-2 border rounded bg-light text-center">
-                            <small class="text-muted d-block">授業点合計</small>
-                            <strong class="fs-5 text-primary">{{ evaluation.score_points|floatformat:1 }}</strong>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="p-2 border rounded bg-light text-center">
-                            <small class="text-muted d-block">小テスト/QR</small>
-                            <strong class="fs-5">{{ evaluation.total_quiz_score }}</strong>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="p-2 border rounded bg-light text-center">
-                            <small class="text-muted d-block">ピア評価</small>
-                            <strong class="fs-5">{{ evaluation.total_peer_score }}</strong>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover table-bordered text-center align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 15%;">回</th>
-                                <th style="width: 15%;">日付</th>
-                                <th style="width: 20%;">小テスト/QR</th>
-                                <th style="width: 20%;">ピア評価</th>
-                                <th style="width: 15%;">その他</th>
-                                <th style="width: 15%;">計</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for data in evaluation.session_scores %}
-                            <tr>
-                                <td>第{{ data.session.session_number }}回</td>
-                                <td>{{ data.date|date:"m/d" }}</td>
-                                <td>
-                                    {% if data.quiz_score > 0 %}
-                                        <span class="text-success fw-bold">{{ data.quiz_score }}</span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if data.peer_score > 0 %}
-                                        <span class="text-info fw-bold">{{ data.peer_score }}</span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if data.manual_points > 0 %}
-                                        <span>{{ data.manual_points }}</span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td class="bg-light fw-bold">
-                                    {% if data.total_score > 0 %}
-                                        {{ data.total_score }}
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endfor %}
-{% endif %}
 
 <!-- 設定変更モーダル -->
 <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">

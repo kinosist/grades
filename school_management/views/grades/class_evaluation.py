@@ -13,6 +13,9 @@ def class_evaluation_view(request, class_id):
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
     students = classroom.students.all().order_by('student_number')
     
+    # 表示モード (simple / detail) - デフォルトは詳細モード
+    view_mode = request.GET.get('mode', 'detail')
+    
     # 授業回の一覧を取得
     sessions = LessonSession.objects.filter(classroom=classroom).order_by('session_number')
     
@@ -54,13 +57,19 @@ def class_evaluation_view(request, class_id):
                 )
                 if session_quiz_scores.exists():
                     has_quiz = True
-                    quiz_score = sum(qs.score for qs in session_quiz_scores)
+                    # 重複対策: 同一クイズは最新のみ
+                    quiz_score_dict = {}
+                    for qs in session_quiz_scores:
+                        quiz_score_dict[qs.quiz.id] = qs.score
+                    quiz_score = sum(quiz_score_dict.values())
             except Exception as e:
                 logger.error(f"小テストスコア取得エラー: {e}", exc_info=True)
                 pass
             
             # ピア評価スコアを取得（貢献度 + 投票ポイント）
             peer_evaluation_score = 0
+            contrib_score = 0
+            vote_score = 0
             try:
                 if session.has_peer_evaluation:
                     # 1. 貢献度評価 (5段階評価の合計)
@@ -70,7 +79,6 @@ def class_evaluation_view(request, class_id):
                     ).aggregate(total=Sum('contribution_score'))['total'] or 0
                     
                     # 2. 投票ポイント (1位=2点, 2位=1点)
-                    vote_score = 0
                     # この授業回での学生のグループを取得
                     membership = GroupMember.objects.filter(
                         student=student,
@@ -109,6 +117,8 @@ def class_evaluation_view(request, class_id):
                 'manual_points': manual_points,
                 'quiz_score': quiz_score,
                 'peer_score': peer_evaluation_score,
+                'peer_contrib': contrib_score,
+                'peer_vote': vote_score,
                 'total_score': manual_points + quiz_score + peer_evaluation_score,
                 'date': session.date,
                 'has_peer_evaluation': session.has_peer_evaluation,
@@ -213,5 +223,7 @@ def class_evaluation_view(request, class_id):
         'session_peer_averages': session_peer_averages,  # ピア評価平均値
         'total_sessions': len(session_list),
         'grading_system': grading_system, # テンプレート側で表示切り替えに使用
+        'view_mode': view_mode,
+        'table_colspan': (len(session_list) * 2 + 7) if view_mode == 'detail' else 7,
     }
     return render(request, 'school_management/class_evaluation.html', context)

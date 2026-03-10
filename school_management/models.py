@@ -378,31 +378,31 @@ class PeerEvaluation(models.Model):
     lesson_session = models.ForeignKey(LessonSession, on_delete=models.CASCADE, verbose_name='授業回')
     evaluator_token = models.UUIDField(verbose_name='評価者トークン（匿名化）')
     evaluator_group = models.ForeignKey(
-        Group, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        Group,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name='peer_evaluations_as_evaluator',
         verbose_name='評価者グループ'
     )
     evaluator_group_number = models.IntegerField(verbose_name='評価者グループ番号', null=True, blank=True)
     
     first_place_group = models.ForeignKey(
-        Group, 
-        on_delete=models.SET_NULL, 
+        Group,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='first_place_votes', 
+        related_name='first_place_votes',
         verbose_name='1位グループ'
     )
     first_place_group_number = models.IntegerField(verbose_name='1位グループ番号', null=True, blank=True)
     
     second_place_group = models.ForeignKey(
-        Group, 
-        on_delete=models.SET_NULL, 
-        null=True,
+        Group,
+        on_delete=models.CASCADE,
+        null=True, 
         blank=True,
-        related_name='second_place_votes', 
+        related_name='second_place_votes',
         verbose_name='2位グループ'
     )
     second_place_group_number = models.IntegerField(verbose_name='2位グループ番号', null=True, blank=True)
@@ -889,30 +889,54 @@ class SelfEvaluation(models.Model):
 @receiver([post_save, post_delete], sender=QuizScore)
 def update_class_points_from_quiz(sender, instance, **kwargs):
     if instance.quiz.lesson_session.classroom:
-        scp, _ = StudentClassPoints.objects.get_or_create(
-            student=instance.student,
-            classroom=instance.quiz.lesson_session.classroom
-        )
-        scp.recalculate_total()
+        try:
+            scp = StudentClassPoints.objects.get(
+                student=instance.student,
+                classroom=instance.quiz.lesson_session.classroom
+            )
+            scp.recalculate_total()
+        except StudentClassPoints.DoesNotExist:
+            if kwargs.get('signal') == post_save:
+                scp = StudentClassPoints.objects.create(
+                    student=instance.student,
+                    classroom=instance.quiz.lesson_session.classroom
+                )
+                scp.recalculate_total()
 
 @receiver([post_save, post_delete], sender=StudentLessonPoints)
 def update_class_points_from_lesson(sender, instance, **kwargs):
     if instance.lesson_session.classroom:
-        scp, _ = StudentClassPoints.objects.get_or_create(
-            student=instance.student,
-            classroom=instance.lesson_session.classroom
-        )
-        scp.recalculate_total()
+        try:
+            scp = StudentClassPoints.objects.get(
+                student=instance.student,
+                classroom=instance.lesson_session.classroom
+            )
+            scp.recalculate_total()
+        except StudentClassPoints.DoesNotExist:
+            if kwargs.get('signal') == post_save:
+                scp = StudentClassPoints.objects.create(
+                    student=instance.student,
+                    classroom=instance.lesson_session.classroom
+                )
+                scp.recalculate_total()
 
 @receiver([post_save, post_delete], sender=SelfEvaluation)
 def update_class_points_from_self_eval(sender, instance, **kwargs):
     """自己評価・教師評価更新時に成績を再計算"""
     if instance.classroom:
-        scp, _ = StudentClassPoints.objects.get_or_create(
-            student=instance.student,
-            classroom=instance.classroom
-        )
-        scp.recalculate_total()
+        try:
+            scp = StudentClassPoints.objects.get(
+                student=instance.student,
+                classroom=instance.classroom
+            )
+            scp.recalculate_total()
+        except StudentClassPoints.DoesNotExist:
+            if kwargs.get('signal') == post_save:
+                scp = StudentClassPoints.objects.create(
+                    student=instance.student,
+                    classroom=instance.classroom
+                )
+                scp.recalculate_total()
 
 @receiver(post_save, sender=LessonSession)
 def create_qr_quiz_for_session(sender, instance, created, **kwargs):
@@ -974,18 +998,19 @@ def update_quiz_score_from_qr(sender, instance, **kwargs):
         score_obj = scores.first()
         if scores.count() > 1:
             scores.exclude(id=score_obj.id).delete()
-    else:
-        score_obj = QuizScore.objects.create(
+        
+        # 点数を更新（変更がある場合のみ保存して再計算シグナルを発火）
+        if score_obj.score != total_points:
+            score_obj.score = total_points
+            score_obj.save()
+    elif kwargs.get('signal') == post_save:
+        # 削除時以外のみ新規作成（カスケード削除時の復活防止）
+        QuizScore.objects.create(
             quiz=quiz,
             student=student,
-            score=0,
+            score=total_points,
             graded_by=instance.scanned_by
         )
-        
-    # 点数を更新（変更がある場合のみ保存して再計算シグナルを発火）
-    if score_obj.score != total_points:
-        score_obj.score = total_points
-        score_obj.save()
 
 @receiver(pre_save, sender=QRCodeScan)
 def set_qr_points_from_class_settings(sender, instance, **kwargs):
@@ -1007,11 +1032,19 @@ def set_peer_evaluation_group_numbers(sender, instance, **kwargs):
 def update_class_points_from_contribution(sender, instance, **kwargs):
     """貢献度評価更新時に成績を再計算"""
     if instance.peer_evaluation.lesson_session.classroom:
-        scp, _ = StudentClassPoints.objects.get_or_create(
-            student=instance.evaluatee,
-            classroom=instance.peer_evaluation.lesson_session.classroom
-        )
-        scp.recalculate_total()
+        try:
+            scp = StudentClassPoints.objects.get(
+                student=instance.evaluatee,
+                classroom=instance.peer_evaluation.lesson_session.classroom
+            )
+            scp.recalculate_total()
+        except StudentClassPoints.DoesNotExist:
+            if kwargs.get('signal') == post_save:
+                scp = StudentClassPoints.objects.create(
+                    student=instance.evaluatee,
+                    classroom=instance.peer_evaluation.lesson_session.classroom
+                )
+                scp.recalculate_total()
 
 @receiver([post_save, post_delete], sender=PeerEvaluation)
 def update_class_points_from_peer_vote(sender, instance, **kwargs):
@@ -1037,11 +1070,19 @@ def update_class_points_from_peer_vote(sender, instance, **kwargs):
             for group in groups:
                 members = GroupMember.objects.filter(group=group)
                 for member in members:
-                    scp, _ = StudentClassPoints.objects.get_or_create(
-                        student=member.student,
-                        classroom=instance.lesson_session.classroom
-                    )
-                    scp.recalculate_total()
+                    try:
+                        scp = StudentClassPoints.objects.get(
+                            student=member.student,
+                            classroom=instance.lesson_session.classroom
+                        )
+                        scp.recalculate_total()
+                    except StudentClassPoints.DoesNotExist:
+                        if kwargs.get('signal') == post_save:
+                            scp = StudentClassPoints.objects.create(
+                                student=member.student,
+                                classroom=instance.lesson_session.classroom
+                            )
+                            scp.recalculate_total()
     except Exception:
         pass
 
@@ -1050,10 +1091,18 @@ def update_class_points_from_group_member(sender, instance, **kwargs):
     """グループメンバー変更時に成績を再計算"""
     try:
         if instance.group.lesson_session.classroom:
-            scp, _ = StudentClassPoints.objects.get_or_create(
-                student=instance.student,
-                classroom=instance.group.lesson_session.classroom
-            )
-            scp.recalculate_total()
+            try:
+                scp = StudentClassPoints.objects.get(
+                    student=instance.student,
+                    classroom=instance.group.lesson_session.classroom
+                )
+                scp.recalculate_total()
+            except StudentClassPoints.DoesNotExist:
+                if kwargs.get('signal') == post_save:
+                    scp = StudentClassPoints.objects.create(
+                        student=instance.student,
+                        classroom=instance.group.lesson_session.classroom
+                    )
+                    scp.recalculate_total()
     except Exception:
         pass

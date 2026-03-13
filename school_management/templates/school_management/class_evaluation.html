@@ -250,7 +250,7 @@ body { background-color: #f8fafc; }
             display: contents; /* ラッパーを無視してグリッド配置 */
         }
         
-        .print-btn {
+        .csv-btn {
             grid-column: 2;
             grid-row: 1;
             width: 100%;
@@ -354,8 +354,8 @@ body { background-color: #f8fafc; }
                                 <i class="fas fa-th me-1"></i>詳細
                             </a>
                         </div>
-                        <button class="btn btn-success print-btn" onclick="window.print()">
-                            <i class="fas fa-print me-1"></i>印刷 / PDF保存
+                        <button type="button" class="btn btn-success csv-btn" onclick="showCSVPreview()">
+                            <i class="fas fa-file-csv me-1"></i>CSVダウンロード
                         </button>
                     </div>
                 </div>
@@ -530,6 +530,31 @@ body { background-color: #f8fafc; }
     </div>
 </div>
 
+<!-- CSVプレビューモーダル -->
+<div class="modal fade" id="csvPreviewModal" tabindex="-1" aria-labelledby="csvPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title" id="csvPreviewModalLabel"><i class="fas fa-file-csv me-2 text-success"></i>CSV出力プレビュー</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2 small">
+                    <i class="fas fa-info-circle me-1"></i>
+                    以下の内容でCSVファイルがダウンロードされます。必要に応じて内容を手動で編集できます。
+                </div>
+                <textarea id="csvPreviewText" class="form-control" rows="15" style="font-family: 'Courier New', Consolas, monospace; white-space: pre; overflow-wrap: normal; overflow-x: scroll;"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-success" onclick="downloadCSV()">
+                    <i class="fas fa-download me-1"></i>ダウンロード
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // 印刷時のスタイル調整
 window.addEventListener('beforeprint', function() {
@@ -620,6 +645,93 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// CSVプレビュー表示
+function showCSVPreview() {
+    const table = document.querySelector('.evaluation-table');
+    const rows = Array.from(table.querySelectorAll('tr'));
+    const csvMatrix = [];
+    
+    for (let i = 0; i < rows.length; i++) {
+        csvMatrix.push([]);
+    }
+    
+    rows.forEach((row, rowIndex) => {
+        if (row.style.display === 'none') return;
+        
+        const cells = Array.from(row.querySelectorAll('th, td'));
+        cells.forEach(cell => {
+            if (cell.style.display === 'none') return;
+
+            let text = "";
+            const input = cell.querySelector('input[type="number"], input[type="text"]');
+            if (input) {
+                text = input.value;
+            } else {
+                // 余分な改行をスペース2つに置換
+                text = cell.innerText.trim().replace(/\r?\n|\r/g, '  ');
+            }
+            
+            let escapedText = text;
+            if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+                escapedText = '"' + text.replace(/"/g, '""') + '"';
+            }
+            
+            const colspan = parseInt(cell.getAttribute('colspan') || 1, 10);
+            const rowspan = parseInt(cell.getAttribute('rowspan') || 1, 10);
+            
+            let colIndex = 0;
+            while (csvMatrix[rowIndex][colIndex] !== undefined) {
+                colIndex++;
+            }
+            
+            for (let r = 0; r < rowspan; r++) {
+                for (let c = 0; c < colspan; c++) {
+                    if (r === 0 && c === 0) {
+                        csvMatrix[rowIndex + r][colIndex + c] = escapedText;
+                    } else {
+                        csvMatrix[rowIndex + r][colIndex + c] = "";
+                    }
+                }
+            }
+        });
+    });
+    
+    const csvContent = csvMatrix.map(row => {
+        return Array.from(row).map(item => item !== undefined ? item : "").join(',');
+    }).join('\r\n');
+    
+    document.getElementById('csvPreviewText').value = csvContent;
+    const previewModal = new bootstrap.Modal(document.getElementById('csvPreviewModal'));
+    previewModal.show();
+}
+
+// CSVダウンロード処理
+function downloadCSV() {
+    const csvContent = document.getElementById('csvPreviewText').value;
+    // BOMを付与してExcelでの文字化けを防ぐ
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+    const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    
+    const className = "{{ classroom.class_name|escapejs }}";
+    const mode = "{{ view_mode }}" === "detail" ? "詳細" : "簡易";
+    const date = new Date().toISOString().slice(0, 10);
+    link.setAttribute("download", `評価一覧_${className}_${mode}_${date}.csv`);
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    const modalElement = document.getElementById('csvPreviewModal');
+    const modalInstance = bootstrap.Modal.getInstance(modalElement);
+    if (modalInstance) {
+        modalInstance.hide();
+    }
 }
 </script>
 {% endblock %}

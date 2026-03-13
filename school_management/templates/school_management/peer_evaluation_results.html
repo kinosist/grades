@@ -7,7 +7,7 @@
 {% block breadcrumbs %}
 <li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
 <li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' lesson_session.classroom.id %}">{{ lesson_session.classroom.class_name }}</a></li>
-<li class="breadcrumb-item"><a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}">第{{ lesson_session.session_number }}回</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}?active_tab=peer">第{{ lesson_session.session_number }}回</a></li>
 <li class="breadcrumb-item active" aria-current="page">ピア評価結果</li>
 {% endblock %}
 
@@ -34,7 +34,7 @@
                                     <i class="fas fa-trash-alt me-1"></i>全削除
                                 </button>
                             </form>
-                            <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}" class="btn btn-secondary">
+                            <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}?active_tab=peer" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left me-1"></i>戻る
                             </a>
                         </div>

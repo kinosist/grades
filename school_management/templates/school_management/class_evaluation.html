@@ -1,210 +1,310 @@
 {% extends 'school_management/base.html' %}
 {% load static %}
-{% load evaluation_filters %}
 
 {% block title %}{{ classroom.class_name }} - 評価一覧{% endblock %}
+{% block page_title %}評価一覧{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">評価一覧</li>
+{% endblock %}
 
 {% block extra_css %}
 <style>
+    
+body { background-color: #f8fafc; }
+
+    /* --- ベースのスタイル --- */
     .evaluation-table {
         font-size: 14px;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         width: 100%;
-        margin-top: 20px;
+        margin-top: 0;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
     }
     
     .evaluation-table th,
     .evaluation-table td {
-        border: 1px solid #ddd;
-        padding: 8px;
+        border-bottom: 1px solid #dee2e6;
+        border-right: 1px solid #dee2e6;
+        padding: 12px 8px;
         text-align: center;
         vertical-align: middle;
+        background-color: #fff;
+    }
+    
+    .evaluation-table th:last-child,
+    .evaluation-table td:last-child {
+        border-right: none;
+    }
+
+    .evaluation-table tr:last-child td {
+        border-bottom: none;
     }
     
     .evaluation-table th {
         background-color: #f8f9fa;
-        font-weight: bold;
+        color: #495057;
+        font-weight: 600;
         position: sticky;
         top: 0;
         z-index: 10;
+        border-bottom: 2px solid #dee2e6;
     }
     
-    .evaluation-table .student-info {
-        text-align: left;
-        min-width: 120px;
+    /* 列ごとの設定 */
+    .evaluation-table .number-col { 
+        width: 50px; 
+        min-width: 50px;
+        background-color: #f8f9fa; 
+        position: sticky;
+        left: 0;
+        z-index: 11;
+        border-right: 1px solid #dee2e6;
     }
-    
-    .evaluation-table .number-col {
-        width: 50px;
+    .evaluation-table .name-col { 
+        text-align: left; 
+        width: 160px;
+        min-width: 160px; 
+        font-weight: 600; 
+        color: #212529; 
+        background-color: #fff;
+        position: sticky;
+        left: 50px;
+        z-index: 11;
+        border-right: 1px solid #dee2e6;
     }
-    
-    .evaluation-table .name-col {
-        width: 100px;
+    .evaluation-table .furigana-col { 
+        text-align: left; 
+        width: 160px;
+        min-width: 160px; 
+        color: #6c757d; 
+        font-size: 0.9em; 
+        background-color: #fff;
+        position: sticky;
+        left: 210px;
+        z-index: 11;
+        border-right: 2px solid #dee2e6;
+        box-shadow: 4px 0 5px -2px rgba(0,0,0,0.1);
     }
-    
-    .evaluation-table .furigana-col {
-        width: 100px;
-    }
-    
+    .evaluation-table .input-col { background-color: #f0f7ff; width: 100px; min-width: 100px; }
     .evaluation-table .total-col {
-        width: 80px;
-        background-color: #e3f2fd;
+        width: 100px;
+        min-width: 100px;
+        background-color: #e9ecef;
         font-weight: bold;
+        color: #0d6efd;
+        font-size: 1.1em;
     }
+    .evaluation-table .attendance-point-col { min-width: 80px; }
+    .evaluation-table .session-col { min-width: 80px; background-color: #fff; }
+    .evaluation-table .breakdown-col { min-width: 140px; background-color: #fff; font-size: 0.85em; }
+    .evaluation-table .score-col { min-width: 120px; }
     
-    .evaluation-table .attendance-col {
-        width: 80px;
-        background-color: #f3e5f5;
-    }
-    
-    .evaluation-table .multiplier-col {
-        width: 60px;
-        background-color: #e8f5e8;
-    }
-    
-    .evaluation-table .session-col {
-        width: 60px;
-        background-color: #fff3e0;
-    }
-    
-    .evaluation-table .score-col {
-        width: 80px;
-        background-color: #e1f5fe;
-        font-weight: bold;
-    }
-    
-    .evaluation-table .multiplier-value {
-        background-color: #e8f5e8;
-        font-weight: bold;
-    }
-    
-    .evaluation-table .attendance-rate {
-        font-size: 12px;
-        color: #666;
-    }
-    
-    .evaluation-table .attendance-multiplier {
-        font-size: 12px;
-        color: #666;
-    }
-    
-    .evaluation-table .session-points {
-        font-weight: bold;
-        color: #1976d2;
-    }
-    
-    .evaluation-table .qr-points-main {
-        font-weight: bold;
-        color: #1976d2;
-        font-size: 16px;
-        text-align: center;
-    }
-    
-    .evaluation-table .peer-score-main {
-        font-weight: bold;
-        color: #ff9800;
-        font-size: 12px;
-        text-align: center;
+    .header-sub-text {
+        display: block;
+        font-size: 0.75em;
+        font-weight: normal;
+        color: #6c757d;
+        line-height: 1.2;
         margin-top: 2px;
     }
     
-    .evaluation-table .qr-points-small {
-        font-size: 10px;
-        color: #1976d2;
-        text-align: center;
-        margin-top: 2px;
+    /* ヘッダーのz-indexを上げる */
+    .evaluation-table thead th.number-col,
+    .evaluation-table thead th.name-col,
+    .evaluation-table thead th.furigana-col {
+        z-index: 12;
+    }
+
+    /* 2段ヘッダー用の調整 */
+    .evaluation-table.mode-detail thead tr:first-child th {
+        height: 50px; /* 1行目の高さ固定 */
+    }
+    .evaluation-table.mode-detail thead tr:last-child th {
+        top: 50px; /* 1行目の高さ分下げる */
+        z-index: 9;
+        height: 30px;
+        padding: 4px;
+        font-weight: normal;
+        font-size: 0.85em;
+        background-color: #f1f3f5;
+    }
+
+    /* モード切替ボタンのホバー無効化 */
+    .btn-group a.btn-outline-secondary:hover {
+        background-color: #fff;
+        color: #6c757d;
+    }
+
+    /* アクションボタンエリアのレイアウト */
+    .action-layout {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
     
-    .evaluation-table .quiz-score {
-        color: #4caf50;
-        font-weight: bold;
-        font-size: 11px;
-        text-align: center;
-        margin-bottom: 2px;
+    .right-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
     }
-    
-    .evaluation-table .peer-score {
-        font-size: 11px;
-        color: #ff9800;
-        font-weight: bold;
-    }
-    
-    .evaluation-table .total-score {
-        font-size: 12px;
-        color: #4caf50;
-        font-weight: bold;
-        border-top: 1px solid #ddd;
-        margin-top: 2px;
-        padding-top: 2px;
-    }
-    
-    .evaluation-table .spacer-div {
-        height: 11px;
-    }
-    
-    .evaluation-table .empty-session {
-        color: #ccc;
-    }
-    
-    .evaluation-table .peer-avg {
-        color: #ff9800;
-        font-weight: bold;
-        font-size: 10px;
-    }
-    
+
+    /* テーブルコンテナ（スクロール用） */
     .table-container {
         overflow-x: auto;
         max-height: 80vh;
-        border: 1px solid #ddd;
         border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        position: relative;
     }
-    
+
     .header-info {
-        background-color: #f8f9fa;
-        padding: 15px;
+        background-color: white;
+        padding: 20px;
         border-radius: 8px;
         margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     
     .class-title {
         font-size: 24px;
         font-weight: bold;
-        color: #1976d2;
-        margin-bottom: 10px;
+        color: #212529;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
     }
     
     .class-stats {
         display: flex;
-        gap: 20px;
+        gap: 15px;
         flex-wrap: wrap;
     }
     
     .stat-item {
-        background-color: white;
-        padding: 10px 15px;
-        border-radius: 6px;
-        border: 1px solid #e0e0e0;
-        min-width: 120px;
+        background-color: #f8f9fa;
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        min-width: 140px;
+        flex: 1;
     }
     
     .stat-label {
         font-size: 12px;
-        color: #666;
-        margin-bottom: 5px;
+        color: #6c757d;
+        margin-bottom: 2px;
+        font-weight: 600;
+        text-transform: uppercase;
     }
     
     .stat-value {
-        font-size: 18px;
+        font-size: 20px;
         font-weight: bold;
-        color: #1976d2;
+        color: #212529;
     }
     
-    .export-buttons {
-        margin-bottom: 20px;
+    .attendance-input {
+        text-align: center;
+        font-weight: bold;
+        color: #0d6efd;
     }
     
-    .btn-export {
-        margin-right: 10px;
+    .session-detail-text {
+        font-size: 0.7rem;
+        color: #6c757d;
+        white-space: nowrap;
+    }
+
+    /* --- 📱 レスポンス対応 --- */
+    @media (max-width: 768px) {
+        .header-info { padding: 15px; margin-bottom: 15px; }
+        .class-title { font-size: 18px; margin-bottom: 10px; }
+        .class-title .text-muted { font-size: 14px !important; margin-left: 0 !important; width: 100%; display: block; margin-top: 4px; }
+        
+        .class-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-item { min-width: auto; padding: 8px 12px; }
+        .stat-value { font-size: 16px; }
+
+        /* アクションボタンのグリッドレイアウト */
+        .action-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .back-btn {
+            grid-column: 1;
+            grid-row: 1;
+            width: 100%;
+        }
+        
+        .right-actions {
+            display: contents; /* ラッパーを無視してグリッド配置 */
+        }
+        
+        .csv-btn {
+            grid-column: 2;
+            grid-row: 1;
+            width: 100%;
+        }
+        
+        .mode-switch {
+            grid-column: 1 / span 2;
+            grid-row: 2;
+            width: 100%;
+            display: flex;
+        }
+        
+        .mode-switch .btn {
+            flex: 1;
+            padding: 6px 0;
+        }
+
+        .evaluation-table th, .evaluation-table td { padding: 8px 4px; font-size: 12px; }
+        .input-group-text { padding: 2px 6px; font-size: 12px; }
+        
+        .evaluation-table .number-col {
+            width: 40px;
+            min-width: 40px;
+            left: 0;
+        }
+        .evaluation-table .name-col {
+            left: 40px;
+            width: 120px;
+            min-width: 120px;
+            max-width: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .furigana-col { display: none; }
+        
+        .evaluation-table .total-col {
+            width: 80px;
+            min-width: 80px;
+            font-size: 1em;
+        }
+    }
+    
+    @media print {
+        .no-print { display: none !important; }
+        .table-container {
+            overflow: visible;
+            max-height: none;
+            box-shadow: none;
+        }
+        .evaluation-table { border: 1px solid #000; font-size: 10pt; }
+        .evaluation-table th, .evaluation-table td { border: 1px solid #000; padding: 4px; }
+        .input-col, .total-col { background-color: white !important; color: black !important; }
+        .furigana-col { display: table-cell !important; }
     }
 </style>
 {% endblock %}
@@ -213,10 +313,13 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <!-- ヘッダー情報 -->
             <div class="header-info">
                 <div class="class-title">
-                    <i class="fas fa-chalkboard me-2"></i>{{ classroom.class_name }} - 評価一覧
+                    <div><i class="fas fa-chalkboard me-2 text-primary"></i>{{ classroom.class_name }}</div>
+                    <span class="text-muted fs-5 ms-2 fw-normal">- 評価一覧</span>
+                    {% if grading_system == 'goal' %}
+                        <span class="badge bg-info ms-2" style="font-size: 0.6em; vertical-align: middle;">目標管理モード</span>
+                    {% endif %}
                 </div>
                 <div class="class-stats">
                     <div class="stat-item">
@@ -228,89 +331,225 @@
                         <div class="stat-value">{{ total_sessions }}回</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">平均ポイント</div>
+                        <div class="stat-label">中央値</div>
                         <div class="stat-value">
-                            {% if student_evaluations %}
-                                {{ student_evaluations|length|floatformat:1 }}
-                            {% else %}
-                                0
-                            {% endif %}
+                            {{ classroom.get_average_points }}
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- エクスポートボタン -->
-            <div class="export-buttons">
-                <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-secondary btn-export">
-                    <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
-                </a>
-                <button class="btn btn-success btn-export" onclick="window.print()">
-                    <i class="fas fa-print me-1"></i>印刷
-                </button>
+            <div class="mb-3 no-print action-area">
+                <div class="action-layout">
+                    <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary back-btn">
+                        <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
+                    </a>
+                    
+                    <div class="right-actions">
+                        <div class="btn-group mode-switch" role="group">
+                            <a href="?mode=simple" class="btn btn-sm {% if view_mode == 'simple' %}btn-primary{% else %}btn-outline-secondary bg-white{% endif %}">
+                                <i class="fas fa-list me-1"></i>簡易
+                            </a>
+                            <a href="?mode=detail" class="btn btn-sm {% if view_mode == 'detail' %}btn-primary{% else %}btn-outline-secondary bg-white{% endif %}">
+                                <i class="fas fa-th me-1"></i>詳細
+                            </a>
+                        </div>
+                        <button type="button" class="btn btn-success csv-btn" onclick="showCSVPreview()">
+                            <i class="fas fa-file-csv me-1"></i>CSVダウンロード
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <!-- 評価テーブル -->
             <div class="table-container">
-                <table class="evaluation-table">
+                <table class="evaluation-table mode-{{ view_mode }}">
                     <thead>
                         <tr>
-                            <th class="number-col">No</th>
-                            <th class="name-col">氏名</th>
-                            <th class="furigana-col">シメイ</th>
-                            <th class="total-col">合計点</th>
-                            <th class="attendance-col">
-                                出席点<br>
-                                <small class="attendance-multiplier">20%</small>
+                            <th class="number-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>No.</th>
+                            <th class="name-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>氏名</th>
+                            <th class="furigana-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>フリガナ</th>
+                            <th class="total-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
+                                合計
+                                {% if grading_system == 'goal' %}
+                                    <span class="header-sub-text">(講師評価 + 出席)</span>
+                                {% else %}
+                                    <span class="header-sub-text">((授業点×2) + 出席)</span>
+                                {% endif %}
                             </th>
-                            <th class="attendance-col">
-                                出席率<br>
-                                <small class="attendance-multiplier">0.00%</small>
+                            <th class="input-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
+                                出席率
+                                <span class="header-sub-text">入力(%)</span>
                             </th>
-                            <th class="score-col">点数</th>
-                            <th class="multiplier-col">
-                                倍率<br>
-                                <small class="attendance-multiplier">2</small>
+                            <th class="attendance-point-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
+                                <div class="d-flex flex-column align-items-center">
+                                    <span>出席点</span>
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 text-muted" data-bs-toggle="modal" data-bs-target="#settingsModal" title="満点を変更">
+                                        <small style="font-size: 0.85em; white-space: nowrap;">(MAX {{ classroom.attendance_max_points }} <i class="fas fa-edit"></i>)</small>
+                                    </button>
+                                </div>
                             </th>
+                            <th class="score-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
+                                授業点
+                                {% if grading_system == 'goal' %}
+                                    <span class="header-sub-text">(講師評価)</span>
+                                {% else %}
+                                    <span class="header-sub-text">(QR + ピア + 他)</span>
+                                {% endif %}
+                            </th>
+                            {% if view_mode == 'detail' %}
+                                {% for session in sessions %}
+                                    <th class="session-col text-center" colspan="2">
+                                        第{{ session.session_number }}回 <small class="fw-normal">{{ session.date|date:"m/d" }}</small>
+                                    </th>
+                                {% endfor %}
+                            {% endif %}
                         </tr>
+                        {% if view_mode == 'detail' %}
+                        <!-- 2段目ヘッダー -->
+                        <tr>
+                            {% for session in sessions %}
+                                <th class="text-center">点数</th>
+                                <th class="text-center">内訳</th>
+                            {% endfor %}
+                        </tr>
+                        {% endif %}
                     </thead>
                     <tbody>
                         {% for evaluation in student_evaluations %}
                         <tr>
                             <td class="number-col">{{ forloop.counter }}</td>
-                            <td class="student-info name-col">{{ evaluation.student.full_name }}</td>
-                            <td class="student-info furigana-col">{{ evaluation.student.furigana|default:"" }}</td>
-                            <td class="total-col">{{ evaluation.total_points }}</td>
-                            <td class="attendance-col attendance-points">
-                                {{ evaluation.attendance_points }}<br>
-                                <small class="attendance-rate">{{ evaluation.attendance_rate|floatformat:2 }}%</small>
+                            <td class="name-col">
+                                {{ evaluation.student.full_name }}
+                                {% if view_mode == 'detail' %}
+                                    <div class="text-muted" style="font-size: 0.75em;">{{ evaluation.student.student_number }}</div>
+                                {% endif %}
                             </td>
-                            <td class="attendance-col">
-                                <input type="number" 
-                                       name="attendance_rate_{{ evaluation.student.id }}" 
-                                       value="{{ evaluation.attendance_rate }}" 
-                                       min="0" 
-                                       max="100" 
-                                       step="0.1"
-                                       data-student-id="{{ evaluation.student.id }}"
-                                       data-class-id="{{ classroom.id }}"
-                                       onchange="saveAttendanceRate(this)"
-                                       style="width: 70px; padding: 2px; text-align: center; border: 1px solid #ccc; border-radius: 3px;">
-                                %
+                            <td class="furigana-col">{{ evaluation.student.furigana|default:"-" }}</td>
+                            
+                            <td class="total-col">
+                                <span class="total-points">
+                                    {{ evaluation.total_points|floatformat:1 }}
+                                </span>
                             </td>
-                            <td class="score-col">{{ evaluation.class_points }}</td>
-                            <td class="multiplier-col multiplier-value">{{ evaluation.multiplier }}</td>
+
+                            <td class="input-col">
+                                <div class="input-group input-group-sm">
+                                    <input type="number" 
+                                           class="form-control attendance-input"
+                                           name="attendance_rate_{{ evaluation.student.id }}" 
+                                           value="{{ evaluation.attendance_rate }}" 
+                                           min="0" max="100" step="1"
+                                           data-student-id="{{ evaluation.student.id }}"
+                                           data-class-id="{{ classroom.id }}"
+                                           onchange="saveAttendanceRate(this)">
+                                </div>
+                            </td>
+
+                            <td class="attendance-point-col">
+                                <span class="attendance-points">{{ evaluation.attendance_points|floatformat:1 }}</span>
+                            </td>
+
+                            <td class="score-col">
+                                <div class="d-flex flex-column align-items-center">
+                                    <span class="fw-bold">{{ evaluation.score_points|floatformat:1 }}</span>
+                                    {% if grading_system != 'goal' and view_mode == 'detail' %}
+                                    <div class="header-sub-text mt-1" style="font-size: 0.7rem; white-space: nowrap;">
+                                        QR{{ evaluation.total_quiz_score }} / ピア{{ evaluation.total_peer_score }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+
+                            {% if view_mode == 'detail' %}
+                                {% for session_data in evaluation.session_scores %}
+                                    <td class="text-center">
+                                        {% if session_data.total_score > 0 %}
+                                            <span class="fw-bold text-primary fs-6">{{ session_data.total_score }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-start breakdown-col">
+                                        {% if session_data.total_score > 0 %}
+                                            <div style="line-height: 1.3;">
+                                                {% if session_data.quiz_score > 0 %}
+                                                    <div><span class="text-muted">QR:</span> {{ session_data.quiz_score }}</div>
+                                                {% endif %}
+                                                {% if session_data.peer_score > 0 %}
+                                                    <div><span class="text-muted">ピア:</span> {{ session_data.peer_score }} <span class="text-muted" style="font-size: 0.9em;">(貢献{{ session_data.peer_contrib }}/投票{{ session_data.peer_vote }})</span></div>
+                                                {% endif %}
+                                                {% if session_data.manual_points > 0 %}
+                                                    <div><span class="text-muted">他:</span> {{ session_data.manual_points }}</div>
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+                            {% endif %}
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center py-4">
-                                <i class="fas fa-user-slash fa-2x text-muted mb-2"></i>
-                                <p class="text-muted">このクラスに学生がいません</p>
+                            <td colspan="{{ table_colspan }}" class="text-center py-5">
+                                <i class="fas fa-user-slash fa-3x text-muted mb-3 opacity-50"></i>
+                                <h5 class="text-muted">データがありません</h5>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 設定変更モーダル -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-cog me-2"></i>評価設定</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{% url 'school_management:update_class_settings' classroom.id %}" method="post">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="attendance_max_points" class="form-label fw-bold">出席点満点</label>
+                        <input type="number" class="form-control" id="attendance_max_points" name="attendance_max_points" value="{{ classroom.attendance_max_points }}" min="0" max="1000">
+                        <div class="form-text">出席率100%のときに付与される最大ポイント数です。</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">保存する</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- CSVプレビューモーダル -->
+<div class="modal fade" id="csvPreviewModal" tabindex="-1" aria-labelledby="csvPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title" id="csvPreviewModalLabel"><i class="fas fa-file-csv me-2 text-success"></i>CSV出力プレビュー</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2 small">
+                    <i class="fas fa-info-circle me-1"></i>
+                    以下の内容でCSVファイルがダウンロードされます。必要に応じて内容を手動で編集できます。
+                </div>
+                <textarea id="csvPreviewText" class="form-control" rows="15" style="font-family: 'Courier New', Consolas, monospace; white-space: pre; overflow-wrap: normal; overflow-x: scroll;"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-success" onclick="downloadCSV()">
+                    <i class="fas fa-download me-1"></i>ダウンロード
+                </button>
             </div>
         </div>
     </div>
@@ -328,9 +567,10 @@ window.addEventListener('afterprint', function() {
     document.querySelector('.table-container').style.overflow = 'auto';
 });
 
-// 出席率の自動保存
+// 出席率の自動保存 & リアルタイム計算
 function saveAttendanceRate(input) {
-    const attendanceRate = parseFloat(input.value);
+    const gradingSystem = "{{ grading_system }}";
+    let attendanceRate = parseFloat(input.value);
     const studentId = input.dataset.studentId;
     const classId = input.dataset.classId;
     
@@ -338,36 +578,37 @@ function saveAttendanceRate(input) {
     if (isNaN(attendanceRate) || attendanceRate < 0 || attendanceRate > 100) {
         alert('出席率は0〜100の範囲で入力してください。');
         input.value = 0;
-        return;
+        attendanceRate = 0;
     }
     
-    // 出席点を計算（最大20点）
-    const ATTENDANCE_MAX_POINTS = 20;
+    // 計算ロジック
+    const ATTENDANCE_MAX_POINTS = {{ classroom.attendance_max_points }};
     const newAttendancePoints = (attendanceRate / 100) * ATTENDANCE_MAX_POINTS;
-    
-    // 行全体のデータを取得
     const row = input.closest('tr');
-    
-    // 現在の合計点と点数（クラスポイント）を取得
-    const totalPointsCell = row.querySelector('.total-col');
     const scoreCell = row.querySelector('.score-col');
-    const currentTotalPoints = parseFloat(totalPointsCell.textContent) || 0;
-    const classPoints = parseFloat(scoreCell.textContent) || 0;
+    // 余分な空白や文字を除去して数値のみ抽出 (例: "10pt" -> 10)
+    const classPoints = parseFloat(scoreCell.textContent.trim().replace(/[^0-9.-]/g, '')) || 0;
     
-    // 新しい合計点を計算（出席点 + 点数×2）
-    const newTotalPoints = newAttendancePoints + (classPoints * 2);
-    
-    // 出席点のセルを更新
-    const attendancePointsCell = row.querySelector('.attendance-points');
-    if (attendancePointsCell) {
-        attendancePointsCell.innerHTML = newAttendancePoints.toFixed(1) + '<br><small class="attendance-rate">' + attendanceRate.toFixed(2) + '%</small>';
+    // 合計 = (授業点 * 2) + 出席点
+    // 目標管理モードの場合は (授業点 + 出席点)
+    let newTotalPoints = 0;
+    if (gradingSystem !== 'goal') {
+        newTotalPoints = (classPoints * 2) + newAttendancePoints;
+    } else {
+        newTotalPoints = classPoints + newAttendancePoints;
     }
     
-    // 合計点のセルを更新
-    totalPointsCell.textContent = newTotalPoints.toFixed(1);
+    // 画面更新
+    const attendancePointsSpan = row.querySelector('.attendance-points');
+    const totalPointsSpan = row.querySelector('.total-points');
+    if (attendancePointsSpan) attendancePointsSpan.textContent = newAttendancePoints.toFixed(1);
+    if (totalPointsSpan) {
+        totalPointsSpan.textContent = newTotalPoints.toFixed(1);
+    }
     
-    // サーバーに送信
-    fetch(`/classes/${classId}/attendance-rate/`, {
+    // サーバー送信
+    const url = "{% url 'school_management:update_attendance_rate' classroom.id %}";
+    fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -380,21 +621,17 @@ function saveAttendanceRate(input) {
             attendance_points: newAttendancePoints
         })
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            console.log('出席率を保存しました:', attendanceRate);
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            // 保存成功時のチェックマーク表示を削除（スムーズな入力のため）
+            console.log('保存成功');
         } else {
-            alert('保存に失敗しました: ' + (data.error || '不明なエラー'));
+            input.classList.add('is-invalid');
         }
-    })
-    .catch(error => {
-        console.error('エラー:', error);
-        alert('保存に失敗しました');
     });
 }
 
-// CSRFトークンを取得する関数
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -408,6 +645,93 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// CSVプレビュー表示
+function showCSVPreview() {
+    const table = document.querySelector('.evaluation-table');
+    const rows = Array.from(table.querySelectorAll('tr'));
+    const csvMatrix = [];
+    
+    for (let i = 0; i < rows.length; i++) {
+        csvMatrix.push([]);
+    }
+    
+    rows.forEach((row, rowIndex) => {
+        if (row.style.display === 'none') return;
+        
+        const cells = Array.from(row.querySelectorAll('th, td'));
+        cells.forEach(cell => {
+            if (cell.style.display === 'none') return;
+
+            let text = "";
+            const input = cell.querySelector('input[type="number"], input[type="text"]');
+            if (input) {
+                text = input.value;
+            } else {
+                // 余分な改行をスペース2つに置換
+                text = cell.innerText.trim().replace(/\r?\n|\r/g, '  ');
+            }
+            
+            let escapedText = text;
+            if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+                escapedText = '"' + text.replace(/"/g, '""') + '"';
+            }
+            
+            const colspan = parseInt(cell.getAttribute('colspan') || 1, 10);
+            const rowspan = parseInt(cell.getAttribute('rowspan') || 1, 10);
+            
+            let colIndex = 0;
+            while (csvMatrix[rowIndex][colIndex] !== undefined) {
+                colIndex++;
+            }
+            
+            for (let r = 0; r < rowspan; r++) {
+                for (let c = 0; c < colspan; c++) {
+                    if (r === 0 && c === 0) {
+                        csvMatrix[rowIndex + r][colIndex + c] = escapedText;
+                    } else {
+                        csvMatrix[rowIndex + r][colIndex + c] = "";
+                    }
+                }
+            }
+        });
+    });
+    
+    const csvContent = csvMatrix.map(row => {
+        return Array.from(row).map(item => item !== undefined ? item : "").join(',');
+    }).join('\r\n');
+    
+    document.getElementById('csvPreviewText').value = csvContent;
+    const previewModal = new bootstrap.Modal(document.getElementById('csvPreviewModal'));
+    previewModal.show();
+}
+
+// CSVダウンロード処理
+function downloadCSV() {
+    const csvContent = document.getElementById('csvPreviewText').value;
+    // BOMを付与してExcelでの文字化けを防ぐ
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+    const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    
+    const className = "{{ classroom.class_name|escapejs }}";
+    const mode = "{{ view_mode }}" === "detail" ? "詳細" : "簡易";
+    const date = new Date().toISOString().slice(0, 10);
+    link.setAttribute("download", `評価一覧_${className}_${mode}_${date}.csv`);
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    const modalElement = document.getElementById('csvPreviewModal');
+    const modalInstance = bootstrap.Modal.getInstance(modalElement);
+    if (modalInstance) {
+        modalInstance.hide();
+    }
 }
 </script>
 {% endblock %}

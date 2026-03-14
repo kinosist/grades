@@ -3,7 +3,8 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from ...models import LessonSession, Group, GroupMember, PeerEvaluation, ContributionEvaluation
+from django.db.models import Q
+from ...models import LessonSession, Group, GroupMember, PeerEvaluation, ContributionEvaluation, Student
 
 # ---------------------------------------------------------
 # 作成・リンク管理
@@ -76,7 +77,7 @@ def peer_evaluation_common_form(request, session_id):
             first_place = get_object_or_404(Group, id=first_place_id)
             second_place = get_object_or_404(Group, id=second_place_id)
             
-            PeerEvaluation.objects.create(
+            peer_evaluation = PeerEvaluation.objects.create(
                 lesson_session=lesson_session,
                 evaluator_token=str(uuid.uuid4()),
                 evaluator_group=evaluator_group,
@@ -86,7 +87,25 @@ def peer_evaluation_common_form(request, session_id):
                 second_place_reason=request.POST.get('second_place_reason', ''),
                 general_comment=request.POST.get('general_comment', '')
             )
-            # 必要であればここに貢献度評価の保存処理を追加
+            
+            # 貢献度評価の保存
+            if participant_count > 1:
+                # 自分以外の人数分ループ (participant_count - 1)
+                evaluation_count = participant_count - 1
+                for i in range(evaluation_count):
+                    member_id = request.POST.get(f'participant_{i}_member')
+                    score = request.POST.get(f'participant_{i}_contribution')
+                    
+                    if member_id and score:
+                        try:
+                            student = Student.objects.get(id=member_id)
+                            ContributionEvaluation.objects.create(
+                                peer_evaluation=peer_evaluation,
+                                evaluatee=student,
+                                contribution_score=int(score)
+                            )
+                        except (Student.DoesNotExist, ValueError):
+                            pass
             
             return render(request, 'school_management/peer_evaluation_thanks.html', {
                 'lesson_session': lesson_session,
@@ -217,9 +236,20 @@ def peer_evaluation_results(request, session_id):
     group_stats = {}
     
     for group in groups:
-        first_place_votes = evaluations.filter(first_place_group=group).count()
-        second_place_votes = evaluations.filter(second_place_group=group).count()
-        evaluations_given = evaluations.filter(evaluator_group=group).count()
+        first_place_votes = evaluations.filter(
+            Q(first_place_group=group) | 
+            Q(first_place_group_number=group.group_number)
+        ).distinct().count()
+        
+        second_place_votes = evaluations.filter(
+            Q(second_place_group=group) | 
+            Q(second_place_group_number=group.group_number)
+        ).distinct().count()
+        
+        evaluations_given = evaluations.filter(
+            Q(evaluator_group=group) |
+            Q(evaluator_group_number=group.group_number)
+        ).distinct().count()
         
         group_stats[group.id] = {
             'group': group,
@@ -241,3 +271,22 @@ def peer_evaluation_results(request, session_id):
     }
     
     return render(request, 'school_management/peer_evaluation_results.html', context)
+
+@login_required
+def delete_all_peer_evaluations(request, session_id):
+    """ピア評価データを全て削除"""
+    lesson_session = get_object_or_404(LessonSession, id=session_id)
+    
+    # 教員権限チェック
+    if request.user.role not in ['teacher', 'admin']:
+        messages.error(request, '権限がありません。')
+        return redirect('school_management:dashboard')
+    
+    if request.method == 'POST':
+        # ピア評価データを削除（紐づく貢献度評価も自動削除され、ポイントも再計算されます）
+        count = PeerEvaluation.objects.filter(lesson_session=lesson_session).count()
+        PeerEvaluation.objects.filter(lesson_session=lesson_session).delete()
+        
+        messages.success(request, f'{count}件のピア評価データを削除し、リセットしました。')
+        
+    return redirect('school_management:peer_evaluation_results', session_id=session_id)

@@ -3,6 +3,14 @@
 {% block title %}グループを追加 - 第{{ lesson_session.session_number }}回{% endblock %}
 {% block page_title %}グループを追加{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' lesson_session.classroom.id %}">{{ lesson_session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}">第{{ lesson_session.session_number }}回</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:group_management' lesson_session.id %}">グループ編成</a></li>
+<li class="breadcrumb-item active" aria-current="page">グループを追加</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-md-8">
@@ -10,8 +18,8 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-plus me-2"></i>新しいグループを追加</h5>
                 <div>
-                    <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-arrow-left me-1"></i>グループ一覧に戻る
+                    <a href="{% url 'school_management:group_management' lesson_session.id %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i>グループ編成に戻る
                     </a>
                 </div>
             </div>
@@ -38,7 +46,7 @@
                     </div>
 
                     <div class="d-flex justify-content-between">
-                        <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-secondary">
+                        <a href="{% url 'school_management:group_management' lesson_session.id %}" class="btn btn-outline-secondary">
                             <i class="fas fa-times me-1"></i>キャンセル
                         </a>
                         <button type="submit" class="btn btn-primary">
@@ -68,4 +76,3 @@
 </div>
 
 {% endblock %}
-

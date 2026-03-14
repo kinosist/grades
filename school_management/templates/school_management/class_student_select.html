@@ -3,6 +3,12 @@
 {% block title %}学生選択追加 - {{ classroom.class_name }}{% endblock %}
 {% block page_title %}学生選択追加{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">学生選択追加</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -25,7 +31,6 @@
                     <br><small class="text-muted">現在の学生数: {{ classroom.students.count }}名</small>
                 </div>
 
-                <!-- 検索フォーム -->
                 <form method="get" class="mb-4">
                     <div class="row">
                         <div class="col-md-8">

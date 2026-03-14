@@ -1,271 +1,456 @@
 {% extends 'school_management/base.html' %}
 
 {% block title %}{{ session.classroom.class_name }} 第{{ session.session_number }}回 - 学校管理システム{% endblock %}
-{% block page_title %}{{ session.classroom.class_name }} 第{{ session.session_number }}回詳細{% endblock %}
+{% block page_title %}
+    {{ session.classroom.class_name }} 第{{ session.session_number }}回詳細
+    <span class="fs-6 text-muted d-block d-md-inline mt-1 mt-md-0">
+        （実施日: {{ session.date|date:"Y年m月d日" }}（{{ session.date|date:"l" }}））
+    </span>
+{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' session.classroom.id %}">{{ session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">第{{ session.session_number }}回</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    body { background-color: #f8fafc; }
+
+    /* --- 【修正】タブを絶対に一列にして青いバーを出す --- */
+    .nav-tabs-wrapper {
+        overflow-x: auto; /* 横スクロールを許可 */
+        overflow-y: hidden;
+        white-space: nowrap; /* テキストの折り返しを禁止 */
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 12px; /* バーを表示するための余白 */
+        margin-bottom: 1rem;
+    }
+
+    /* スクロールバーのデザイン（常に青く表示） */
+    .nav-tabs-wrapper::-webkit-scrollbar {
+        height: 6px; /* 少し太めにして見やすく */
+        display: block !important;
+    }
+    .nav-tabs-wrapper::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    .nav-tabs-wrapper::-webkit-scrollbar-thumb {
+        background: #0d6efd; /* 青いバー */
+        border-radius: 10px;
+    }
+
+    .nav-tabs {
+        display: flex;
+        flex-wrap: nowrap !important; /* 絶対に改行させない */
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .nav-tabs .nav-item {
+        flex: 0 0 auto; /* 各タブの幅を自動に保ち、縮ませない */
+    }
+
+    .nav-link {
+        white-space: nowrap;
+    }
+    /* ------------------------------------------- */
+
+    .nav-tabs .nav-link.active {
+        font-weight: bold;
+        border-top: 3px solid #0d6efd;
+    }
+    .clickable-row {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .hover-card {
+        transition: all 0.3s ease;
+    }
+    .hover-card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+        border-color: #0d6efd !important;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="row">
-    <!-- 授業回情報 -->
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-calendar me-2"></i>授業回情報</h5>
-            </div>
-            <div class="card-body">
-                <dl class="row info-list mb-0">
-                    <dt class="col-sm-5 text-end">回番号:</dt>
-                    <dd class="col-sm-7"><span class="badge bg-primary fs-6">第{{ session.session_number }}回</span></dd>
-                    
-                    <dt class="col-sm-5 text-end">実施日:</dt>
-                    <dd class="col-sm-7">{{ session.date|date:"Y年m月d日（l）" }}</dd>
-                    
-                    <dt class="col-sm-5 text-end">トピック:</dt>
-                    <dd class="col-sm-7">{{ session.topic|default:"-" }}</dd>
-                    
-                    <dt class="col-sm-5 text-end">小テスト:</dt>
-                    <dd class="col-sm-7">
-                        {% if session.has_quiz %}
-                            <span class="badge bg-success">実施予定</span>
-                        {% else %}
-                            <span class="badge bg-secondary">なし</span>
+    <div class="col-12">
+        {% with groups=groups|default:session.group_set.all %}
+        
+        <div class="nav-tabs-wrapper">
+            <ul class="nav nav-tabs" id="sessionTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if not request.GET.active_tab or request.GET.active_tab == 'content' %}active{% endif %}" id="content-tab" data-bs-toggle="tab" data-bs-target="#content" type="button" role="tab" aria-controls="content" aria-selected="{% if not request.GET.active_tab or request.GET.active_tab == 'content' %}true{% else %}false{% endif %}">
+                        <i class="fas fa-info-circle me-2"></i>授業内容
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if request.GET.active_tab == 'group' %}active{% endif %}" id="group-tab" data-bs-toggle="tab" data-bs-target="#group" type="button" role="tab" aria-controls="group" aria-selected="{% if request.GET.active_tab == 'group' %}true{% else %}false{% endif %}">
+                        <i class="fas fa-users me-2"></i>グループ編成
+                        {% if groups %}
+                            <span class="badge bg-secondary ms-1">{{ groups.count }}</span>
                         {% endif %}
-                    </dd>
-                    
-                    <dt class="col-sm-5 text-end">ピア評価:</dt>
-                    <dd class="col-sm-7">
-                        {% if session.has_peer_evaluation %}
-                            <span class="badge bg-info">実施予定</span>
-                        {% else %}
-                            <span class="badge bg-secondary">なし</span>
-                        {% endif %}
-                    </dd>
-                </dl>
-            </div>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if request.GET.active_tab == 'report' %}active{% endif %}" id="report-tab" data-bs-toggle="tab" data-bs-target="#report" type="button" role="tab" aria-controls="report" aria-selected="{% if request.GET.active_tab == 'report' %}true{% else %}false{% endif %}">
+                        <i class="fas fa-book-open me-2"></i>日報
+                        {% with report_count=session.lesson_reports.count %}
+                            {% if report_count > 0 %}<span class="badge bg-success ms-1">{{ report_count }}</span>{% endif %}
+                        {% endwith %}
+                    </button>
+                </li>
+                
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if request.GET.active_tab == 'qr' %}active{% endif %}" id="qr-tab" data-bs-toggle="tab" data-bs-target="#qr-grading" type="button" role="tab" aria-controls="qr-grading" aria-selected="{% if request.GET.active_tab == 'qr' %}true{% else %}false{% endif %}">
+                        <i class="fas fa-qrcode me-2"></i>QR巡回採点
+                    </button>
+                </li>
+
+                {% if session.has_peer_evaluation %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if request.GET.active_tab == 'peer' %}active{% endif %}" id="peer-tab" data-bs-toggle="tab" data-bs-target="#peer" type="button" role="tab" aria-controls="peer" aria-selected="{% if request.GET.active_tab == 'peer' %}true{% else %}false{% endif %}">
+                        <i class="fas fa-user-friends me-2"></i>ピア評価管理
+                    </button>
+                </li>
+                {% endif %}
+            </ul>
         </div>
 
-        <!-- クイックアクション -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h6><i class="fas fa-bolt me-2"></i>クイックアクション</h6>
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <a href="{% url 'school_management:group_management' session.id %}" class="btn btn-outline-primary btn-sm">
-                        <i class="fas fa-users me-1"></i>グループ編成
-                    </a>
-                    
-                    {% if session.has_quiz %}
-                        <a href="{% url 'school_management:quiz_create' session.id %}" class="btn btn-outline-success btn-sm">
-                            <i class="fas fa-clipboard-check me-1"></i>小テスト作成
-                        </a>
-                    {% endif %}
-                    
-                    {% if session.has_peer_evaluation %}
-                        <a href="#peer-evaluation-links" class="btn btn-outline-info btn-sm">
-                            <i class="fas fa-link me-1"></i>ピア評価リンク
-                        </a>
-                    {% endif %}
-                    
-                    <a href="#" class="btn btn-outline-warning btn-sm">
-                        <i class="fas fa-qrcode me-1"></i>QR巡回採点
-                    </a>
+        <div class="tab-content" id="sessionTabsContent">
+            <div class="tab-pane fade {% if not request.GET.active_tab or request.GET.active_tab == 'content' %}show active{% endif %}" id="content" role="tabpanel" aria-labelledby="content-tab">
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-info-circle me-2"></i>授業内容</h5>
+                        <div class="d-flex">
+                            <form action="{% url 'school_management:session_delete' session.id %}" method="post" onsubmit="return confirm('本当にこの授業回を削除しますか？\n\n※関連する出席データ、小テスト結果、ピア評価なども全て削除されます。\n※この操作は取り消せません。');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger btn-sm me-2">
+                                    <i class="fas fa-trash me-1"></i>削除
+                                </button>
+                            </form>
+                            <a href="{% url 'school_management:class_detail' session.classroom.id %}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-arrow-left me-1"></i>クラスに戻る
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <h6 class="text-muted">トピック</h6>
+                            <p class="fs-5">{{ session.topic|default:"トピック未設定" }}</p>
+                        </div>
+                        <div class="d-flex gap-4">
+                            <div class="d-flex align-items-center">
+                                <strong class="me-2">QR採点:</strong>
+                                <span class="badge bg-warning text-dark"><i class="fas fa-qrcode me-1"></i>実施可能</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <strong class="me-2">ピア評価:</strong>
+                                {% if session.has_peer_evaluation %}
+                                    <span class="badge bg-info">実施予定</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">なし</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- グループ一覧 -->
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5><i class="fas fa-users me-2"></i>グループ編成</h5>
-                {% if groups %}
-                    <span class="badge bg-primary">{{ groups.count }}グループ</span>
-                {% endif %}
-            </div>
-            <div class="card-body">
-                {% if groups %}
-                    <div class="row">
-                        {% for group in groups %}
-                        <div class="col-md-6 mb-3">
-                            <div class="card border-primary">
-                                <div class="card-header bg-primary text-white">
-                                    <strong><i class="fas fa-layer-group me-2"></i>グループ{{ group.group_number }}</strong>
-                                </div>
-                                <div class="card-body">
-                                    {% for member in group.groupmember_set.all %}
-                                    <div class="d-flex align-items-center mb-2">
-                                        <i class="fas fa-user me-2 text-primary"></i>
-                                        <div>
-                                            <strong>{{ member.student.full_name }}</strong>
-                                            {% if member.role %}
-                                                <span class="badge bg-secondary ms-2">{{ member.role }}</span>
-                                            {% endif %}
-                                            <br>
-                                            <small class="text-muted">{{ member.student.student_number }}</small>
+            <div class="tab-pane fade {% if request.GET.active_tab == 'group' %}show active{% endif %}" id="group" role="tabpanel" aria-labelledby="group-tab">
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-users me-2"></i>グループ編成</h5>
+                        {% if groups %}
+                            <span class="badge bg-primary">{{ groups.count }}グループ</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if groups %}
+                            <div class="row">
+                                {% for group in groups %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="card border-primary">
+                                        <div class="card-header bg-primary text-white">
+                                            <strong><i class="fas fa-layer-group me-2"></i>グループ{{ group.group_number }}</strong>
+                                        </div>
+                                        <div class="card-body">
+                                            {% for member in group.groupmember_set.all %}
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="fas fa-user me-2 text-primary"></i>
+                                                <div>
+                                                    <strong>{{ member.student.full_name }}</strong>
+                                                    {% if member.role %}
+                                                        <span class="badge bg-secondary ms-2">{{ member.role }}</span>
+                                                    {% endif %}
+                                                    <br>
+                                                    <small class="text-muted">{{ member.student.student_number }}</small>
+                                                </div>
+                                            </div>
+                                            {% empty %}
+                                            <p class="text-muted mb-0">メンバーが設定されていません</p>
+                                            {% endfor %}
                                         </div>
                                     </div>
-                                    {% empty %}
-                                    <p class="text-muted mb-0">メンバーが設定されていません</p>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="text-center mt-3">
+                                <a href="{% url 'school_management:group_management' session.id %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-edit me-1"></i>グループ編成を編集
+                                </a>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                                <h6 class="text-muted">グループが編成されていません</h6>
+                                <p class="text-muted">学生をグループに分けて、グループワークやピア評価の準備をしましょう。</p>
+                                <a href="{% url 'school_management:group_management' session.id %}" class="btn btn-primary">
+                                    <i class="fas fa-users me-1"></i>グループ編成を開始
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade {% if request.GET.active_tab == 'report' %}show active{% endif %}" id="report" role="tabpanel" aria-labelledby="report-tab">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-book-open me-2"></i>日報入力</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'school_management:session_detail' session.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="save_reports">
+                            {% if student_report_data %}
+                                <div class="row g-3 mb-3">
+                                    {% for item in student_report_data %}
+                                    <div class="col-md-6 col-xl-4">
+                                        <div class="card h-100 report-item-card" data-has-report="{% if item.report %}1{% else %}0{% endif %}">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-2 gap-2">
+                                                    <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:.85rem;flex-shrink:0;">{{ item.student.full_name|first }}</div>
+                                                    <div>
+                                                        <div class="fw-bold small">{{ item.student.full_name }}</div>
+                                                        <small class="text-muted">{{ item.student.student_number }}</small>
+                                                    </div>
+                                                    {% if item.report %}<span class="ms-auto badge bg-success"><i class="fas fa-check"></i></span>{% endif %}
+                                                </div>
+                                                {% if item.goal %}
+                                                    <div class="small rounded p-1 px-2 mb-2" style="background:#e3f0ff;color:#0d47a1;border:1px solid #90caf9;">
+                                                        <i class="fas fa-bullseye me-1"></i>{{ item.goal.goal_text|truncatechars:60 }}
+                                                    </div>
+                                                {% endif %}
+                                                <textarea name="report_{{ item.student.id }}" class="form-control" style="min-height:70px;font-size:.875rem;resize:vertical;" placeholder="今日やったこと・気づき...">{{ item.report.report_text|default:'' }}</textarea>
+                                            </div>
+                                        </div>
+                                    </div>
                                     {% endfor %}
+                                </div>
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>すべて保存</button>
+                                </div>
+                            {% else %}
+                                <p class="text-muted text-center py-3">このクラスに学生が登録されていません。</p>
+                            {% endif %}
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade {% if request.GET.active_tab == 'qr' %}show active{% endif %}" id="qr-grading" role="tabpanel" aria-labelledby="qr-tab">
+                <div class="card mb-4 border-warning">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1"><i class="fas fa-qrcode me-2 text-warning"></i>QR巡回採点</h5>
+                            <p class="text-muted mb-0 small">
+                                教室を巡回してQRコードを読み取り、ポイントを付与します。
+                            </p>
+                        </div>
+                        <a href="{% url 'school_management:class_qr_codes' session.classroom.id %}?session_id={{ session.id }}&auto_start=true" class="btn btn-warning shadow-sm fw-bold">
+                            <i class="fas fa-camera me-2"></i>カメラ起動
+                        </a>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mb-3">
+                    <form action="{% url 'school_management:session_reset_qr' session.id %}" method="post" onsubmit="return confirm('この授業回の全ての小テスト・QRデータを削除してリセットしますか？\n\n※既存の点数は全て消えます。\n※この操作は取り消せません。');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            <i class="fas fa-trash-restore me-1"></i>データをリセットして再構築
+                        </button>
+                    </form>
+                </div>
+
+                {% if session.quiz_set.count > 1 %}
+                <div class="alert alert-danger d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>重複した小テスト枠が検出されました</strong>
+                        <p class="mb-0 small">この授業回には複数の小テスト枠が存在し、ポイントが分散している可能性があります。統合してください。</p>
+                    </div>
+                    <form action="{% url 'school_management:merge_duplicate_quizzes' session.id %}" method="post">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger fw-bold shadow-sm">
+                            <i class="fas fa-compress-arrows-alt me-1"></i>重複を統合
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0 text-muted"><i class="fas fa-vial me-2"></i>テスト用スキャン（カメラなし）</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-2">クリックすると、その生徒のQRコードを読み取ったことにしてポイントを付与します。</p>
+                        <div class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
+                            {% for student in session.classroom.students.all %}
+                                {% with qr=student.qr_codes.first %}
+                                    {% if qr %}
+                                        <a href="{% url 'school_management:qr_code_scan' qr.qr_code_id %}?session_id={{ session.id }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2">
+                                            <span>{{ student.full_name }} <small class="text-muted">({{ student.student_number }})</small></span>
+                                            <span class="badge bg-secondary rounded-pill"><i class="fas fa-magic"></i> スキャン</span>
+                                        </a>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-users me-2"></i>各生徒の獲得ポイント</h5>
+                    </div>
+                    <div class="card-body">
+                        {% for quiz in session.quiz_set.all %}
+                            <div class="mb-4">
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 20%;">学籍番号</th>
+                                                <th style="width: 40%;">氏名</th>
+                                                <th style="width: 40%;">獲得ポイント</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in quiz.get_student_scores %}
+                                            <tr>
+                                                <td>{{ item.student.student_number }}</td>
+                                                <td>
+                                                    {{ item.student.full_name }}
+                                                </td>
+                                                <td>
+                                                    {% if item.has_score %}
+                                                        <span class="badge bg-success fs-6">{{ item.score }}pt</span>
+                                                    {% else %}
+                                                        <span class="text-muted">-</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="text-center py-4 text-muted">
+                                <p>この授業回には小テストやQRアクションが設定されていません。</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {% if session.has_peer_evaluation %}
+            <div class="tab-pane fade {% if request.GET.active_tab == 'peer' %}show active{% endif %}" id="peer" role="tabpanel" aria-labelledby="peer-tab">
+                {% if groups %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-user-friends me-2"></i>ピア評価管理</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-4">
+                            <h6><i class="fas fa-info-circle me-2"></i>ピア評価について</h6>
+                            <ul class="mb-0">
+                                <li>学生は匿名でグループメンバーの貢献度を評価します</li>
+                                <li>他グループの発表内容について順位付けを行います</li>
+                                <li>評価者の身元は完全に秘匿されます</li>
+                                <li>結果は授業改善とフィードバックに活用されます</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="mb-4 p-3 bg-light rounded border">
+                            <label class="form-label fw-bold text-primary"><i class="fas fa-link me-2"></i>学生共有用 共通リンク</label>
+                            <p class="small text-muted mb-2">このリンクを学生に共有してください。学生はリンクから自分のグループを選択して評価を行います。</p>
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control bg-white" 
+                                       value="http://{{ request.get_host }}{% url 'school_management:peer_evaluation_common' session.id %}" 
+                                       readonly id="peer-link-common">
+                                <button class="btn btn-primary" type="button" 
+                                        onclick="copyToClipboard('peer-link-common')">
+                                    <i class="fas fa-copy me-1"></i>コピー
+                                </button>
+                            </div>
+                            <div class="text-end">
+                                <a href="{% url 'school_management:peer_evaluation_common' session.id %}" target="_blank" class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-external-link-alt me-1"></i>共有フォームを確認する
+                                </a>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold mb-3 text-secondary">管理メニュー</h6>
+                        <div class="row g-3 justify-content-center">
+                            <div class="col-md-5">
+                                <div class="card h-100 text-center hover-card position-relative shadow-sm">
+                                    <div class="card-body d-flex flex-column justify-content-center">
+                                        <i class="fas fa-link fa-3x text-primary mb-3"></i>
+                                        <h5 class="card-title fw-bold">QRコード/リンク共有</h5>
+                                        <p class="card-text text-muted small">学生にフォームを案内するためのQRコードやリンクを取得します。</p>
+                                        <a href="{% url 'school_management:peer_evaluation_link' session.id %}" class="stretched-link text-decoration-none mt-auto">
+                                            <span class="text-primary fw-bold">共有へ <i class="fas fa-chevron-right ms-1"></i></span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <div class="card h-100 text-center hover-card position-relative shadow-sm">
+                                    <div class="card-body d-flex flex-column justify-content-center">
+                                        <i class="fas fa-chart-bar fa-3x text-success mb-3"></i>
+                                        <h5 class="card-title fw-bold">結果を確認</h5>
+                                        <p class="card-text text-muted small">学生から提出された評価の集計結果や、グループランキングを確認します。</p>
+                                        <a href="{% url 'school_management:peer_evaluation_results' session.id %}" class="stretched-link text-decoration-none mt-auto">
+                                            <span class="text-success fw-bold">確認へ <i class="fas fa-chevron-right ms-1"></i></span>
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        {% endfor %}
                     </div>
-                    
-                    <div class="text-center mt-3">
-                        <a href="{% url 'school_management:group_management' session.id %}" class="btn btn-outline-primary">
-                            <i class="fas fa-edit me-1"></i>グループ編成を編集
-                        </a>
-                    </div>
+                </div>
                 {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
-                        <h6 class="text-muted">グループが編成されていません</h6>
-                        <p class="text-muted">学生をグループに分けて、グループワークやピア評価の準備をしましょう。</p>
-                        <a href="{% url 'school_management:group_management' session.id %}" class="btn btn-primary">
-                            <i class="fas fa-users me-1"></i>グループ編成を開始
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-users-slash fa-3x text-muted mb-3"></i>
+                        <h6 class="text-muted">ピア評価を行うには、まずグループを編成してください。</h6>
+                        <a href="?active_tab=group" class="btn btn-primary mt-3">
+                            <i class="fas fa-users me-1"></i> グループ編成へ
                         </a>
                     </div>
+                </div>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
-
-        <!-- 小テスト管理 -->
-        {% if session.has_quiz %}
-        <div class="card mt-3">
-            <div class="card-header">
-                <h5><i class="fas fa-clipboard-check me-2"></i>小テスト管理</h5>
-            </div>
-            <div class="card-body">
-                {% if quizzes %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>小テスト名</th>
-                                    <th>満点</th>
-                                    <th>採点方式</th>
-                                    <th>作成日</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for quiz in quizzes %}
-                                <tr>
-                                    <td><strong>{{ quiz.quiz_name }}</strong></td>
-                                    <td>{{ quiz.max_score }}点</td>
-                                    <td>
-                                        <span class="badge bg-secondary">{{ quiz.get_grading_method_display }}</span>
-                                    </td>
-                                    <td>{{ quiz.created_at|date:"m/d" }}</td>
-                                    <td>
-                                        <a href="{% url 'school_management:quiz_detail' quiz.id %}" class="btn btn-outline-primary btn-sm">
-                                            <i class="fas fa-eye me-1"></i>詳細
-                                        </a>
-                                        <a href="{% url 'school_management:question_manage' quiz.id %}" class="btn btn-outline-info btn-sm">
-                                            <i class="fas fa-clipboard-list me-1"></i>問題管理
-                                        </a>
-                                        <a href="{% url 'school_management:quiz_grading' quiz.id %}" class="btn btn-outline-success btn-sm">
-                                            <i class="fas fa-qrcode me-1"></i>採点
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="text-center py-3">
-                        <i class="fas fa-clipboard-plus fa-2x text-muted mb-2"></i>
-                        <p class="text-muted">小テストがまだ作成されていません。</p>
-                        <a href="{% url 'school_management:quiz_create' session.id %}" class="btn btn-success">
-                            <i class="fas fa-plus me-1"></i>小テストを作成
-                        </a>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- ピア評価リンク -->
-        {% if session.has_peer_evaluation and groups %}
-        <div class="card mt-3" id="peer-evaluation-links">
-            <div class="card-header">
-                <h5><i class="fas fa-link me-2"></i>ピア評価リンク</h5>
-            </div>
-            <div class="card-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>学生向けピア評価フォーム</strong><br>
-                    以下のリンクを学生に共有して、匿名でピア評価を実施してもらいます。
-                </div>
-                
-                {% for group in groups %}
-                <div class="mb-3">
-                    <label class="form-label"><strong>グループ{{ group.group_number }}用リンク:</strong></label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" 
-                               value="http://127.0.0.1:8000{% url 'school_management:peer_evaluation' session.id group.id %}" 
-                               readonly id="peer-link-{{ group.id }}">
-                        <button class="btn btn-outline-secondary" type="button" 
-                                onclick="copyToClipboard('peer-link-{{ group.id }}')">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- ピア評価管理 -->
-        {% if session.has_peer_evaluation %}
-        <div class="card mt-3" id="peer-evaluation-section">
-            <div class="card-header">
-                <h5><i class="fas fa-user-friends me-2"></i>ピア評価管理</h5>
-            </div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <div class="card border-info">
-                            <div class="card-body text-center">
-                                <i class="fas fa-link fa-2x text-info mb-2"></i>
-                                <h6>匿名評価リンク作成</h6>
-                                <p class="text-muted small">学生用の匿名評価フォームリンクを生成</p>
-                                <a href="{% url 'school_management:peer_evaluation_link' session.id %}" class="btn btn-info btn-sm">
-                                    <i class="fas fa-external-link-alt me-1"></i>リンク作成
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card border-success">
-                            <div class="card-body text-center">
-                                <i class="fas fa-chart-bar fa-2x text-success mb-2"></i>
-                                <h6>評価結果確認</h6>
-                                <p class="text-muted small">提出された評価の結果を分析</p>
-                                <a href="{% url 'school_management:peer_evaluation_results' session.id %}" class="btn btn-success btn-sm">
-                                    <i class="fas fa-chart-line me-1"></i>結果確認
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="alert alert-info">
-                    <h6><i class="fas fa-info-circle me-2"></i>ピア評価について</h6>
-                    <ul class="mb-0">
-                        <li>学生は匿名でグループメンバーの貢献度を評価します</li>
-                        <li>他グループの発表内容について順位付けを行います</li>
-                        <li>評価者の身元は完全に秘匿されます</li>
-                        <li>結果は授業改善とフィードバックに活用されます</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        {% endif %}
+        {% endwith %}
     </div>
 </div>
 
@@ -294,5 +479,14 @@ function copyToClipboard(elementId) {
         button.innerHTML = originalIcon;
     }, 2000);
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 日報カードの左ボーダー色をデータ属性から設定
+    document.querySelectorAll('.report-item-card').forEach(card => {
+        card.style.borderLeft = card.dataset.hasReport === '1'
+            ? '4px solid #198754'
+            : '4px solid #0d6efd';
+    });
+});
 </script>
 {% endblock %}

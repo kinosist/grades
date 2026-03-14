@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from ...models import LessonSession
 
 @login_required
@@ -26,14 +27,28 @@ def peer_evaluation_results_view(request, session_id):
     
     for evaluation in evaluations:
         # グループ投票集計
+        # 1位: FKまたは番号からグループ番号を取得
+        f_num = None
         if evaluation.first_place_group:
-            group_name = f"グループ{evaluation.first_place_group.group_number}"
+            f_num = evaluation.first_place_group.group_number
+        elif evaluation.first_place_group_number:
+            f_num = evaluation.first_place_group_number
+            
+        if f_num:
+            group_name = f"グループ{f_num}"
             if group_name not in group_votes:
                 group_votes[group_name] = {'first': 0, 'second': 0}
             group_votes[group_name]['first'] += 1
             
+        # 2位
+        s_num = None
         if evaluation.second_place_group:
-            group_name = f"グループ{evaluation.second_place_group.group_number}"
+            s_num = evaluation.second_place_group.group_number
+        elif evaluation.second_place_group_number:
+            s_num = evaluation.second_place_group_number
+            
+        if s_num:
+            group_name = f"グループ{s_num}"
             if group_name not in group_votes:
                 group_votes[group_name] = {'first': 0, 'second': 0}
             group_votes[group_name]['second'] += 1
@@ -56,11 +71,22 @@ def peer_evaluation_results_view(request, session_id):
     
     for group in groups:
         # このグループが1位に選ばれた回数
-        first_place_votes = evaluations.filter(first_place_group=group).count()
+        first_place_votes = evaluations.filter(
+            Q(first_place_group=group) | 
+            Q(first_place_group_number=group.group_number)
+        ).distinct().count()
+        
         # このグループが2位に選ばれた回数
-        second_place_votes = evaluations.filter(second_place_group=group).count()
+        second_place_votes = evaluations.filter(
+            Q(second_place_group=group) | 
+            Q(second_place_group_number=group.group_number)
+        ).distinct().count()
+        
         # このグループが評価した回数
-        evaluations_given = evaluations.filter(evaluator_group=group).count()
+        evaluations_given = evaluations.filter(
+            Q(evaluator_group=group) |
+            Q(evaluator_group_number=group.group_number)
+        ).distinct().count()
         
         group_stats[group.id] = {
             'group': group,
@@ -84,4 +110,3 @@ def peer_evaluation_results_view(request, session_id):
         'total_groups': groups.count(),  # 新テンプレート用
     }
     return render(request, 'school_management/peer_evaluation_results.html', context)
-

@@ -5,14 +5,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ピア評価フォーム - {{ lesson_session.classroom.class_name }}</title>
+    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /**
+         * Issue #47 対応: テキストエリアの表示崩れ防止
+         * ユーザーが長文を入力した際や手動でリサイズした際に、
+         * フォーム全体が縦に伸びすぎてしまう問題を防ぐためのスタイル制限。
+         */
+        textarea.form-control {
+            max-height: 200px;  /* 画面を圧迫しない最大高さを設定 */
+            overflow-y: auto;   /* 制限を超えた場合はスクロールバーを表示 */
+            resize: vertical;   /* 横方向のリサイズを禁止し、縦方向のみ許可 */
+        }
+    </style>
 </head>
 <body class="bg-light">
     <div class="container py-4">
         <div class="row justify-content-center">
             <div class="col-lg-10">
-                <!-- ヘッダー -->
+                
+                <!-- ページヘッダー情報 -->
                 <div class="card mb-4">
                     <div class="card-body text-center">
                         <h2 class="text-primary mb-3">
@@ -33,7 +48,7 @@
                     </div>
                 </div>
 
-                <!-- 評価が締め切られている場合の表示 -->
+                <!-- 評価期間外の制御 -->
                 {% if is_closed %}
                 <div class="alert alert-warning text-center">
                     <h4><i class="fas fa-lock me-2"></i>評価期限が終了しました</h4>
@@ -41,7 +56,7 @@
                 </div>
                 {% else %}
 
-                <!-- 注意事項 -->
+                <!-- 注意事項のアナウンス -->
                 <div class="alert alert-info">
                     <h6><i class="fas fa-info-circle me-2"></i>このフォームについて</h6>
                     <p class="mb-2">
@@ -53,7 +68,7 @@
                     </p>
                 </div>
 
-                <!-- グループが設定されていない場合 -->
+                <!-- グループ未編成時のエラーハンドリング -->
                 {% if not groups %}
                 <div class="alert alert-warning text-center">
                     <h4><i class="fas fa-exclamation-triangle me-2"></i>グループが設定されていません</h4>
@@ -61,10 +76,11 @@
                 </div>
                 {% else %}
 
+                <!-- ピア評価メインフォーム -->
                 <form method="post" id="evaluationForm">
                     {% csrf_token %}
                     
-                    <!-- 自分のグループ選択 -->
+                    <!-- セクション1: 評価者自身のグループ選択 -->
                     <div class="card mb-4">
                         <div class="card-header bg-primary text-white">
                             <h5 class="mb-0"><i class="fas fa-users me-2"></i>あなたのグループ</h5>
@@ -103,7 +119,7 @@
                         </div>
                     </div>
 
-                    <!-- 今日参加したメンバーの選択と貢献度評価 -->
+                    <!-- セクション2: グループメンバーの貢献度評価（初期状態は非表示） -->
                     <div class="card mb-4" id="memberEvaluationCard" style="display: none;">
                         <div class="card-header bg-success text-white">
                             <h5 class="mb-0"><i class="fas fa-star me-2"></i>メンバー貢献度評価</h5>
@@ -111,7 +127,7 @@
                         <div class="card-body">
                             <p class="text-muted mb-4">今日のグループワークに参加したメンバーを選択し、その貢献度を評価してください。</p>
                             
-                            <!-- 参加者数 -->
+                            <!-- 参加者数の選択 -->
                             <div class="mb-4">
                                 <label class="form-label"><strong>今日参加したメンバー数（あなたを含む）</strong></label>
                                 <select class="form-select" id="participantCount" name="participant_count" onchange="updateParticipantSelection()">
@@ -127,12 +143,12 @@
                                 <div class="form-text">※2名以上の場合、自分以外のメンバーを評価します。1名の場合はメンバー評価はスキップされます。</div>
                             </div>
 
-                            <!-- 動的に生成される参加メンバー選択と評価フォーム -->
+                            <!-- 動的に生成されるメンバー評価フォームの描画領域 -->
                             <div id="participantEvaluationContainer"></div>
                         </div>
                     </div>
 
-                    <!-- 他グループ評価 -->
+                    <!-- セクション3: 他グループへの評価 -->
                     <div class="card mb-4">
                         <div class="card-header bg-warning text-dark">
                             <h5 class="mb-0"><i class="fas fa-trophy me-2"></i>他グループ評価</h5>
@@ -141,6 +157,7 @@
                             <p class="text-muted mb-4">発表内容やアイデアの良さを基準に、他グループのランキングを付けてください。</p>
                             
                             <div class="row">
+                                <!-- 1位グループの選択 -->
                                 <div class="col-md-6 mb-3">
                                     <label for="first_place_group" class="form-label">
                                         <i class="fas fa-medal text-warning me-2"></i><strong>1位のグループ</strong>
@@ -158,12 +175,14 @@
                                         {% endfor %}
                                     </select>
                                     <div class="mt-2">
-                                        <label for="first_place_reason" class="form-label">理由（任意）</label>
+                                        <!-- 理由を必須にし、赤文字で強調 -->
+                                        <label for="first_place_reason" class="form-label">理由<span class="text-danger">（必須）</span></label>
                                         <textarea class="form-control" id="first_place_reason" name="first_place_reason" rows="2" 
-                                                  placeholder="1位に選んだ理由を簡潔に記入してください"></textarea>
+                                                  placeholder="1位に選んだ理由を簡潔に記入してください" required></textarea>
                                     </div>
                                 </div>
                                 
+                                <!-- 2位グループの選択 -->
                                 <div class="col-md-6 mb-3">
                                     <label for="second_place_group" class="form-label">
                                         <i class="fas fa-medal text-secondary me-2"></i><strong>2位のグループ</strong>
@@ -181,16 +200,17 @@
                                         {% endfor %}
                                     </select>
                                     <div class="mt-2">
-                                        <label for="second_place_reason" class="form-label">理由（任意）</label>
+                                        <!-- 理由を必須にし、赤文字で強調 -->
+                                        <label for="second_place_reason" class="form-label">理由<span class="text-danger">（必須）</span></label>
                                         <textarea class="form-control" id="second_place_reason" name="second_place_reason" rows="2" 
-                                                  placeholder="2位に選んだ理由を簡潔に記入してください"></textarea>
+                                                  placeholder="2位に選んだ理由を簡潔に記入してください" required></textarea>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 全体コメント -->
+                    <!-- セクション4: 全体コメント -->
                     <div class="card mb-4">
                         <div class="card-header bg-info text-white">
                             <h5 class="mb-0"><i class="fas fa-comment me-2"></i>全体コメント（任意）</h5>
@@ -201,7 +221,7 @@
                         </div>
                     </div>
 
-                    <!-- 進捗表示 -->
+                    <!-- 進捗ステータスバー -->
                     <div class="card mb-4" id="progressCard">
                         <div class="card-header">
                             <h6><i class="fas fa-tasks me-2"></i>入力進捗</h6>
@@ -236,7 +256,7 @@
                         </div>
                     </div>
 
-                    <!-- 提出ボタン -->
+                    <!-- 送信アクション -->
                     <div class="text-center mb-4">
                         <button type="submit" class="btn btn-primary btn-lg" id="submitButton" disabled>
                             <i class="fas fa-paper-plane me-2"></i>評価を提出する
@@ -250,59 +270,66 @@
         </div>
     </div>
 
-    <!-- グループ情報をJavaScriptで利用するためのJSONデータ -->
+    <!-- Djangoから渡されるJSONデータ -->
     {% if groups and not is_closed %}
     <script type="application/json" id="groups-data">
         {{ groups_json|safe }}
     </script>
     {% endif %}
 
+    <!-- Bootstrap Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
     {% if groups and not is_closed %}
     <script>
-    // グループデータを取得
+    /** @type {Array} グループ構成のマスターデータ */
     const groupsData = JSON.parse(document.getElementById('groups-data').textContent);
     
+    /** @type {Array} 画面初期化時の全グループ選択肢（重複制御用） */
+    const allGroupOptions = Array.from(document.getElementById('first_place_group').options)
+        .filter(opt => opt.value !== '')
+        .map(opt => ({ value: opt.value, text: opt.textContent.trim() }));
+    
+    /**
+     * 自身のグループが選択された際のハンドラー
+     * メンバー評価UIの表示と、他グループ評価の選択肢除外を行う
+     * @param {number} groupId - 選択された自グループのID
+     */
     function loadGroupMembers(groupId) {
-        // メンバー評価カードを表示
         document.getElementById('memberEvaluationCard').style.display = 'block';
-        
-        // 参加者数選択肢を動的に更新
         const group = groupsData.find(g => g.id == groupId);
         if (group) {
             updateParticipantCountOptions(group.members.length);
         }
-        
-        // 進捗更新
-        updateProgress();
+        updateRankGroupOptions();
     }
     
-    // 参加者数選択肢を動的に更新
+    /**
+     * 選択されたグループの人数に応じて、参加者数のセレクトボックスを生成する
+     * @param {number} groupMemberCount - グループの所属人数
+     */
     function updateParticipantCountOptions(groupMemberCount) {
         const participantCountSelect = document.getElementById('participantCount');
         const currentValue = participantCountSelect.value;
-        
-        // 既存のオプションをクリア
         participantCountSelect.innerHTML = '<option value="">選択してください</option>';
         
-        // グループのメンバー数に基づいてオプションを生成
         for (let i = 1; i <= groupMemberCount; i++) {
             const option = document.createElement('option');
             option.value = i;
-            if (i === 1) {
-                option.textContent = '1名（自分のみ）';
-            } else {
-                option.textContent = `${i}名`;
-            }
+            option.textContent = i === 1 ? '1名（自分のみ）' : `${i}名`;
             participantCountSelect.appendChild(option);
         }
         
-        // 以前の選択値を復元（有効な場合のみ）
+        // 既存の選択値が有効範囲内であれば復元する
         if (currentValue && parseInt(currentValue) <= groupMemberCount) {
             participantCountSelect.value = currentValue;
         }
     }
 
+    /**
+     * 参加者数に応じて、メンバー評価用のフォーム（セレクトボックスとラジオボタン）を動的に生成する
+     * 元のデザイン要件に基づき、評価レベルごとに適切な色とテキストを付与する
+     */
     function updateParticipantSelection() {
         const count = parseInt(document.getElementById('participantCount').value);
         const selectedGroupId = document.querySelector('input[name="evaluator_group"]:checked')?.value;
@@ -311,333 +338,163 @@
         
         const group = groupsData.find(g => g.id == selectedGroupId);
         const container = document.getElementById('participantEvaluationContainer');
-        
         let html = '<h6 class="mb-3">参加メンバーの選択と貢献度評価</h6>';
-        
-        // グループのメンバー数をチェック
         const groupMemberCount = group.members.length;
-        
-        // 1名の場合（自分のみ）
+
         if (count === 1) {
-            html += `<div class="alert alert-warning mb-3">
-                        <i class="fas fa-user me-2"></i>
-                        参加メンバー数: 1名（自分のみ）→ メンバー評価はスキップされます
-                     </div>
+            html += `<div class="alert alert-warning mb-3"><i class="fas fa-user me-2"></i>参加メンバー数: 1名（自分のみ）</div>
                      <div class="text-center py-4">
                         <i class="fas fa-user-check fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">自分一人での参加のため、メンバー貢献度評価はありません。</p>
-                        <p class="text-muted">グループ評価と全体コメントのみ入力してください。</p>
+                        <p class="text-muted">メンバー評価はありません。</p>
                      </div>`;
-        } else {
-            // グループの人数を超えている場合はエラー表示
-            if (count > groupMemberCount) {
-                html += `<div class="alert alert-danger mb-3">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            エラー: 選択した参加者数（${count}名）がグループのメンバー数（${groupMemberCount}名）を超えています。
-                         </div>
-                         <div class="text-center py-4">
-                            <i class="fas fa-users fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">参加者数をグループのメンバー数以下に調整してください。</p>
-                            <p class="text-muted">グループ「${group.name}」のメンバー数: ${groupMemberCount}名</p>
-                         </div>`;
-            } else {
-                // 2名以上の場合（自分以外を評価）
-                const evaluationCount = count - 1;
+        } else if (count <= groupMemberCount) {
+            const evaluationCount = count - 1;
+            html += `<div class="alert alert-info mb-3"><i class="fas fa-info-circle me-2"></i>自分以外の${evaluationCount}名を評価してください</div>`;
+            
+            /** * 【デザイン復元箇所】評価レベルの設定定義
+             * value: 送信される値, text: 表示テキスト, class: Bootstrapの色定義 
+             */
+            const evalConfig = [
+                { value: 5, text: "5：非常に積極的だった",       class: "btn-outline-success" },
+                { value: 4, text: "4：よく貢献していた",         class: "btn-outline-primary" },
+                { value: 3, text: "3：普通",                     class: "btn-outline-secondary" },
+                { value: 2, text: "2：あまり貢献していなかった", class: "btn-outline-warning" },
+                { value: 1, text: "1：全く貢献していなかった",   class: "btn-outline-danger" }
+            ];
+
+            for (let i = 0; i < evaluationCount; i++) {
+                // 所属メンバーのオプションタグを生成
+                const memberOptions = group.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
                 
-                html += `<div class="alert alert-info mb-3">
-                            <i class="fas fa-info-circle me-2"></i>
-                            参加メンバー数: ${count}名 → 評価対象: ${evaluationCount}名（自分以外のメンバーを評価してください）
-                         </div>`;
-                
-                for (let i = 0; i < evaluationCount; i++) {
-                    html += `
-                        <div class="border rounded p-3 mb-3">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label"><strong>${i + 1}人目のメンバー（自分以外）</strong></label>
-                                    <select class="form-select" name="participant_${i}_member" required onchange="updateMemberSelection()">
-                                        <option value="">選択してください</option>`;
-                    
-                    group.members.forEach(member => {
-                        html += `<option value="${member.id}">${member.name}</option>`;
-                    });
-                    
-                    html += `
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label"><strong>貢献度評価</strong></label>
-                                    <div class="btn-group-vertical d-grid" role="group">
-                                        <input type="radio" class="btn-check" name="participant_${i}_contribution" id="contrib_${i}_5" value="5">
-                                        <label class="btn btn-outline-success" for="contrib_${i}_5">5：非常に積極的だった</label>
-                                        
-                                        <input type="radio" class="btn-check" name="participant_${i}_contribution" id="contrib_${i}_4" value="4">
-                                        <label class="btn btn-outline-primary" for="contrib_${i}_4">4：積極的だった</label>
-                                        
-                                        <input type="radio" class="btn-check" name="participant_${i}_contribution" id="contrib_${i}_3" value="3">
-                                        <label class="btn btn-outline-secondary" for="contrib_${i}_3">3：普通だった</label>
-                                        
-                                        <input type="radio" class="btn-check" name="participant_${i}_contribution" id="contrib_${i}_2" value="2">
-                                        <label class="btn btn-outline-warning" for="contrib_${i}_2">2：あまり貢献していなかった</label>
-                                        
-                                        <input type="radio" class="btn-check" name="participant_${i}_contribution" id="contrib_${i}_1" value="1">
-                                        <label class="btn btn-outline-danger" for="contrib_${i}_1">1：全く貢献していなかった</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>`;
-                }
+                // 評価設定に基づきラジオボタンを生成（text-startでテキストを左揃えにして読みやすく）
+                const radioButtons = evalConfig.map(config => `
+                    <input type="radio" class="btn-check" name="participant_${i}_contribution" id="contrib_${i}_${config.value}" value="${config.value}" required>
+                    <label class="btn ${config.class} text-start" for="contrib_${i}_${config.value}">${config.text}</label>
+                `).join('');
+
+                html += `
+                    <div class="border rounded p-3 mb-3">
+                        <label class="form-label"><strong>${i+1}人目のメンバー</strong></label>
+                        <select class="form-select mb-3" name="participant_${i}_member" required onchange="updateMemberSelection()">
+                            <option value="">選択してください</option>
+                            ${memberOptions}
+                        </select>
+                        <label class="form-label"><strong>貢献度評価</strong></label>
+                        <div class="btn-group-vertical d-grid" role="group">
+                            ${radioButtons}
+                        </div>
+                    </div>`;
             }
         }
-        
         container.innerHTML = html;
         updateProgress();
     }
 
-    // メンバー選択の重複チェック
+    /**
+     * メンバー選択または評価ラジオボタンが変更された際に進捗を更新する
+     */
     function updateMemberSelection() {
-        const selectedGroupId = document.querySelector('input[name="evaluator_group"]:checked')?.value;
-        if (!selectedGroupId) return;
-        
-        const group = groupsData.find(g => g.id == selectedGroupId);
-        const count = parseInt(document.getElementById('participantCount').value);
-        
-        // グループのメンバー数をチェック
-        if (count > group.members.length) {
-            return; // グループの人数を超えている場合は処理をスキップ
-        }
-        
-        const evaluationCount = count - 1;
-        
-        // 選択されたメンバーIDを収集
-        const selectedMembers = [];
-        for (let i = 0; i < evaluationCount; i++) {
-            const select = document.querySelector(`select[name="participant_${i}_member"]`);
-            if (select && select.value) {
-                selectedMembers.push(select.value);
-            }
-        }
-        
-        // 各選択肢を更新
-        for (let i = 0; i < evaluationCount; i++) {
-            const select = document.querySelector(`select[name="participant_${i}_member"]`);
-            if (!select) continue;
-            
-            const currentValue = select.value;
-            const currentIndex = i;
-            
-            // 選択肢をリセット
-            select.innerHTML = '<option value="">選択してください</option>';
-            
-            // 利用可能なメンバーを追加
-            group.members.forEach(member => {
-                // 現在の選択肢以外で選択されていないメンバーのみ追加
-                const isSelected = selectedMembers.includes(member.id) && selectedMembers.indexOf(member.id) !== currentIndex;
-                if (!isSelected) {
-                    const option = document.createElement('option');
-                    option.value = member.id;
-                    option.textContent = member.name;
-                    select.appendChild(option);
-                }
-            });
-            
-            // 現在の選択を復元
-            if (currentValue) {
-                select.value = currentValue;
-            }
-        }
-        
-        // 進捗を更新
         updateProgress();
     }
 
+    /**
+     * フォーム全体の入力状態を検証し、進捗バーと送信ボタンの状態を制御する
+     */
     function updateProgress() {
-        // グループ選択チェック
+        // 自グループ選択の確認
         const groupSelected = document.querySelector('input[name="evaluator_group"]:checked');
         document.querySelector('#progressGroup input').checked = !!groupSelected;
         
-        // メンバー評価チェック
+        // メンバー評価の入力確認
         const participantCount = document.getElementById('participantCount').value;
         let membersComplete = false;
+        
         if (participantCount) {
             const count = parseInt(participantCount);
             if (count === 1) {
-                // 1名の場合はメンバー評価をスキップ
-                membersComplete = true;
+                membersComplete = true; // 1名の場合は免除
             } else {
-                // 2名以上の場合、自分以外を評価
-                const evaluationCount = count - 1;
-                let allSelected = true;
-                for (let i = 0; i < evaluationCount; i++) {
+                const evalCount = count - 1;
+                let allFilled = true;
+                for (let i = 0; i < evalCount; i++) {
                     const memberSelected = document.querySelector(`select[name="participant_${i}_member"]`)?.value;
-                    const contributionSelected = document.querySelector(`input[name="participant_${i}_contribution"]:checked`);
-                    if (!memberSelected || !contributionSelected) {
-                        allSelected = false;
+                    const radioSelected = document.querySelector(`input[name="participant_${i}_contribution"]:checked`);
+                    if (!memberSelected || !radioSelected) {
+                        allFilled = false; 
                         break;
                     }
                 }
-                membersComplete = allSelected;
+                membersComplete = allFilled;
             }
         }
         document.querySelector('#progressMembers input').checked = membersComplete;
         
-        // 1位選択チェック
-        const firstSelected = document.getElementById('first_place_group').value;
-        document.querySelector('#progressFirst input').checked = !!firstSelected;
+        // 他グループ評価（1位）と理由の入力確認
+        const first = document.getElementById('first_place_group').value;
+        const firstReason = document.getElementById('first_place_reason').value.trim();
+        document.querySelector('#progressFirst input').checked = !!(first && firstReason);
         
-        // 2位選択チェック
-        const secondSelected = document.getElementById('second_place_group').value;
-        document.querySelector('#progressSecond input').checked = !!secondSelected;
+        // 他グループ評価（2位）と理由の入力確認
+        const second = document.getElementById('second_place_group').value;
+        const secondReason = document.getElementById('second_place_reason').value.trim();
+        document.querySelector('#progressSecond input').checked = !!(second && secondReason);
         
-        // 提出ボタン有効/無効
-        const allComplete = groupSelected && membersComplete && firstSelected && secondSelected;
-        document.getElementById('submitButton').disabled = !allComplete;
+        // 全必須項目が満たされた場合のみ送信ボタンを有効化
+        document.getElementById('submitButton').disabled = !(groupSelected && membersComplete && first && firstReason && second && secondReason);
     }
 
-    // 1位選択時に2位の選択肢を更新
-    function updateSecondPlaceOptions() {
+    /**
+     * 評価対象の重複を防ぐため、1位・2位のセレクトボックスの選択肢を動的に再構築する
+     * 除外条件: ①自分が所属するグループ ②もう一方の順位で選択済みのグループ
+     */
+    function updateRankGroupOptions() {
+        const myGroupId = document.querySelector('input[name="evaluator_group"]:checked')?.value;
         const firstSelect = document.getElementById('first_place_group');
         const secondSelect = document.getElementById('second_place_group');
-        const selectedFirst = firstSelect.value;
+        
+        const currentFirst = firstSelect.value;
         const currentSecond = secondSelect.value;
         
-        // 2位の選択肢をリセット
-        secondSelect.innerHTML = '<option value="">選択してください</option>';
-        
-        if (selectedFirst) {
-            // 1位で選択されたグループ以外を2位の選択肢に追加
-            groupsData.forEach(group => {
-                if (group.id != selectedFirst) {
-                    const option = document.createElement('option');
-                    option.value = group.id;
-                    option.textContent = group.name || `${group.id}グループ`;
-                    secondSelect.appendChild(option);
-                }
-            });
-            
-            // 2位が既に選択されていて、1位と同じグループだった場合はリセット
-            if (currentSecond === selectedFirst) {
-                secondSelect.value = '';
-            } else if (currentSecond && currentSecond !== selectedFirst) {
-                // 2位が既に選択されていて、1位と異なる場合は保持
-                secondSelect.value = currentSecond;
-            }
-        } else {
-            // 1位が選択されていない場合は全てのグループを表示
-            groupsData.forEach(group => {
-                const option = document.createElement('option');
-                option.value = group.id;
-                option.textContent = group.name || `${group.id}グループ`;
-                secondSelect.appendChild(option);
-            });
-            
-            // 2位の選択を保持
-            if (currentSecond) {
-                secondSelect.value = currentSecond;
-            }
-        }
-        
-        updateProgress();
-    }
-
-    // 2位選択時に1位の選択肢を更新
-    function updateFirstPlaceOptions() {
-        const firstSelect = document.getElementById('first_place_group');
-        const secondSelect = document.getElementById('second_place_group');
-        const selectedSecond = secondSelect.value;
-        const currentFirst = firstSelect.value;
-        
-        // 1位の選択肢をリセット
+        // 1位選択肢の再構築
         firstSelect.innerHTML = '<option value="">選択してください</option>';
-        
-        if (selectedSecond) {
-            // 2位で選択されたグループ以外を1位の選択肢に追加
-            groupsData.forEach(group => {
-                if (group.id != selectedSecond) {
-                    const option = document.createElement('option');
-                    option.value = group.id;
-                    option.textContent = group.name || `${group.id}グループ`;
-                    firstSelect.appendChild(option);
-                }
-            });
-            
-            // 1位が既に選択されていて、2位と同じグループだった場合はリセット
-            if (currentFirst === selectedSecond) {
-                firstSelect.value = '';
-            } else if (currentFirst && currentFirst !== selectedSecond) {
-                // 1位が既に選択されていて、2位と異なる場合は保持
-                firstSelect.value = currentFirst;
+        allGroupOptions.forEach(opt => {
+            if (opt.value !== myGroupId && opt.value !== currentSecond) {
+                const newOpt = document.createElement('option');
+                newOpt.value = opt.value;
+                newOpt.textContent = opt.text;
+                firstSelect.appendChild(newOpt);
             }
-        } else {
-            // 2位が選択されていない場合は全てのグループを表示
-            groupsData.forEach(group => {
-                const option = document.createElement('option');
-                option.value = group.id;
-                option.textContent = group.name || `${group.id}グループ`;
-                firstSelect.appendChild(option);
-            });
-            
-            // 1位の選択を保持
-            if (currentFirst) {
-                firstSelect.value = currentFirst;
+        });
+        if (currentFirst && currentFirst !== myGroupId && currentFirst !== currentSecond) {
+            firstSelect.value = currentFirst;
+        }
+
+        // 2位選択肢の再構築
+        secondSelect.innerHTML = '<option value="">選択してください</option>';
+        allGroupOptions.forEach(opt => {
+            if (opt.value !== myGroupId && opt.value !== firstSelect.value) {
+                const newOpt = document.createElement('option');
+                newOpt.value = opt.value;
+                newOpt.textContent = opt.text;
+                secondSelect.appendChild(newOpt);
             }
+        });
+        if (currentSecond && currentSecond !== myGroupId && currentSecond !== firstSelect.value) {
+            secondSelect.value = currentSecond;
         }
         
         updateProgress();
     }
 
-    // イベントリスナー設定
+    // セレクトボックス変更時のハンドラーを統合関数に紐付け
+    function updateSecondPlaceOptions() { updateRankGroupOptions(); }
+    function updateFirstPlaceOptions() { updateRankGroupOptions(); }
+    
+    // イベントリスナーの登録（変更監視）
     document.addEventListener('change', updateProgress);
-
-    // フォーム送信時のバリデーション
-    document.getElementById('evaluationForm').addEventListener('submit', function(e) {
-        // 1位と2位の重複チェック
-        const first = document.getElementById('first_place_group').value;
-        const second = document.getElementById('second_place_group').value;
-        
-        if (first && second && first === second) {
-            e.preventDefault();
-            alert('1位と2位には異なるグループを選択してください。');
-            return false;
-        }
-        
-        // メンバー評価の重複チェック
-        const participantCount = document.getElementById('participantCount').value;
-        if (participantCount) {
-            const count = parseInt(participantCount);
-            const selectedGroupId = document.querySelector('input[name="evaluator_group"]:checked')?.value;
-            
-            if (selectedGroupId) {
-                const group = groupsData.find(g => g.id == selectedGroupId);
-                
-                // グループの人数を超えている場合はエラー
-                if (count > group.members.length) {
-                    e.preventDefault();
-                    alert(`参加者数（${count}名）がグループのメンバー数（${group.members.length}名）を超えています。`);
-                    return false;
-                }
-                
-                if (count > 1) {
-                    // 2名以上の場合のみ重複チェック
-                    const evaluationCount = count - 1;
-                    const selectedMembers = [];
-                    
-                    for (let i = 0; i < evaluationCount; i++) {
-                        const memberSelected = document.querySelector(`select[name="participant_${i}_member"]`)?.value;
-                        if (memberSelected) {
-                            if (selectedMembers.includes(memberSelected)) {
-                                e.preventDefault();
-                                alert('同じメンバーを複数回評価することはできません。');
-                                return false;
-                            }
-                            selectedMembers.push(memberSelected);
-                        }
-                    }
-                }
-            }
-            // 1名の場合はメンバー評価をスキップするため、重複チェックは不要
-        }
-    });
+    document.getElementById('first_place_reason').addEventListener('input', updateProgress);
+    document.getElementById('second_place_reason').addEventListener('input', updateProgress);
+    
     </script>
     {% endif %}
 </body>

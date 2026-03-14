@@ -1,29 +1,66 @@
 {% extends 'school_management/base.html' %}
 
 {% block title %}{{ classroom.class_name }} - QRコード一覧{% endblock %}
+{% block page_title %}QRコード一覧{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">QRコード一覧</li>
+{% endblock %}
 
 {% block content %}
+<style>
+    body { background-color: #f8fafc; }
+</style>
+
 <div class="container mt-4">
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h2 class="card-title mb-0">
-                            <i class="fas fa-qrcode me-2"></i>{{ classroom.class_name }} - QRコード一覧
-                        </h2>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-primary" onclick="openCameraScanner()">
-                                <i class="fas fa-camera me-2"></i>カメラでスキャン
-                            </button>
-                            <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary">
+                    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+                        <div>
+                            <h2 class="card-title mb-0">
+                                <i class="fas fa-qrcode me-2"></i>{{ classroom.class_name }} - QRコード一覧
+                            </h2>
+                            {% if lesson_session %}
+                            <div class="mt-2">
+                                <span class="badge bg-warning text-dark fs-6">
+                                    <i class="fas fa-chalkboard-teacher me-1"></i>
+                                    第{{ lesson_session.session_number }}回 ({{ lesson_session.date|date:"m/d" }}) の採点中
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex gap-2 flex-column flex-sm-row">
+                            {% if lesson_session %}
+                                <button class="btn btn-primary w-100 w-sm-auto shadow-sm" onclick="openCameraScanner()">
+                                    <i class="fas fa-camera me-2"></i>カメラでスキャン
+                                </button>
+                            {% else %}
+                                <button class="btn btn-secondary w-100 w-sm-auto shadow-sm" disabled title="授業回詳細からアクセスしてください">
+                                    <i class="fas fa-camera me-2"></i>カメラでスキャン
+                                </button>
+                            {% endif %}
+                            <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary w-100 w-sm-auto shadow-sm">
                                 <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
                             </a>
                         </div>
                     </div>
-                    <p class="text-muted mb-0 mt-2">
-                        {{ classroom.year }}年度 {{ classroom.get_semester_display }} - 在籍学生数: {{ qr_codes|length }}名
-                    </p>
+                    <div class="d-flex flex-column flex-lg-row align-items-lg-center mt-3 gap-2 flex-wrap">
+                        <p class="text-muted mb-0">
+                            {{ classroom.year }}年度 {{ classroom.get_semester_display }} - 在籍学生数: {{ qr_codes|length }}名
+                        </p>
+                        {% if not lesson_session %}
+                            <div class="alert alert-warning py-1 px-2 mb-0 small d-flex align-items-center">
+                                <i class="fas fa-exclamation-circle me-1"></i>授業回が指定されていません。スキャンするには授業詳細からアクセスしてください。
+                            </div>
+                        {% endif %}
+                        <div class="bg-light rounded px-2 py-1 border align-self-start align-self-lg-center">
+                            <span class="text-muted small">QRアクション: <strong>{{ classroom.qr_point_value }}pt/回</strong></span>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     {% if qr_codes %}
@@ -44,7 +81,7 @@
                                         
                                         <div class="d-flex justify-content-between align-items-center">
                                             <span class="badge bg-primary">スキャン数: {{ qr_data.scan_count }}</span>
-                                            <span class="badge bg-success">ポイント: {{ qr_data.class_points }}pt</span>
+                                            <span class="badge bg-success">ポイント: {{ qr_data.scan_count }}pt</span>
                                         </div>
                                     </div>
                                     <div class="card-footer">
@@ -75,7 +112,6 @@
     </div>
 </div>
 
-<!-- カメラスキャンモーダル -->
 <div class="modal fade" id="cameraScannerModal" tabindex="-1" aria-labelledby="cameraScannerModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -86,20 +122,15 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-center">
-                <div id="camera-container">
-                    <video id="qr-video" width="100%" height="400" autoplay muted></video>
+                <div id="camera-container" style="position: relative; overflow: hidden; border-radius: 8px; background: #000;">
+                    <video id="qr-video" width="100%" height="400" autoplay muted style="object-fit: cover;"></video>
                     <canvas id="qr-canvas" style="display: none;"></canvas>
-                </div>
-                <div id="scan-result" class="mt-3" style="display: none;">
-                    <div class="alert alert-success">
-                        <i class="fas fa-check-circle me-2"></i>
-                        QRコードを検出しました！
-                    </div>
-                </div>
-                <div id="scan-error" class="mt-3" style="display: none;">
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        QRコードの読み取りに失敗しました
+                    
+                    <!-- 結果表示オーバーレイ -->
+                    <div id="scan-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 10;">
+                        <div id="overlay-content" class="text-center p-3">
+                            <!-- JSで内容を挿入 -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -174,27 +205,88 @@ function startQRScan() {
 }
 
 function showScanResult(data) {
-    document.getElementById('scan-result').style.display = 'block';
-    document.getElementById('scan-error').style.display = 'none';
+    
+    // URLパラメータからsession_idを取得
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
     
     // QRコードのURLを処理
     if (data.includes('qr-codes/scan/')) {
-        // スキャンページに移動
-        window.location.href = data;
+        let targetUrl = data;
+        // session_idがある場合は付与して遷移
+        if (sessionId) {
+            const separator = targetUrl.includes('?') ? '&' : '?';
+            targetUrl += `${separator}session_id=${sessionId}`;
+        }
+        
+        // スキャン一時停止
+        clearInterval(scanInterval);
+        
+        // AJAXで送信（画面遷移なし）
+        fetch(targetUrl, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showOverlay('success', result);
+            } else {
+                showOverlay('error', { error: result.error });
+            }
+        })
+        .catch(err => {
+            showOverlay('error', { error: '通信エラーが発生しました' });
+        });
+        
     } else {
-        showError('無効なQRコードです。正しいQRコードをスキャンしてください。');
+        // 無効なQRコードの場合も少し待って再開
+        setTimeout(startQRScan, 1000);
     }
 }
 
-function showError(message) {
-    document.getElementById('scan-error').style.display = 'block';
-    document.getElementById('scan-result').style.display = 'none';
-    document.getElementById('scan-error').innerHTML = `
-        <div class="alert alert-danger">
-            <i class="fas fa-exclamation-triangle me-2"></i>
-            ${message}
+function nextScan() {
+    hideOverlay();
+    startQRScan();
+}
+
+function showOverlay(type, data) {
+    const overlay = document.getElementById('scan-overlay');
+    const content = document.getElementById('overlay-content');
+    
+    let html = '';
+    if (type === 'success') {
+        html = `
+            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+            <h3 class="fw-bold">${data.student_name}</h3>
+            <div class="mt-2">
+                <span class="badge bg-success fs-4">+${data.points_awarded}pt</span>
+            </div>
+            <p class="mt-2 text-white-50">合計: <span class="fw-bold text-white">${data.current_quiz_points}</span>pt</p>
+        `;
+    } else {
+        html = `
+            <i class="fas fa-times-circle fa-4x text-danger mb-3"></i>
+            <h4 class="fw-bold">エラー</h4>
+            <p class="mt-2">${data.error || '読み取りに失敗しました'}</p>
+        `;
+    }
+    
+    html += `
+        <div class="mt-4">
+            <button class="btn btn-light btn-lg px-5 rounded-pill fw-bold shadow-sm" onclick="nextScan()">
+                次へ <i class="fas fa-chevron-right ms-2"></i>
+            </button>
         </div>
     `;
+    
+    content.innerHTML = html;
+    overlay.style.display = 'flex';
+}
+
+function hideOverlay() {
+    document.getElementById('scan-overlay').style.display = 'none';
 }
 
 function stopCamera() {
@@ -206,17 +298,33 @@ function stopCamera() {
         clearInterval(scanInterval);
         scanInterval = null;
     }
+    hideOverlay();
 }
 
 // 手動URL入力ボタンのイベント
 document.getElementById('manualInputBtn').addEventListener('click', function() {
-    const url = prompt('QRコードのURLを入力してください:');
+    let url = prompt('QRコードのURLを入力してください:');
     if (url) {
         if (url.includes('qr-codes/scan/')) {
+            // URLパラメータからsession_idを取得して付与
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session_id');
+            if (sessionId) {
+                const separator = url.includes('?') ? '&' : '?';
+                url += `${separator}session_id=${sessionId}`;
+            }
             window.location.href = url;
         } else {
             alert('無効なQRコードURLです。');
         }
+    }
+});
+
+// 自動起動（URLパラメータ auto_start=true の場合）
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('auto_start') === 'true') {
+        openCameraScanner();
     }
 });
 </script>

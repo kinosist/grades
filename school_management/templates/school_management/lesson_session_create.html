@@ -3,6 +3,12 @@
 {% block title %}授業回作成 - {{ classroom.class_name }}{% endblock %}
 {% block page_title %}授業回作成{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">授業回作成</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-lg-8">

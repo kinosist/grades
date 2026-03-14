@@ -3,8 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse
 from django.db import models
-# モデルのインポート（../../models.py を指す）
-from ...models import ClassRoom, Student, StudentQRCode, StudentClassPoints
+# モデルのインポート
+from ...models import ClassRoom, Student, StudentQRCode, StudentClassPoints, LessonSession, QRCodeScan
 from .utils import generate_qr_code_image
 
 @login_required
@@ -14,7 +14,7 @@ def qr_code_list(request):
         messages.error(request, '教員のみアクセス可能です。')
         return redirect('school_management:dashboard')
     
-    classrooms = ClassRoom.objects.filter(teachers=request.user).order_by('-year', '-semester', 'class_name')
+    classrooms = ClassRoom.objects.filter(teachers=request.user)
     
     class_data = []
     for classroom in classrooms:
@@ -48,12 +48,22 @@ def class_qr_codes(request, class_id):
         return redirect('school_management:dashboard')
     
     students = classroom.students.all()
+    session_id = request.GET.get('session_id')
+    lesson_session = None
+    
+    if session_id:
+        lesson_session = get_object_or_404(LessonSession, id=session_id)
+    
     qr_codes = []
     for student in students:
         qr_code, created = StudentQRCode.objects.get_or_create(student=student, defaults={'is_active': True})
-        scan_url = request.build_absolute_uri(
-            reverse('school_management:qr_code_scan', kwargs={'qr_code_id': qr_code.qr_code_id})
-        ) + f'?class_id={class_id}'
+        
+        base_url = reverse('school_management:qr_code_scan', kwargs={'qr_code_id': qr_code.qr_code_id})
+        params = f'?class_id={class_id}'
+        if session_id:
+            params += f'&session_id={session_id}'
+            
+        scan_url = request.build_absolute_uri(base_url) + params
         
         try:
             class_points = StudentClassPoints.objects.get(student=student, classroom=classroom).points
@@ -68,7 +78,7 @@ def class_qr_codes(request, class_id):
             'class_points': class_points
         })
     
-    context = {'classroom': classroom, 'qr_codes': qr_codes}
+    context = {'classroom': classroom, 'qr_codes': qr_codes, 'lesson_session': lesson_session}
     return render(request, 'school_management/class_qr_codes.html', context)
 
 @login_required
@@ -103,3 +113,20 @@ def qr_code_detail(request, student_id):
         'classroom': classroom,
     }
     return render(request, 'school_management/qr_code_detail.html', context)
+
+@login_required
+def delete_qr_scan(request, scan_id):
+    """QRスキャン履歴の削除"""
+    if not request.user.is_teacher:
+        messages.error(request, '権限がありません。')
+        return redirect('school_management:dashboard')
+    
+    scan = get_object_or_404(QRCodeScan, id=scan_id)
+    student_id = scan.qr_code.student.id
+    
+    # 削除（シグナルによりポイント再計算が行われる）
+    scan.delete()
+    
+    messages.success(request, 'スキャン履歴を削除しました。ポイントが再計算されました。')
+    
+    return redirect('school_management:qr_code_detail', student_id=student_id)

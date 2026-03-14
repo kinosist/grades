@@ -96,8 +96,14 @@ def bulk_student_add_csv(request, class_id):
                 continue
             
             student_number = parts[0].strip()
-            full_name = parts[1].strip()
+            full_name = parts[1].strip() if len(parts) > 1 else ""
             email = parts[2].strip() if len(parts) > 2 and parts[2].strip() else None
+            
+            # ✨ 【修正箇所】名前が空っぽ（必須エラー）の場合、スキップしてエラーにする
+            if not full_name:
+                errors.append(f'行{line_num}: 氏名が入力されていません - {student_number}')
+                error_count += 1
+                continue
             
             try:
                 # 重複チェック（学籍番号またはメールアドレス）

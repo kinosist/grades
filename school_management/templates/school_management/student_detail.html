@@ -4,15 +4,42 @@
 {% block title %}{{ student.full_name }}の詳細 - 学校管理システム{% endblock %}
 {% block page_title %}学生詳細{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:student_list' %}">学生管理</a></li>
+<li class="breadcrumb-item active" aria-current="page">学生詳細</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+
+    body { background-color: #f8fafc; }
+
+    /* 行全体をクリック可能にするスタイル */
+    .clickable-row {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .clickable-row:hover {
+        background-color: #f8fafc !important;
+    }
+    
+    /* カード内の区切り線 */
+    .dashed-divider {
+        border-top: 2px dashed #e2e8f0;
+        margin: 2rem 0;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5><i class="fas fa-user me-2"></i>{{ student.full_name }}の詳細情報</h5>
-                    <div>
-                        <a href="{% url 'school_management:student_edit' student.student_number %}" class="btn btn-outline-warning btn-sm">
+    <div class="col-lg-7 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-user me-2 text-primary"></i>{{ student.full_name }}の詳細情報</h5>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'school_management:student_edit' student.student_number %}" class="btn btn-warning btn-sm text-white fw-bold">
                             <i class="fas fa-edit me-1"></i>編集
                         </a>
                         <form method="post" style="display: inline;" onsubmit="return confirm('{{ student.full_name }}さんを削除してもよろしいですか？この操作は取り消せません。関連するすべてのデータも削除されます。');">
@@ -28,77 +55,65 @@
                     </div>
                 </div>
             </div>
-            <div class="card-body">
-                <dl class="row info-list">
-                    <dt class="col-sm-4 text-end">学籍番号:</dt>
-                    <dd class="col-sm-8">{{ student.student_number }}</dd>
+            <div class="card-body p-4">
+                <dl class="row info-list mb-0">
+                    <dt class="col-sm-3 text-muted">学籍番号</dt>
+                    <dd class="col-sm-9 fw-bold">{{ student.student_number }}</dd>
                     
-                    <dt class="col-sm-4 text-end">氏名:</dt>
-                    <dd class="col-sm-8">{{ student.full_name }}</dd>
+                    <dt class="col-sm-3 text-muted">氏名</dt>
+                    <dd class="col-sm-9 fs-5 fw-bold">{{ student.full_name }}</dd>
                     
-                    <dt class="col-sm-4 text-end">フリガナ:</dt>
-                    <dd class="col-sm-8">{{ student.furigana|default:"-" }}</dd>
+                    <dt class="col-sm-3 text-muted">フリガナ</dt>
+                    <dd class="col-sm-9">{{ student.furigana|default:"-" }}</dd>
                     
-                    <dt class="col-sm-4 text-end">メールアドレス:</dt>
-                    <dd class="col-sm-8">{{ student.email|default:"未設定" }}</dd>
+                    <dt class="col-sm-3 text-muted">メール</dt>
+                    <dd class="col-sm-9">{{ student.email|default:"未設定" }}</dd>
                     
-                    <dt class="col-sm-4 text-end">ポイント:</dt>
-                    <dd class="col-sm-8">
+                    <dt class="col-sm-3 text-muted">ポイント</dt>
+                    <dd class="col-sm-9">
                         <small class="text-muted">※クラスごとに独立管理（下記の所属クラス欄で確認）</small>
                     </dd>
                     
                     {% if student.memo %}
-                    <dt class="col-sm-4 text-end">備考:</dt>
-                    <dd class="col-sm-8">{{ student.memo }}</dd>
+                    <dt class="col-sm-3 text-muted">備考</dt>
+                    <dd class="col-sm-9">{{ student.memo }}</dd>
                     {% endif %}
                 </dl>
-            </div>
-        </div>
-        
-        <!-- 所属クラス -->
-        <div class="card mt-4">
-            <div class="card-header">
-                <h6><i class="fas fa-chalkboard me-2"></i>所属クラス</h6>
-            </div>
-            <div class="card-body">
+
+                <hr class="dashed-divider">
+
+                <h6 class="fw-bold mb-3 text-dark"><i class="fas fa-chalkboard me-2 text-secondary"></i>所属クラス</h6>
+                
                 {% if classes %}
                     <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
+                        <table class="table table-hover align-middle">
+                            <thead class="bg-light">
                                 <tr>
                                     <th>クラス名</th>
-                                    <th>年度</th>
-                                    <th>学期</th>
+                                    <th>年度・学期</th>
                                     <th>担当教師</th>
                                     <th>ポイント</th>
-                                    <th>操作</th>
-                                </tr>
+                                    </tr>
                             </thead>
                             <tbody>
                                 {% for data in class_data %}
-                                <tr>
+                                <tr class="clickable-row" data-href="{% url 'school_management:class_detail' data.classroom.id %}">
                                     <td><strong>{{ data.classroom.class_name }}</strong></td>
-                                    <td>{{ data.classroom.year }}</td>
                                     <td>
-                                        <span class="badge bg-{% if data.classroom.semester == 'first' %}primary{% else %}secondary{% endif %}">
+                                        {{ data.classroom.year }} 
+                                        <span class="badge bg-light text-dark border ms-1">
                                             {{ data.classroom.get_semester_display }}
                                         </span>
                                     </td>
                                     <td>
                                         {% for teacher in data.classroom.teachers.all %}
-                                            {{ teacher.full_name }}{% if not forloop.last %}, {% endif %}
+                                            <span class="small text-muted">{{ teacher.full_name }}</span>{% if not forloop.last %}, {% endif %}
                                         {% endfor %}
                                     </td>
                                     <td>
-                                        <span class="badge bg-{% if data.points >= 50 %}success{% elif data.points >= 30 %}warning{% else %}secondary{% endif %} fs-6">
+                                        <span class="badge bg-{% if data.points >= 50 %}success{% elif data.points >= 30 %}warning{% else %}secondary{% endif %} rounded-pill px-3">
                                             {{ data.points }}pt
                                         </span>
-                                    </td>
-                                    <td>
-                                        <a href="{% url 'school_management:class_detail' data.classroom.id %}" 
-                                           class="btn btn-outline-primary btn-sm">
-                                            <i class="fas fa-eye me-1"></i>詳細
-                                        </a>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -106,62 +121,77 @@
                         </table>
                     </div>
                 {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-exclamation-circle fa-2x text-muted mb-3"></i>
-                        <p class="text-muted">まだクラスに所属していません。</p>
+                    <div class="text-center py-4 bg-light rounded-3">
+                        <i class="fas fa-chalkboard-teacher fa-2x text-muted mb-2 opacity-50"></i>
+                        <p class="text-muted small mb-0">まだクラスに所属していません。</p>
                     </div>
                 {% endif %}
             </div>
         </div>
     </div>
     
-    <div class="col-md-4">
-        <!-- 学習統計 -->
-        <div class="card">
-            <div class="card-header">
-                <h6><i class="fas fa-chart-bar me-2"></i>学習統計</h6>
+    <div class="col-lg-5">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-bold"><i class="fas fa-chart-bar me-2 text-success"></i>学習統計</h6>
             </div>
             <div class="card-body">
-                <div class="row text-center">
+                <div class="row text-center g-3">
                     <div class="col-6">
-                        <div class="border-end">
-                            <h4 class="text-primary">{{ classes.count }}</h4>
-                            <small class="text-muted">所属クラス数</small>
+                        <div class="p-3 bg-light rounded-3">
+                            <h3 class="text-primary fw-bold mb-1">{{ classes.count }}</h3>
+                            <small class="text-muted fw-bold" style="font-size: 0.75rem;">所属クラス</small>
                         </div>
                     </div>
                     <div class="col-6">
-                        <h4 class="text-success">0</h4>
-                        <small class="text-muted">小テスト回数</small>
-                    </div>
-                </div>
-                <hr>
-                <div class="row text-center">
-                    <div class="col-6">
-                        <div class="border-end">
-                            <h4 class="text-warning">0</h4>
-                            <small class="text-muted">ピア評価回数</small>
+                        <div class="p-3 bg-light rounded-3">
+                            <h3 class="text-success fw-bold mb-1">{{ stats.total_quizzes }}</h3>
+                            <small class="text-muted fw-bold" style="font-size: 0.75rem;">小テスト回数</small>
                         </div>
                     </div>
                     <div class="col-6">
-                        <h4 class="text-info">-</h4>
-                        <small class="text-muted">平均点</small>
+                        <div class="p-3 bg-light rounded-3">
+                            <h3 class="text-warning fw-bold mb-1">{{ stats.peer_eval_count }}</h3>
+                            <small class="text-muted fw-bold" style="font-size: 0.75rem;">ピア評価</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded-3">
+                            <h3 class="text-secondary fw-bold mb-1">{{ stats.avg_score }}点</h3>
+                            <small class="text-muted fw-bold" style="font-size: 0.75rem;">平均点</small>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- 最近の活動 -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h6><i class="fas fa-clock me-2"></i>最近の活動</h6>
+        <div class="card shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-bold"><i class="fas fa-clock me-2 text-info"></i>最近の活動</h6>
             </div>
-            <div class="card-body">
-                <div class="text-center py-3">
-                    <i class="fas fa-history fa-2x text-muted mb-2"></i>
+            <div class="card-body" style="min-height: 200px;">
+                <div class="text-center py-5 opacity-50">
+                    <i class="fas fa-history fa-3x text-muted mb-3"></i>
                     <p class="text-muted small">活動履歴はまだありません</p>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('.clickable-row');
+    rows.forEach(row => {
+        row.addEventListener('click', function(e) {
+            // テキスト選択などは阻害しないようにする
+            const selection = window.getSelection();
+            if (selection.toString().length > 0) return;
+
+            const url = this.getAttribute('data-href');
+            if (url) window.location.href = url;
+        });
+    });
+});
+</script>
 {% endblock %}

@@ -11,7 +11,7 @@
     <div class="container py-5">
         <div class="row justify-content-center">
             <div class="col-md-8 col-lg-6">
-                <!-- 完了メッセージ -->
+                <!-- 完了メッセージ表示エリア -->
                 <div class="card border-success">
                     <div class="card-header bg-success text-white text-center">
                         <h3 class="mb-0">
@@ -25,7 +25,7 @@
                             <p class="text-muted">ピア評価が正常に送信されました。</p>
                         </div>
 
-                        <!-- 評価情報 -->
+                        <!-- 評価した授業情報の表示 -->
                         <div class="mb-4">
                             <div class="row">
                                 <div class="col-6">
@@ -43,7 +43,7 @@
                             </div>
                         </div>
 
-                        <!-- メッセージ -->
+                        <!-- 重要なお知らせ -->
                         <div class="alert alert-info">
                             <h6><i class="fas fa-info-circle me-2"></i>重要なお知らせ</h6>
                             <ul class="mb-0 text-start">
@@ -54,17 +54,9 @@
                             </ul>
                         </div>
 
-                        <!-- 次のアクション -->
-                        <div class="mt-4">
-                            <p class="text-muted mb-3">このページを閉じて構いません。</p>
-                            <div class="d-grid gap-2">
-                                <button class="btn btn-success" onclick="window.close()">
-                                    <i class="fas fa-times me-1"></i>ページを閉じる
-                                </button>
-                                <button class="btn btn-outline-secondary" onclick="window.print()">
-                                    <i class="fas fa-print me-1"></i>完了証明を印刷
-                                </button>
-                            </div>
+                        <!-- 【修正箇所】印刷ボタンと機能しない閉じるボタンを削除し、案内テキストのみ残す -->
+                        <div class="mt-4 text-center">
+                            <p class="text-muted fw-bold mb-0">ブラウザのタブを閉じて終了してください。</p>
                         </div>
                     </div>
                     <div class="card-footer text-center text-muted small">
@@ -73,7 +65,7 @@
                     </div>
                 </div>
 
-                <!-- 評価結果プレビュー（オプション） -->
+                <!-- 評価結果プレビュー（オプション表示） -->
                 {% if show_evaluation_preview %}
                 <div class="card mt-4">
                     <div class="card-header">
@@ -81,13 +73,13 @@
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <strong>1位グループ:</strong> {{ first_place_group.group_name|default:first_place_group.group_number }}グループ
+                            <strong>1位グループ:</strong> {{ first_place_group.group_name|default:first_place_group.group_number }}
                             {% if first_place_reason %}
                                 <div class="small text-muted mt-1">理由: {{ first_place_reason }}</div>
                             {% endif %}
                         </div>
                         <div class="mb-3">
-                            <strong>2位グループ:</strong> {{ second_place_group.group_name|default:second_place_group.group_number }}グループ
+                            <strong>2位グループ:</strong> {{ second_place_group.group_name|default:second_place_group.group_number }}
                             {% if second_place_reason %}
                                 <div class="small text-muted mt-1">理由: {{ second_place_reason }}</div>
                             {% endif %}
@@ -106,7 +98,9 @@
     </div>
 
     <script>
-        // 完了時刻を表示
+        /**
+         * ページ読み込み完了時に現在の時刻を取得し、完了時刻として表示する
+         */
         document.addEventListener('DOMContentLoaded', function() {
             const now = new Date();
             const timeString = now.toLocaleString('ja-JP', {
@@ -120,13 +114,10 @@
             document.getElementById('completion-time').textContent = timeString;
         });
 
-        // 5秒後に自動的にページを閉じる（オプション）
-        setTimeout(function() {
-            const autoClose = confirm('5秒が経過しました。ページを自動的に閉じますか？');
-            if (autoClose) {
-                window.close();
-            }
-        }, 5000);
+        /* * 【修正箇所】Issue #48 対応
+         * ブラウザの仕様上、スクリプトで開いていないウィンドウは window.close() で閉じることができず
+         * コンソールエラーや無意味なポップアップの原因となるため、5秒後に自動で閉じる処理を削除しました。
+         */
     </script>
 </body>
 </html>

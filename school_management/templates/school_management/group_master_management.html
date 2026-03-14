@@ -3,6 +3,12 @@
 {% block title %}グループマスタ編集 - {{ classroom.class_name }}{% endblock %}
 {% block page_title %}グループマスタ編集{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">グループマスタ編集</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-lg-8">
@@ -68,8 +74,7 @@
                     </div>
 
                     <div id="groupsContainer">
-                        <!-- グループが動的に生成されます -->
-                    </div>
+                        </div>
 
                     <div class="d-flex justify-content-between mt-4">
                         <div>
@@ -93,7 +98,6 @@
     </div>
     
     <div class="col-lg-4">
-        <!-- 学生一覧 -->
         <div class="card mb-3">
             <div class="card-header">
                 <h6><i class="fas fa-user-graduate me-2"></i>学生一覧</h6>
@@ -117,7 +121,6 @@
             </div>
         </div>
 
-        <!-- ヘルプ -->
         <div class="card">
             <div class="card-header">
                 <h6><i class="fas fa-lightbulb me-2"></i>使い方</h6>
@@ -222,8 +225,7 @@ function updateGroups() {
                  ondragover="allowDrop(event)" 
                  data-group="${i}">
                 <div id="group_${i}_members" class="group-members">
-                    <!-- メンバーがここに追加されます -->
-                </div>
+                    </div>
                 <div class="text-center text-muted p-3" id="group_${i}_placeholder">
                     <i class="fas fa-user-plus fa-2x mb-2"></i>
                     <p class="mb-0">学生をここにドロップしてください</p>
@@ -526,8 +528,7 @@ function addNewGroup() {
              ondragover="allowDrop(event)" 
              data-group="${newGroupNumber}">
             <div id="group_${newGroupNumber}_members" class="group-members">
-                <!-- メンバーがここに追加されます -->
-            </div>
+                </div>
             <div class="text-center text-muted p-3" id="group_${newGroupNumber}_placeholder">
                 <i class="fas fa-user-plus fa-2x mb-2"></i>
                 <p class="mb-0">学生をここにドロップしてください</p>
@@ -716,8 +717,7 @@ document.addEventListener('DOMContentLoaded', function() {
                          ondragover="allowDrop(event)" 
                          data-group="${groupNum}">
                         <div id="group_${groupNum}_members" class="group-members">
-                            <!-- メンバーがここに追加されます -->
-                        </div>
+                            </div>
                         <div class="text-center text-muted p-3" id="group_${groupNum}_placeholder">
                             <i class="fas fa-user-plus fa-2x mb-2"></i>
                             <p class="mb-0">学生をここにドロップしてください</p>

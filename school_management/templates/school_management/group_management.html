@@ -3,7 +3,20 @@
 {% block title %}グループ編成 - 第{{ lesson_session.session_number }}回{% endblock %}
 {% block page_title %}グループ編成{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' lesson_session.classroom.id %}">{{ lesson_session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}">第{{ lesson_session.session_number }}回</a></li>
+<li class="breadcrumb-item active" aria-current="page">グループ編成</li>
+{% endblock %}
+
 {% block content %}
+<style>
+body {
+    background-color: #f8fafc;
+}
+</style>
+
 <div class="row">
     <div class="col-lg-8">
         <div class="card">

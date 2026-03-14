@@ -3,75 +3,150 @@
 {% block title %}学生一覧 - 学校管理システム{% endblock %}
 {% block page_title %}学生一覧{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item active" aria-current="page">学生管理</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    body { background-color: #f8fafc; }
+    
+    
+    /* カードデザイン */
+    .modern-card {
+        border: none !important;
+        border-radius: 20px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        background-color: #ffffff;
+    }
+
+    /* ✨ 改善版：おしゃれな検索ボックス */
+    .search-input-group {
+        border-radius: 50px;
+        overflow: hidden;
+        background-color: #f1f5f9; /* 少し色を付けて背景と区別 */
+        border: 2px solid #f1f5f9; /* 背景と同じ色で縁取り */
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        padding: 2px;
+    }
+    
+    /* 入力中（フォーカス時）のスタイル */
+    .search-input-group:focus-within {
+        background-color: #ffffff; /* 入力時は白く光る */
+        border-color: #0d6efd; /* 青い枠線 */
+        box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.1);
+        transform: translateY(-1px);
+    }
+
+    .search-input-group .form-control {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding-left: 10px;
+    }
+
+    .search-input-group .input-group-text {
+        background-color: transparent !important;
+        border: none !important;
+        color: #94a3b8;
+    }
+
+    /* PC用テーブル */
+    .table-modern thead th {
+        background-color: #f8f9fa;
+        color: #64748b;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        padding: 1rem;
+        border: none;
+    }
+    .table-modern tbody td {
+        padding: 1.2rem 1rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .clickable-row {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .clickable-row:hover {
+      background-color: rgba(0,0,0,0.05) ;
+        transform: translateY(-1px);
+    }
+
+    /* スマホ・タブレット用カード */
+    .student-mobile-card {
+        border: 1px solid #f1f5f9;
+        border-radius: 16px;
+        transition: all 0.2s;
+        background-color: #fff;
+        text-decoration: none !important;
+        display: block;
+    }
+    .student-mobile-card:active {
+        transform: scale(0.97);
+        background-color: #f8fafc;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5><i class="fas fa-users me-2"></i>学生一覧</h5>
-                <a href="{% url 'school_management:student_create' %}" class="btn btn-primary">
-                    <i class="fas fa-user-plus me-1"></i>新しい学生
-                </a>
-            </div>
-            <div class="card-body">
-                <!-- 検索フォーム -->
-                <form method="get" class="mb-4">
-                    <div class="row">
-                        <div class="col-md-10">
-                            <input type="text" class="form-control" name="search" 
-                                   placeholder="学籍番号、氏名、フリガナで検索..." 
-                                   value="{{ search_query }}">
-                        </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-outline-secondary w-100">
-                                <i class="fas fa-search"></i> 検索
-                            </button>
-                        </div>
+        <div class="card modern-card">
+            <div class="card-body p-4">
+                
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-bold m-0 text-dark"><i class="fas fa-users me-2 text-primary"></i>学生一覧</h5>
+                    <a href="{% url 'school_management:student_create' %}" class="btn btn-primary  px-4 shadow-sm fw-bold">
+                        <i class="fas fa-user-plus me-2"></i>新しい学生
+                    </a>
+                </div>
+
+                <form method="get" class="mb-5">
+                    <div class="input-group input-group-lg search-input-group">
+                        <span class="input-group-text ps-3">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" class="form-control" name="search" 
+                               placeholder="学籍番号、氏名、フリガナで検索..." 
+                               value="{{ search_query }}">
+                        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">
+                            検索
+                        </button>
                     </div>
                 </form>
 
                 {% if students %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
+                    
+                    <div class="table-responsive d-none d-md-block">
+                        <table class="table table-modern align-middle mb-0">
                             <thead>
                                 <tr>
-                                    <th>学籍番号</th>
+                                    <th style="width: 180px;">学籍番号</th>
                                     <th>氏名</th>
-                                    <th>メールアドレス</th>
-                                    <th>役割</th>
-                                    <th>操作</th>
+                                    <th class="d-none d-lg-table-cell">メールアドレス</th>
+                                    <th style="width: 120px; text-align: center;">役割</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for student in students %}
-                                <tr>
-                                    <td><strong>{{ student.student_number|default:"未設定" }}</strong></td>
-                                    <td>{{ student.full_name }}</td>
-                                    <td>{{ student.email|default:"-" }}</td>
-                                    <td><span class="badge bg-success">{{ student.get_role_display }}</span></td>
+                                <tr class="clickable-row" data-href="{% url 'school_management:student_detail' student.student_number %}">
                                     <td>
-                                        {% if student.student_number %}
-                                        <div class="btn-group" role="group">
-                                            <a href="{% url 'school_management:student_detail' student.student_number %}" 
-                                               class="btn btn-outline-primary btn-sm">
-                                                <i class="fas fa-eye me-1"></i>詳細
-                                            </a>
-                                            <a href="{% url 'school_management:student_edit' student.student_number %}" 
-                                               class="btn btn-outline-warning btn-sm">
-                                                <i class="fas fa-edit me-1"></i>編集
-                                            </a>
-                                            <form method="post" style="display: inline;" onsubmit="return confirm('{{ student.full_name }}さんを削除してもよろしいですか？この操作は取り消せません。');">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="action" value="delete_student">
-                                                <input type="hidden" name="student_number" value="{{ student.student_number }}">
-                                                <button type="submit" class="btn btn-outline-danger btn-sm">
-                                                    <i class="fas fa-trash me-1"></i>削除
-                                                </button>
-                                            </form>
-                                        </div>
-                                        {% else %}
-                                        <span class="text-muted">学籍番号未設定</span>
-                                        {% endif %}
+                                        <span class="badge bg-light text-dark border fw-bold px-3 py-2 rounded-pill">
+                                            {{ student.student_number|default:"未設定" }}
+                                        </span>
+                                    </td>
+                                    <td class="fw-bold text-dark text-nowrap">{{ student.full_name }}</td>
+                                    <td class="text-muted d-none d-lg-table-cell text-truncate" style="max-width: 250px;">
+                                        {{ student.email|default:"-" }}
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-success-soft text-success px-3 py-1 rounded-pill" style="background-color: #d1e7dd;">
+                                            {{ student.get_role_display }}
+                                        </span>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -79,25 +154,53 @@
                         </table>
                     </div>
 
+                    <div class="d-md-none">
+                        <div class="row g-3">
+                            {% for student in students %}
+                            <div class="col-12">
+                                <a href="{% url 'school_management:student_detail' student.student_number %}" class="student-mobile-card p-3 shadow-sm">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="badge bg-light text-dark border rounded-pill">
+                                            {{ student.student_number|default:"-" }}
+                                        </span>
+                                        <span class="badge bg-success-soft text-success px-2 py-1 rounded-2" style="background-color: #d1e7dd;">
+                                            {{ student.get_role_display }}
+                                        </span>
+                                    </div>
+                                    <h5 class="fw-bold text-dark mb-1">{{ student.full_name }}</h5>
+                                    <p class="text-muted small mb-0 text-truncate">
+                                        <i class="far fa-envelope me-1"></i>{{ student.email|default:"メール未設定" }}
+                                    </p>
+                                </a>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
                 {% else %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-user-graduate fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">学生が見つかりません</h5>
-                        {% if search_query %}
-                            <p class="text-muted">「{{ search_query }}」に一致する学生がいません。</p>
-                            <a href="{% url 'school_management:student_list' %}" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left me-1"></i>すべての学生を表示
-                            </a>
-                        {% else %}
-                            <p class="text-muted">まだ学生が登録されていません。最初の学生を登録してください。</p>
-                            <a href="{% url 'school_management:student_create' %}" class="btn btn-primary">
-                                <i class="fas fa-user-plus me-1"></i>最初の学生を登録する
-                            </a>
-                        {% endif %}
+                    <div class="text-center py-5 opacity-50">
+                        <i class="fas fa-user-graduate fa-4x mb-3 text-secondary"></i>
+                        <h5 class="fw-bold text-dark">学生が見つかりません</h5>
+                        <a href="{% url 'school_management:student_list' %}" class="btn btn-light rounded-pill px-4 mt-2">
+                            一覧に戻る
+                        </a>
                     </div>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
+<div class="py-5"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('.clickable-row');
+    rows.forEach(row => {
+        row.addEventListener('click', function() {
+            const url = this.getAttribute('data-href');
+            if (url) window.location.href = url;
+        });
+    });
+});
+</script>
 {% endblock %}

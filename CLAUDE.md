@@ -3,118 +3,89 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-Django 5.2.5 web application for educational institutions (学校管理システム). Uses `uv` for package management. SQLite3 database in development.
+Django 5.2.5 web application for educational institutions (学校管理システム). Teacher-facing system for class/student/quiz/peer-evaluation management. Uses `uv` for package management. SQLite3 in development, PostgreSQL in production (Railway). Deployed via GitHub push to Railway (auto-deploy).
 
 ## Development Commands
 
-### Environment Setup
-```powershell
-uv sync                              # Install dependencies
-uv run python manage.py migrate      # Apply database migrations
-uv run python manage.py createsuperuser # Create admin user (email as username)
+```bash
+uv sync                                  # Install dependencies
+uv run python manage.py migrate          # Apply database migrations
+uv run python manage.py makemigrations   # Create migration files
+uv run python manage.py runserver        # Start at http://127.0.0.1:8000/
+uv run python manage.py createsuperuser  # Create admin user (email as username)
+uv run python manage.py shell            # Django Python shell
+uv run python manage.py dbshell          # Access database shell
 ```
 
-### Development Server
-```powershell
-uv run python manage.py runserver    # Start at http://127.0.0.1:8000/
-```
-
-### Database Management
-```powershell
-uv run python manage.py makemigrations  # Create migration files
-uv run python manage.py migrate         # Apply migrations
-uv run python manage.py dbshell         # Access database shell
-uv run python manage.py shell           # Django Python shell
-```
-
-### Test Data
-```powershell
-uv run python test_login.py            # Test login functionality
-uv run python create_test_users.py     # Create test user data
-```
+No test suite exists. Manual testing via `uv run python test_login.py` and `uv run python create_test_users.py`.
 
 ## Architecture
 
 ### Project Structure
 - **`school_project/`**: Django settings and root URL configuration
-- **`school_management/`**: Main application with all business logic
-  - `models.py`: All data models (unified CustomUser, ClassRoom, LessonSession, Group, Quiz, PeerEvaluation, etc.)
-  - `views/`: View logic split by feature domain
-    - `auth/`: Login/logout (`login.py`, `logout.py`)
-    - `dashboard/`: Dashboard views (`dashboard_view.py`, `teacher_dashboard.py`, `student_dashboard.py`, `admin_teacher_dashboard.py`)
-    - `classes/`: Class CRUD (`list.py`, `detail.py`, `management.py`)
-    - `sessions/`: Lesson session management (`list.py`, `detail.py`, `management.py`, `lesson.py`)
-    - `students/`: Student CRUD and enrollment (`list.py`, `detail.py`, `management.py`, `enrollment.py`)
-    - `quizzes/`: Quiz management and grading (`management.py`, `grading.py`, `questions.py`)
-    - `groups/`: Group management (`read.py`, `write.py`, `master.py`)
-    - `peer_eval/`: Peer evaluation (`management.py`, `form.py`, `improved.py`, `results.py`)
-    - `grades/`: Class evaluation and points (`class_evaluation.py`, `class_points.py`)
-    - `attendance/`: QR code and attendance (`manage.py`, `scan.py`, `student.py`, `utils.py`)
-    - `utils.py`: Shared utilities (health_check)
-  - `urls.py`: URL routing (app_name='school_management')
+- **`school_management/`**: Single-app architecture with all business logic
+  - `models.py`: All data models (~1050 lines) including signal handlers at the bottom
+  - `views/`: Split by feature domain (10 subdirectories), each with `__init__.py` re-exporting view functions
+  - `urls.py`: URL routing (`app_name='school_management'`)
   - `templates/school_management/`: All HTML templates
 
-### User Model Architecture
+### View Directory Mapping
+| Directory | Purpose | Key files |
+|-----------|---------|-----------|
+| `auth/` | Login/logout | `login.py`, `logout.py` |
+| `dashboard/` | Dashboards | `dashboard_view.py`, `teacher_dashboard.py`, `student_dashboard.py` |
+| `classes/` | Class CRUD | `list.py`, `detail.py`, `management.py` |
+| `sessions/` | Lesson sessions | `management.py`, `detail.py`, `list.py`, `lesson.py` |
+| `students/` | Student CRUD | `list.py`, `detail.py`, `management.py`, `enrollment.py`, `self_eval.py` |
+| `quizzes/` | Quiz & grading | `management.py`, `grading.py`, `questions.py` |
+| `groups/` | Group management | `read.py`, `write.py`, `master.py` |
+| `peer_eval/` | Peer evaluation | `management.py`, `form.py`, `improved.py`, `results.py` |
+| `grades/` | Evaluation & points | `class_evaluation.py`, `class_points.py` |
+| `attendance/` | QR code & scans | `manage.py`, `scan.py`, `student.py`, `utils.py` |
+
+### User Model
 **Critical**: Uses `CustomUser` (extends `AbstractUser`) as the unified user model:
-- `AUTH_USER_MODEL = 'school_management.CustomUser'` in settings
+- `AUTH_USER_MODEL = 'school_management.CustomUser'`
 - Email-based authentication (`USERNAME_FIELD = 'email'`)
-- Role-based system: `role` field with choices: 'admin', 'teacher', 'student'
-- Both `Teacher` and `Student` are aliases pointing to `CustomUser` for backward compatibility
-- Properties: `is_teacher` (admin/teacher), `is_student` (student)
-- Students have `student_number`, teachers have `teacher_id`
-- Points system: `points` field for gamification, per-lesson tracking via `StudentLessonPoints`, per-class via `StudentClassPoints`
+- Role field: `'admin'`, `'teacher'`, `'student'`
+- `Teacher` and `Student` are aliases for `CustomUser` (backward compatibility)
+- Properties: `is_teacher` (admin/teacher roles), `is_student` (student role)
+- Students do NOT log in to this system; only teachers/admins use the login
 
-### Core Feature Models
-**ClassRoom**: Year/semester-based classes with many-to-many relationships to teachers and students
+### Points & Grading System
+Two grading modes per class (`ClassRoom.grading_system`):
+- **`standard`**: Points accumulated from quizzes + lesson points + QR scans + peer evaluation. Formula: `attendance_points + (class_points * 2)`
+- **`goal`**: Teacher directly assigns a score via `SelfEvaluation.teacher_score`
 
-**LessonSession**: Individual lesson instances within a classroom
-- Tracks session number, date, topic
-- Flags: `has_quiz`, `has_peer_evaluation`, `peer_evaluation_closed`
-- One-to-many with Group, Quiz, PeerEvaluation
+Points hierarchy:
+- `StudentClassPoints`: Aggregated per-student per-class total. Auto-recalculated on `save()` via `calculate_points_internal()`
+- `StudentLessonPoints`: Per-student per-session manual points
+- `QuizScore`: Per-quiz results
+- `QRCodeScan`: Scan history, converted to `QuizScore` via signals
 
-**Group**: Work groups within lesson sessions
-- Has `group_number`, optional `group_name`
-- Members tracked via `GroupMember` model with optional roles
+Signal handlers in `models.py` (line ~889+) auto-recalculate `StudentClassPoints` when `QuizScore`, `StudentLessonPoints`, `SelfEvaluation`, `QRCodeScan`, `ContributionEvaluation`, `PeerEvaluation`, or `GroupMember` changes.
 
-**Quiz System**:
-- Quiz model with grading methods: pass_fail, numeric, rubric, qr_mobile
-- `QuizScore` for results (with `is_cancelled` flag for corrections)
-- `Question` and `QuestionChoice` for quiz content (multiple_choice, true_false, short_answer)
-- JSON field `quick_buttons` for grading shortcuts
+### Peer Evaluation Dual-Lookup Pattern
+`PeerEvaluation` stores group references as both FK (`first_place_group`) and number (`first_place_group_number`). The `save()` method syncs numbers from FKs. Queries use OR conditions to handle both:
+```python
+Q(first_place_group=g) | Q(lesson_session=sess, first_place_group_number=g.group_number)
+```
 
-**Peer Evaluation**:
-- `PeerEvaluation`: Anonymous voting (UUID token) for 1st/2nd place groups with reasons
-- `ContributionEvaluation`: 1-5 scale rating for group member contributions
-- Linked to evaluator's group via `evaluator_group`
+### QR Code Flow
+1. Teacher scans student's `StudentQRCode` (UUID-based)
+2. `QRCodeScan` created → `pre_save` signal sets `points_awarded` from `classroom.qr_point_value`
+3. `post_save` signal creates/updates a `QuizScore` on the `is_qr_linked` Quiz for that session
+4. `QuizScore` save triggers `StudentClassPoints` recalculation
 
-**QR Code System**:
-- `StudentQRCode`: UUID-based QR codes for each student
-- `QRCodeScan`: Scan history with point awards and duplicate prevention
+### Key URL Patterns
+- `/`: Login → `/dashboard/`: Teacher dashboard
+- `/classes/<id>/evaluation/`: Grade evaluation view
+- `/classes/<id>/points/`: Points ranking view
+- `/peer-evaluation/<token>/`: Anonymous student evaluation (UUID token)
+- `/qr/<uuid>/`: QR code scan endpoint
 
-### URL Patterns
-Key route patterns (`app_name='school_management'`):
-- `/`: Login (email-based)
-- `/dashboard/`: Teacher dashboard
-- `/student-dashboard/`: Student dashboard
-- `/classes/`: Class management
-- `/classes/<id>/students/select/`: Bulk student enrollment
-- `/classes/<id>/sessions/`: Lesson session management
-- `/sessions/<id>/quizzes/`: Quiz creation and grading
-- `/lesson-sessions/<id>/groups/`: Group management
-- `/lesson-sessions/<id>/peer-evaluation/`: Peer evaluation setup
-- `/peer-evaluation/<token>/`: Anonymous student evaluation form
-- `/students/`: Student master list management
-- `/qr-codes/`: QR code generation and scanning
-
-### Authentication & Access Control
-- Custom user manager (`CustomUserManager`) handles user creation
-- Login redirects: `LOGIN_REDIRECT_URL = '/dashboard/'`
-- Role-based views: Check `user.is_teacher` or `user.is_student`
-- Students access via token-based URLs for peer evaluations (anonymous)
-
-### Key Design Patterns
-- Unique constraints: `(classroom, session_number)`, `(lesson_session, group_number)`, `(peer_evaluation, evaluatee)`
-- CASCADE deletion for referential integrity
-- Many-to-many with intermediate models: `GroupMember` for role assignment
-- UUID tokens for anonymous peer evaluation
-- Points are tracked both globally on CustomUser and per-lesson/per-class via separate models
+### Known Architecture Notes
+- `sessions/__init__.py` has aliasing that makes `lesson.py`'s `lesson_session_create` and `lesson_session_detail` dead code (overridden by `management.py` and `detail.py`)
+- `class_points.py` has N+1 optimization with pre-cached session rankings; `class_evaluation.py` still has the N+1 pattern for peer evaluation queries
+- `class_evaluation.py` has significant dead code: many computed keys in `student_evaluations` dict (`total_combined_score`, `multiplied_points`, `multiplier`, `session_data`, `session_count`, `average_points`, `class_points`, `student_points`, `qr_points`) and context variables (`session_list`, `session_peer_averages`) are never used in the template
+- `models.py` `calculate_points_internal()` previously had a `scanned_by=self.student` filter bug for QR points — now resolved by aggregating QR points via `QuizScore` instead of `QRCodeScan` directly

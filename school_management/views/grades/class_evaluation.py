@@ -2,9 +2,15 @@ from django.shortcuts import render, get_object_or_404
 import logging
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Q
+
+#新しく
+import json
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+
 # ✨ StudentColumnScore を新しくインポートに追加！
 from ...models import (
-    ClassRoom, LessonSession, StudentLessonPoints, QuizScore, Group, 
+    ClassRoom, LessonSession, Student, StudentLessonPoints, QuizScore, Group, 
     GroupMember, StudentClassPoints, PeerEvaluation, ContributionEvaluation, 
     SelfEvaluation, PointColumn, StudentColumnScore
 )
@@ -204,3 +210,29 @@ def class_evaluation_view(request, class_id):
         'table_colspan': table_colspan,
     }
     return render(request, 'school_management/class_evaluation.html', context)
+
+
+@require_POST
+def update_custom_score(request, class_id):
+
+    try:
+        data = json.loads(request.body)
+        student_id = data.get('student_id')
+        column_id = data.get('column_id')
+        score = data.get('score', 0)
+        student = get_object_or_404(Student, id=student_id)
+        column = get_object_or_404(PointColumn, id=column_id)
+
+
+        StudentColumnScore.objects.update_or_create(
+            student=student,
+            column=column,
+            defaults={'score': score}
+        )
+        return JsonResponse({'success': True})
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })

@@ -772,7 +772,6 @@ function saveCustomScore(input) {
     let score = parseFloat(input.value);
     const studentId = input.dataset.studentId;
     const columnId = input.dataset.columnId;
-  console.log("aaa")
     if (isNaN(score)) {
         score = 0;
         input.value = 0;

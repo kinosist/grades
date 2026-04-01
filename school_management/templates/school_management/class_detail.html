@@ -217,6 +217,7 @@
                             </tbody>
                         </table>
                     </div>
+                {% else %}
                 {% endif %}
             </div>
         </div>
@@ -287,7 +288,8 @@
                                 <label for="grading_system" class="form-label fw-bold"><i class="fas fa-balance-scale me-2 text-primary"></i>評価システム</label>
                                 <div class="input-group">
                                     <select class="form-select" id="grading_system" name="grading_system">
-                                        <option value="standard" {% if classroom.grading_system == 'standard' %}selected{% endif %}>通常評価（積み上げ方式）</option>
+                                        <option value="standard" {% if classroom.grading_system == 'standard' or classroom.grading_system == 'default' %}selected{% endif %}>通常評価（積み上げ方式）</option>
+                                        <option value="original" {% if classroom.grading_system == 'original' %}selected{% endif %}>オリジナル（カスタマイズ方式）</option>
                                         <option value="goal" {% if classroom.grading_system == 'goal' %}selected{% endif %}>目標管理（講師評価方式）</option>
                                     </select>
                                     <button class="btn btn-outline-primary" type="submit">更新</button>
@@ -319,7 +321,40 @@
                                 <div class="form-text text-muted small mt-2">出席率100%のときに付与される最大ポイント数です。</div>
                             </form>
                         </div>
-                    </div>
+
+                        <div class="list-group-item p-3 bg-light">
+                            <label class="form-label fw-bold mb-3"><i class="fas fa-columns me-2 text-info"></i>独自の評価項目（列）</label>
+                            
+                            {% if point_columns %}
+                                <ul class="list-group mb-3">
+                                    {% for column in point_columns %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center py-2 border-0 shadow-sm mb-2 rounded">
+                                            <span class="fw-bold text-dark">{{ column.column_title }}</span>
+                                            <form action="{% url 'school_management:delete_point_column' column.id %}" method="post" class="d-inline m-0">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="削除" onclick="return confirm('項目「{{ column.column_title }}」を削除しますか？\n※すでに入力されたこの項目の点数もすべて消去されます。');">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </form>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <div class="alert alert-secondary py-2 small border-0 shadow-sm">
+                                    <i class="fas fa-info-circle me-1"></i>追加された項目はありません。
+                                </div>
+                            {% endif %}
+
+                            <form action="{% url 'school_management:add_point_column' classroom.id %}" method="post" class="mt-2">
+                                {% csrf_token %}
+                                <div class="input-group shadow-sm">
+                                    <input type="text" class="form-control border-info" name="column_title" placeholder="例: プレゼン加点、良い質問..." required>
+                                    <button class="btn btn-info text-white" type="submit"><i class="fas fa-plus me-1"></i>追加</button>
+                                </div>
+                                <div class="form-text text-muted small mt-2">※追加した項目は成績・評価一覧の「列」として表示されます。</div>
+                            </form>
+                        </div>
+                        </div>
                 </div>
             </div>
             

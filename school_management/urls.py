@@ -27,6 +27,10 @@ urlpatterns = [
     path('classes/<int:class_id>/', classes.class_detail_view, name='class_detail'),
     path('classes/<int:class_id>/delete/', classes.class_delete_view, name='class_delete'),
     
+    # 独自の評価項目（列）管理用ルーティングを追加
+    path('classes/<int:class_id>/point-columns/add/', classes.add_point_column, name='add_point_column'),
+    path('point-columns/<int:column_id>/delete/', classes.delete_point_column, name='delete_point_column'),
+    
     # --- 成績・評価（Grades） ---
     path('classes/<int:class_id>/points/', grades.class_points_view, name='class_points'),
     path('classes/<int:class_id>/evaluation/', grades.class_evaluation_view, name='class_evaluation'),

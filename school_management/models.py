@@ -108,7 +108,6 @@ class ClassRoom(models.Model):
         ('first', '前期'),
         ('second', '後期'),
     ]
-    # ✨ 変更：評価システムの選択肢を default と original に刷新！
     GRADING_SYSTEM_CHOICES = [
         ('default', 'デフォルト（通常）'),
         ('original', 'オリジナル（カスタマイズ）'),
@@ -157,7 +156,7 @@ class ClassRoom(models.Model):
         total_sum = sum(sp.total_points for sp in points_list)
         return round(total_sum / count, 1)
 
-# ✨ 新規追加：先生が自由に評価項目（列）を追加できる機能の土台！
+
 class PointColumn(models.Model):
     """独自の評価項目（列）マスタ"""
     classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス', related_name='point_columns')
@@ -170,6 +169,23 @@ class PointColumn(models.Model):
         
     def __str__(self):
         return f"{self.classroom.class_name} - {self.column_title}"
+
+
+# ✨ 新規追加：学生ごとの独自項目の「得点」を保存するテーブル
+class StudentColumnScore(models.Model):
+    """独自評価項目に対する学生の得点データ"""
+    column = models.ForeignKey(PointColumn, on_delete=models.CASCADE, verbose_name='評価項目(列)', related_name='scores')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name='学生', related_name='column_scores')
+    score = models.IntegerField(default=0, verbose_name='得点')
+
+    class Meta:
+        verbose_name = '独自評価項目の得点'
+        verbose_name_plural = '独自評価項目の得点'
+        unique_together = ['column', 'student']
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.column.column_title}: {self.score}pt"
+
 
 class LessonSession(models.Model):
     """授業回マスタ"""
@@ -658,10 +674,16 @@ class StudentClassPoints(models.Model):
             # 上位2位以内（スコアがtop_2_scoresに含まれる）かつ0点より大きい場合のみ加算
             if my_score > 0 and my_score in top_2_scores:
                 peer_total += my_score
+                
+        # ✨ 新規追加: 独自評価項目（列）の合計得点を計算
+        custom_columns_total = StudentColumnScore.objects.filter(
+            student=self.student,
+            column__classroom=self.classroom
+        ).aggregate(total=Sum('score'))['total'] or 0
 
         # 合計を計算
-        # 式: (小テスト(QR含む) + ピア評価 + 授業内ポイント) * 倍率(2) + 出席点
-        class_only_points = quiz_total + peer_total + lesson_total
+        # 式: (小テスト(QR含む) + ピア評価 + 授業内ポイント + 独自評価項目) * 倍率(2) + 出席点
+        class_only_points = quiz_total + peer_total + lesson_total + custom_columns_total
         self.points = int((class_only_points * 2) + self.attendance_points)
 
     @property
@@ -741,8 +763,14 @@ class StudentClassPoints(models.Model):
             
             if my_score > 0 and my_score in top_2_scores:
                 peer_total += my_score
+                
+        # ✨ 新規追加: 独自評価項目（列）の合計得点を計算
+        custom_columns_total = StudentColumnScore.objects.filter(
+            student=self.student,
+            column__classroom=self.classroom
+        ).aggregate(total=Sum('score'))['total'] or 0
         
-        return int(quiz_total + lesson_total + peer_total)
+        return int(quiz_total + lesson_total + peer_total + custom_columns_total)
 
     @property
     def class_points(self):
@@ -1120,3 +1148,22 @@ def update_class_points_from_group_member(sender, instance, **kwargs):
                     scp.recalculate_total()
     except Exception:
         pass
+
+# ✨ 新規追加：独自評価項目の得点が変わった時も、自動で全体の成績を再計算する設定
+@receiver([post_save, post_delete], sender=StudentColumnScore)
+def update_class_points_from_column_score(sender, instance, **kwargs):
+    """独自評価項目の得点更新時に成績を再計算"""
+    if instance.column.classroom:
+        try:
+            scp = StudentClassPoints.objects.get(
+                student=instance.student,
+                classroom=instance.column.classroom
+            )
+            scp.recalculate_total()
+        except StudentClassPoints.DoesNotExist:
+            if kwargs.get('signal') == post_save:
+                scp = StudentClassPoints.objects.create(
+                    student=instance.student,
+                    classroom=instance.column.classroom
+                )
+                scp.recalculate_total()

@@ -482,14 +482,14 @@ body { background-color: #f8fafc; }
                             <!-- ✨ 新規追加：独自評価項目の得点入力セル -->
                             {% for col_id, score in evaluation.custom_column_scores.items %}
                                 <td class="custom-col align-middle text-center">
-                                    <!-- ゆうすけ君向け：このinputにjsで自動保存をかけます -->
-                                    <input type="number" 
-                                           class="form-control form-control-sm text-center mx-auto custom-score-input"
-                                           value="{{ score }}" 
-                                           data-student-id="{{ evaluation.student.id }}" 
-                                           data-column-id="{{ col_id }}" 
-                                           placeholder="0"
-                                           style="width: 60px; font-weight: bold; color: #0dcaf0; border-color: #0dcaf0;">
+                                  <input type="number" 
+                                         class="form-control form-control-sm text-center mx-auto custom-score-input"
+                                         value="{{ score }}" 
+                                         data-student-id="{{ evaluation.student.id }}" 
+                                         data-column-id="{{ col_id }}" 
+                                         onchange="saveCustomScore(this)"
+                                         placeholder="0"
+                                         style="width: 60px; font-weight: bold; color: #0dcaf0; border-color: #0dcaf0;">
                                 </td>
                             {% endfor %}
 
@@ -765,6 +765,41 @@ function downloadCSV() {
     if (modalInstance) {
         modalInstance.hide();
     }
+}
+
+//独自評価システムのスコアの更新
+function saveCustomScore(input) {
+    let score = parseFloat(input.value);
+    const studentId = input.dataset.studentId;
+    const columnId = input.dataset.columnId;
+  console.log("aaa")
+    if (isNaN(score)) {
+        score = 0;
+        input.value = 0;
+    }
+
+    const url = "{% url 'school_management:update_custom_score' classroom.id %}";
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            student_id: studentId,
+            column_id: columnId,
+            score: score
+        })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            console.log('カスタムスコア保存成功');
+        } else {
+            input.classList.add('is-invalid');
+        }
+    });
 }
 </script>
 {% endblock %}

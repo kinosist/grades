@@ -2,13 +2,23 @@ from django.shortcuts import render, get_object_or_404
 import logging
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Q
-from ...models import ClassRoom, LessonSession, StudentLessonPoints, QuizScore, Group, GroupMember, StudentClassPoints, PeerEvaluation, ContributionEvaluation, SelfEvaluation
+# ✨ StudentColumnScore を新しくインポートに追加！
+from ...models import (
+    ClassRoom, LessonSession, StudentLessonPoints, QuizScore, Group, 
+    GroupMember, StudentClassPoints, PeerEvaluation, ContributionEvaluation, 
+    SelfEvaluation, PointColumn, StudentColumnScore
+)
 
 logger = logging.getLogger(__name__)
 
 @login_required
 def class_evaluation_view(request, class_id):
-    """クラスごとの評価一覧（写真のような形式）"""
+    """
+    クラスごとの評価一覧（成績表）を表示するビュー
+    
+    QR採点、ピア評価、各種小テスト、および教員が独自に追加した
+    評価項目の点数を集計し、一覧表示する。
+    """
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
     students = classroom.students.all().order_by('student_number')
     
@@ -17,6 +27,9 @@ def class_evaluation_view(request, class_id):
     
     # 授業回の一覧を取得
     sessions = LessonSession.objects.filter(classroom=classroom).order_by('session_number')
+    
+    # ✨ 先生が追加した「独自の評価項目（列）」の一覧を取得！
+    point_columns = classroom.point_columns.all().order_by('created_at')
     
     # 評価システム（通常 or 目標管理）
     grading_system = classroom.grading_system
@@ -32,7 +45,6 @@ def class_evaluation_view(request, class_id):
             session_key = f"第{session.session_number}回"
             
             # 授業内手動ポイントを取得（StudentLessonPoints）
-            # ※QRコードのポイントはQuizScoreに含まれるため、ここは手動付与分などの「その他」扱い
             manual_points = 0
             lesson_point = StudentLessonPoints.objects.filter(
                 lesson_session=session,
@@ -75,7 +87,6 @@ def class_evaluation_view(request, class_id):
                     ).aggregate(total=Sum('contribution_score'))['total'] or 0
                     
                     # 2. 投票ポイント (1位=2点, 2位=1点)
-                    # この授業回での学生のグループを取得
                     membership = GroupMember.objects.filter(
                         student=student,
                         group__lesson_session=session
@@ -121,6 +132,15 @@ def class_evaluation_view(request, class_id):
                 'has_quiz': has_quiz,
                 'session': session
             }
+
+        # ✨ 新規追加：この学生の「独自の評価項目（列）」ごとの点数を取得！
+        custom_column_scores = {}
+        custom_columns_total = 0
+        for col in point_columns:
+            score_obj = StudentColumnScore.objects.filter(student=student, column=col).first()
+            score_val = score_obj.score if score_obj else 0
+            custom_column_scores[col.id] = score_val
+            custom_columns_total += score_val
         
         # データベースから保存された出席率、出席点を取得
         attendance_rate = 0
@@ -144,7 +164,8 @@ def class_evaluation_view(request, class_id):
             total_points_calculated = score_points + saved_attendance_points
         else:
             # 通常モード: 合計 = (授業点 * 2) + 出席点
-            score_points = total_combined_score
+            # ✨ 独自の評価項目で獲得した点数も、最終スコアに加算する！
+            score_points = total_combined_score + custom_columns_total
             total_points_calculated = (score_points * 2) + saved_attendance_points
 
         # セッションごとのスコアをリスト化（テンプレート表示用）
@@ -159,6 +180,8 @@ def class_evaluation_view(request, class_id):
             'score_points': score_points,
             'total_peer_score': total_peer_score,
             'total_quiz_score': total_quiz_score,
+            'custom_columns_total': custom_columns_total,   # ✨ 独自項目の合計点
+            'custom_column_scores': custom_column_scores,   # ✨ 各独自項目の個別点数
             'attendance_points': saved_attendance_points,
             'attendance_rate': attendance_rate,
             'session_scores': ordered_session_scores,
@@ -166,13 +189,18 @@ def class_evaluation_view(request, class_id):
     
     total_sessions = sessions.count()
 
+    # ✨ テーブルのカラム幅を調整（独自評価項目の数を足す）
+    base_colspan = (total_sessions * 2 + 7) if view_mode == 'detail' else 7
+    table_colspan = base_colspan + point_columns.count()
+
     context = {
         'classroom': classroom,
         'student_evaluations': student_evaluations,
         'sessions': sessions,
+        'point_columns': point_columns,  # ✨ HTMLで列のヘッダーを作るために渡す
         'total_sessions': total_sessions,
         'grading_system': grading_system,
         'view_mode': view_mode,
-        'table_colspan': (total_sessions * 2 + 7) if view_mode == 'detail' else 7,
+        'table_colspan': table_colspan,
     }
     return render(request, 'school_management/class_evaluation.html', context)

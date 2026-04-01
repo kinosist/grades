@@ -101,6 +101,13 @@ body { background-color: #f8fafc; }
         font-size: 1.1em;
     }
     .evaluation-table .attendance-point-col { min-width: 80px; }
+    
+    /* ✨ 新規追加：独自評価項目の列デザイン */
+    .evaluation-table .custom-col { 
+        min-width: 90px; 
+        background-color: #f1fcfa; /* 少し青みがかった色で差別化 */
+    }
+    
     .evaluation-table .session-col { min-width: 80px; background-color: #fff; }
     .evaluation-table .breakdown-col { min-width: 140px; background-color: #fff; font-size: 0.85em; }
     .evaluation-table .score-col { min-width: 120px; }
@@ -396,6 +403,17 @@ body { background-color: #f8fafc; }
                                     <span class="header-sub-text">(QR + ピア + 他)</span>
                                 {% endif %}
                             </th>
+                            
+                            <!-- ✨ 新規追加：独自評価項目のヘッダー -->
+                            {% for col in point_columns %}
+                                <th class="custom-col text-center" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
+                                    <div class="d-flex flex-column align-items-center">
+                                        <span class="fw-bold">{{ col.column_title }}</span>
+                                        <span class="header-sub-text text-info" style="font-size: 0.7rem;"><i class="fas fa-edit me-1"></i>入力</span>
+                                    </div>
+                                </th>
+                            {% endfor %}
+                            
                             {% if view_mode == 'detail' %}
                                 {% for session in sessions %}
                                     <th class="session-col text-center" colspan="2">
@@ -455,10 +473,25 @@ body { background-color: #f8fafc; }
                                     {% if grading_system != 'goal' and view_mode == 'detail' %}
                                     <div class="header-sub-text mt-1" style="font-size: 0.7rem; white-space: nowrap;">
                                         QR{{ evaluation.total_quiz_score }} / ピア{{ evaluation.total_peer_score }}
+                                        {% if evaluation.custom_columns_total > 0 %} / 独自{{ evaluation.custom_columns_total }}{% endif %}
                                     </div>
                                     {% endif %}
                                 </div>
                             </td>
+                            
+                            <!-- ✨ 新規追加：独自評価項目の得点入力セル -->
+                            {% for col_id, score in evaluation.custom_column_scores.items %}
+                                <td class="custom-col align-middle text-center">
+                                    <!-- ゆうすけ君向け：このinputにjsで自動保存をかけます -->
+                                    <input type="number" 
+                                           class="form-control form-control-sm text-center mx-auto custom-score-input"
+                                           value="{{ score }}" 
+                                           data-student-id="{{ evaluation.student.id }}" 
+                                           data-column-id="{{ col_id }}" 
+                                           placeholder="0"
+                                           style="width: 60px; font-weight: bold; color: #0dcaf0; border-color: #0dcaf0;">
+                                </td>
+                            {% endfor %}
 
                             {% if view_mode == 'detail' %}
                                 {% for session_data in evaluation.session_scores %}

@@ -8,6 +8,79 @@
 <li class="breadcrumb-item active" aria-current="page">新しいクラスを作成</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+    /* * 評価システム選択用のカスタムスタイル 
+     * 選択状態が明確にわかるように、非選択時はグレー基調、選択時に色とチェックマークが表示される設計
+     */
+    .system-select-label {
+        border: 2px solid #dee2e6; /* 非選択時は薄いグレーの枠 */
+        border-radius: 0.5rem;
+        background-color: #fff;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        position: relative;
+        display: block; /* label要素全体をクリック可能にするためブロック要素に */
+    }
+    
+    /* マウスホバー時の浮き上がりエフェクト */
+    .system-select-label:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        border-color: #adb5bd; 
+    }
+    
+    /* 右上に配置するチェックアイコン（初期状態は透明で縮小して非表示） */
+    .system-select-label .check-icon {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        opacity: 0;
+        transform: scale(0.5);
+        transition: all 0.2s ease-in-out;
+    }
+    
+    /* タイトル横のメインアイコン（初期状態はグレー） */
+    .system-select-label .icon-container {
+        color: #6c757d; 
+        transition: color 0.2s ease-in-out;
+    }
+    
+    /* タイトルテキスト（常に濃いグレー・黒基調で見やすく） */
+    .system-select-label .title-text {
+        color: #212529;
+    }
+
+    /* === デフォルト方式が選択された時のスタイル === */
+    .btn-check:checked + .system-select-label.default-system {
+        background-color: #f0f7ff; 
+        border-color: #0d6efd;
+    }
+    .btn-check:checked + .system-select-label.default-system .check-icon {
+        opacity: 1; /* チェックマークを浮かび上がらせる */
+        transform: scale(1);
+        color: #0d6efd;
+    }
+    .btn-check:checked + .system-select-label.default-system .icon-container {
+        color: #0d6efd; /* メインアイコンを青色に */
+    }
+
+    /* === オリジナル方式が選択された時のスタイル === */
+    .btn-check:checked + .system-select-label.original-system {
+        background-color: #f1fcf5;
+        border-color: #198754;
+    }
+    .btn-check:checked + .system-select-label.original-system .check-icon {
+        opacity: 1; /* チェックマークを浮かび上がらせる */
+        transform: scale(1);
+        color: #198754;
+    }
+    .btn-check:checked + .system-select-label.original-system .icon-container {
+        color: #198754; /* メインアイコンを緑色に */
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-md-8">
@@ -18,6 +91,8 @@
             <div class="card-body">
                 <form method="post">
                     {% csrf_token %}
+                    
+                    <!-- クラス名・年度の入力 -->
                     <div class="row">
                         <div class="col-md-8">
                             <div class="mb-3">
@@ -36,7 +111,8 @@
                         </div>
                     </div>
                     
-                    <div class="mb-3">
+                    <!-- 学期の選択 -->
+                    <div class="mb-4">
                         <label for="semester" class="form-label">学期 <span class="text-danger">*</span></label>
                         <select class="form-select" id="semester" name="semester" required>
                             <option value="">学期を選択してください</option>
@@ -45,11 +121,60 @@
                         </select>
                     </div>
 
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
+                    <!-- 【新規追加】評価システム（採点方式）の選択UI -->
+                    <div class="mb-4">
+                        <label class="form-label">評価システム（採点方式） <span class="text-danger">*</span></label>
+                        <div class="row g-3">
+                            
+                            <!-- 選択肢1：デフォルト（既存の木下先生方式） -->
+                            <div class="col-md-6">
+                                <input type="radio" class="btn-check" name="grading_system" id="system_default" value="default" checked required>
+                                <label class="w-100 h-100 text-start p-4 system-select-label default-system" for="system_default">
+                                    <!-- 選択時に表示される右上のチェックマーク -->
+                                    <div class="check-icon">
+                                        <i class="fas fa-check-circle fs-4"></i>
+                                    </div>
+                                    
+                                    <div class="d-flex align-items-center mb-2 icon-container">
+                                        <i class="fas fa-layer-group fa-2x me-3"></i>
+                                        <h6 class="mb-0 fw-bold title-text">デフォルト (通常)</h6>
+                                    </div>
+                                    <small class="text-muted d-block" style="white-space: normal;">
+                                        「個人の行動」ベースのポイント積み上げ方式。QRや小テストなどの個人成績を合計して算出します。
+                                    </small>
+                                </label>
+                            </div>
+                            
+                            <!-- 選択肢2：オリジナル（新しい中西先生方式 / 汎用版） -->
+                            <div class="col-md-6">
+                                <input type="radio" class="btn-check" name="grading_system" id="system_original" value="original" required>
+                                <label class="w-100 h-100 text-start p-4 system-select-label original-system" for="system_original">
+                                    <!-- 選択時に表示される右上のチェックマーク -->
+                                    <div class="check-icon">
+                                        <i class="fas fa-check-circle fs-4"></i>
+                                    </div>
+
+                                    <div class="d-flex align-items-center mb-2 icon-container">
+                                        <i class="fas fa-sliders-h fa-2x me-3"></i>
+                                        <h6 class="mb-0 fw-bold title-text">オリジナル (カスタマイズ)</h6>
+                                    </div>
+                                    <small class="text-muted d-block" style="white-space: normal;">
+                                        「グループ順位 × 役割」ベースの傾斜配点方式。チーム戦の結果や役割に応じてポイントを算出します。
+                                    </small>
+                                </label>
+                            </div>
+                            
+                        </div>
+                        <div class="form-text mt-2">※評価システムはクラス作成後でも設定画面から変更可能です。</div>
+                        <div class="form-text">※独自の評価項目（列）の追加は、どちらの方式を選んでも可能です。</div>
+                    </div>
+
+                    <!-- アクションボタン -->
+                    <div class="d-flex gap-2 border-top pt-4">
+                        <button type="submit" class="btn btn-primary px-4">
                             <i class="fas fa-save me-2"></i>クラスを作成
                         </button>
-                        <a href="{% url 'school_management:class_list' %}" class="btn btn-secondary">
+                        <a href="{% url 'school_management:class_list' %}" class="btn btn-secondary px-4">
                             <i class="fas fa-arrow-left me-2"></i>キャンセル
                         </a>
                     </div>
@@ -58,16 +183,18 @@
         </div>
     </div>
     
+    <!-- 右側のヘルプパネル -->
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">
                 <h6><i class="fas fa-info-circle me-2"></i>クラス作成について</h6>
             </div>
             <div class="card-body">
-                <ul class="list-unstyled">
-                    <li><i class="fas fa-check text-success me-2"></i>クラス名は自由に設定できます</li>
-                    <li><i class="fas fa-check text-success me-2"></i>作成後に学生を追加できます</li>
-                    <li><i class="fas fa-check text-success me-2"></i>授業回の管理が可能になります</li>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>クラス名は自由に設定できます</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>評価システムは用途に合わせて選べます</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>作成後に学生を追加できます</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>授業回の管理が可能になります</li>
                     <li><i class="fas fa-check text-success me-2"></i>他の教員も追加できます</li>
                 </ul>
             </div>

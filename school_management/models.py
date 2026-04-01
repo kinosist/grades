@@ -108,9 +108,10 @@ class ClassRoom(models.Model):
         ('first', '前期'),
         ('second', '後期'),
     ]
+    # ✨ 変更：評価システムの選択肢を default と original に刷新！
     GRADING_SYSTEM_CHOICES = [
-        ('standard', '通常評価（積み上げ）'),
-        ('goal', '目標管理（講師評価）'),
+        ('default', 'デフォルト（通常）'),
+        ('original', 'オリジナル（カスタマイズ）'),
     ]
     
     class_name = models.CharField(max_length=100, verbose_name='クラス名')
@@ -119,7 +120,7 @@ class ClassRoom(models.Model):
     grading_system = models.CharField(
         max_length=20, 
         choices=GRADING_SYSTEM_CHOICES, 
-        default='standard',
+        default='default',
         verbose_name='評価システム'
     )
     qr_point_value = models.IntegerField(
@@ -156,6 +157,19 @@ class ClassRoom(models.Model):
         total_sum = sum(sp.total_points for sp in points_list)
         return round(total_sum / count, 1)
 
+# ✨ 新規追加：先生が自由に評価項目（列）を追加できる機能の土台！
+class PointColumn(models.Model):
+    """独自の評価項目（列）マスタ"""
+    classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス', related_name='point_columns')
+    column_title = models.CharField(max_length=100, verbose_name='項目名')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = '評価項目(列)'
+        verbose_name_plural = '評価項目(列)'
+        
+    def __str__(self):
+        return f"{self.classroom.class_name} - {self.column_title}"
 
 class LessonSession(models.Model):
     """授業回マスタ"""

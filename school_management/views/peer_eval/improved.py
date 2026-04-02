@@ -250,8 +250,8 @@ def peer_evaluation_common_form(request, session_id):
         second_place_id = request.POST.get('second_place_group')
         
         if first_place_id and second_place_id:
-            first_place = get_object_or_404(Group, id=first_place_id)
-            second_place = get_object_or_404(Group, id=second_place_id)
+            first_place = get_object_or_404(Group, id=first_place_id, lesson_session=lesson_session)
+            second_place = get_object_or_404(Group, id=second_place_id, lesson_session=lesson_session)
             
             try:
                 peer_evaluation = PeerEvaluation.objects.create(

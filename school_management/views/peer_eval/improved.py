@@ -557,10 +557,18 @@ def peer_evaluation_results(request, session_id):
     sorted_groups = sorted(group_stats.values(), key=lambda x: x['score'], reverse=True)
 
     enrolled_students = lesson_session.classroom.students.filter(role='student').order_by('full_name')
+
+    # 学生ごとの最新提出をまとめて取得してマップ化（N+1クエリ回避）
+    submission_map = {}
+    for evaluation in evaluations.order_by('student_id', '-created_at'):
+        student_id = evaluation.student_id
+        if student_id not in submission_map:
+            submission_map[student_id] = evaluation
+
     student_rows = []
     submitted_count = 0
     for enrolled_student in enrolled_students:
-        submission = evaluations.filter(student=enrolled_student).order_by('-created_at').first()
+        submission = submission_map.get(enrolled_student.id)
         is_submitted = submission is not None
         if is_submitted:
             submitted_count += 1

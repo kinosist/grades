@@ -1,8 +1,8 @@
-from django.db import models
-from django.contrib.auth.models import AbstractUser, BaseUserManager
-from django.contrib.auth import get_user_model
-from django.core.validators import MinValueValidator, MaxValueValidator
 import uuid
+
+from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db import models
 from django.db.models import Sum, Q
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
@@ -376,6 +376,15 @@ class QuestionChoice(models.Model):
 class PeerEvaluation(models.Model):
     """ピア評価"""
     lesson_session = models.ForeignKey(LessonSession, on_delete=models.CASCADE, verbose_name='授業回')
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='peer_evaluations',
+        verbose_name='提出学生'
+    )
+    email = models.EmailField(blank=True, default='', verbose_name='提出メールアドレス')
     evaluator_token = models.UUIDField(verbose_name='評価者トークン（匿名化）')
     evaluator_group = models.ForeignKey(
         Group,
@@ -416,6 +425,13 @@ class PeerEvaluation(models.Model):
     class Meta:
         verbose_name = 'ピア評価'
         verbose_name_plural = 'ピア評価'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['lesson_session', 'student'],
+                condition=Q(student__isnull=False),
+                name='unique_peer_eval_per_student_per_session',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.lesson_session} - 匿名評価 ({self.created_at.strftime('%m/%d %H:%M')})"
@@ -452,6 +468,22 @@ class ContributionEvaluation(models.Model):
 
     def __str__(self):
         return f"{self.peer_evaluation} - {self.evaluatee.full_name}: {self.contribution_score}点"
+
+
+class GoogleOAuthSession(models.Model):
+    """Google OAuth認証済みセッション（匿名フォーム向け）"""
+    session_id = models.CharField(max_length=128, unique=True, verbose_name='セッションID')
+    email = models.EmailField(verbose_name='認証メールアドレス')
+    expires_at = models.DateTimeField(db_index=True, verbose_name='有効期限')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='作成日時')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
+
+    class Meta:
+        verbose_name = 'Google OAuthセッション'
+        verbose_name_plural = 'Google OAuthセッション'
+
+    def __str__(self):
+        return f"{self.email} ({self.expires_at:%Y-%m-%d %H:%M})"
 
 
 class Attendance(models.Model):

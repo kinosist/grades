@@ -99,6 +99,29 @@ def peer_evaluation_results_view(request, session_id):
     
     # スコア順でソート
     sorted_groups = sorted(group_stats.values(), key=lambda x: x['score'], reverse=True)
+
+    submission_map = {}
+    for submission in evaluations.filter(student__isnull=False).order_by('student_id', '-created_at'):
+        if submission.student_id not in submission_map:
+            submission_map[submission.student_id] = submission
+
+    enrolled_students = list(session.classroom.students.filter(role='student').order_by('full_name'))
+    submission_rows = []
+    submitted_count = 0
+    for enrolled_student in enrolled_students:
+        submission = submission_map.get(enrolled_student.id)
+        submitted = submission is not None
+        if submitted:
+            submitted_count += 1
+        submission_rows.append({
+            'student': enrolled_student,
+            'email': enrolled_student.email,
+            'submitted': submitted,
+            'submitted_at': submission.created_at if submission else None,
+        })
+
+    total_students = len(enrolled_students)
+    submission_rate = round((submitted_count / total_students) * 100, 1) if total_students else 0
     
     context = {
         'lesson_session': session,  # テンプレートとの整合性を保つためにキー名を変更
@@ -108,5 +131,9 @@ def peer_evaluation_results_view(request, session_id):
         'group_stats': sorted_groups,  # 新テンプレート用
         'total_evaluations': evaluations.count(),  # 新テンプレート用
         'total_groups': groups.count(),  # 新テンプレート用
+        'submission_rows': submission_rows,
+        'submitted_count': submitted_count,
+        'total_students': total_students,
+        'submission_rate': submission_rate,
     }
     return render(request, 'school_management/peer_evaluation_results.html', context)

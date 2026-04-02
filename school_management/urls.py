@@ -30,6 +30,7 @@ urlpatterns = [
     # 独自の評価項目（列）管理用ルーティングを追加
     path('classes/<int:class_id>/point-columns/add/', classes.add_point_column, name='add_point_column'),
     path('point-columns/<int:column_id>/delete/', classes.delete_point_column, name='delete_point_column'),
+    path('classes/<int:class_id>/update-custom-score/', grades.update_custom_score,name='update_custom_score'),
     
     # --- 成績・評価（Grades） ---
     path('classes/<int:class_id>/points/', grades.class_points_view, name='class_points'),

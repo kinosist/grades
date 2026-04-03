@@ -405,9 +405,11 @@ def peer_evaluation_google_callback(request):
         response.delete_cookie('peer_eval_oauth_state')
         return response
 
+    normalized_email = _normalize_email(email)
+    GoogleOAuthSession.objects.filter(email=normalized_email).delete()
     oauth_session = GoogleOAuthSession.objects.create(
         session_id=secrets.token_urlsafe(32),
-        email=_normalize_email(email),
+        email=normalized_email,
         expires_at=timezone.now() + timedelta(hours=settings.PEER_EVAL_SESSION_TTL_HOURS),
     )
 

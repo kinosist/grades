@@ -333,7 +333,7 @@ def update_class_settings(request, class_id):
     grading_system = request.POST.get('grading_system')
     recalculate_points = False
     
-    # ✨ 修正ポイント：models.py の GRADING_SYSTEM_CHOICES に合わせて許可リストを更新
+    #  修正ポイント：models.py の GRADING_SYSTEM_CHOICES に合わせて許可リストを更新
     if grading_system in ['default', 'original', 'goal']:
         if classroom.grading_system != grading_system:
             classroom.grading_system = grading_system

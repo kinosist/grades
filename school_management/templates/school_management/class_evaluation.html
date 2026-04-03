@@ -93,7 +93,7 @@ body { background-color: #f8fafc; }
     }
     .evaluation-table .input-col { background-color: #f0f7ff; width: 100px; min-width: 100px; }
     
-    /* ✨ 変更：最終成績（100点換算）を表示する列のデザインを少し広めに確保 */
+    /*  変更：最終成績（100点換算）を表示する列のデザインを少し広めに確保 */
     .evaluation-table .total-col {
         width: 120px;
         min-width: 120px;
@@ -385,7 +385,7 @@ body { background-color: #f8fafc; }
                             <th class="name-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>氏名</th>
                             <th class="furigana-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>フリガナ</th>
                             
-                            <!-- ✨ 修正：合計列のヘッダーを評価システムによって動的に変更する -->
+                            <!--  修正：合計列のヘッダーを評価システムによって動的に変更する -->
                             <th class="total-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
                                 {% if grading_system == 'original' %}
                                     最終成績
@@ -452,7 +452,7 @@ body { background-color: #f8fafc; }
                     <tbody>
                         {% for evaluation in student_evaluations %}
                         
-                        <!-- ✨ 修正：オリジナルモードで足切りの場合のみ、行全体をグレーアウトして文字を薄くする -->
+                        <!--  修正：オリジナルモードで足切りの場合のみ、行全体をグレーアウトして文字を薄くする -->
                         <tr class="{% if grading_system == 'original' and evaluation.is_below_cutoff %}table-secondary text-muted{% endif %}">
                             <td class="number-col">{{ forloop.counter }}</td>
                             <td class="name-col">
@@ -463,7 +463,7 @@ body { background-color: #f8fafc; }
                             </td>
                             <td class="furigana-col">{{ evaluation.student.furigana|default:"-" }}</td>
                             
-                            <!-- ✨ 修正：合計スコアの表示を評価システムによって完全に切り替える -->
+                            <!--  修正：合計スコアの表示を評価システムによって完全に切り替える -->
                             <td class="total-col text-center">
                                 {% if grading_system == 'original' %}
                                     <!-- ================= オリジナルモードの表示 ================= -->
@@ -653,7 +653,7 @@ function saveAttendanceRate(input) {
     }
     
     // 計算ロジック
-    // ✨ JSエラー防止のため、Django変数をクォーテーションで囲んでNumber型に変換（修正箇所）
+    //  JSエラー防止のため、Django変数をクォーテーションで囲んでNumber型に変換（修正箇所）
     const ATTENDANCE_MAX_POINTS = Number("{{ classroom.attendance_max_points|default:'0' }}");
     const newAttendancePoints = (attendanceRate / 100) * ATTENDANCE_MAX_POINTS;
     const row = input.closest('tr');
@@ -677,7 +677,7 @@ function saveAttendanceRate(input) {
     if (totalPointsSpan) {
         totalPointsSpan.textContent = newTotalPoints.toFixed(1);
         
-        // 💡 備考: オリジナルモードの場合、出席率を変更すると「クラス全体の中央値」や「最高得点」が変わるため、
+        //  備考: オリジナルモードの場合、出席率を変更すると「クラス全体の中央値」や「最高得点」が変わるため、
         // 厳密な100点換算スコアを再計算するにはページリロードを推奨します。
         // ここでは便宜上、画面上の「素点」のみを更新しています。
     }

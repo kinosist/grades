@@ -298,7 +298,7 @@
                                 <label for="grading_system" class="form-label fw-bold"><i class="fas fa-balance-scale me-2 text-primary"></i>評価システム</label>
                                 <div class="input-group">
                                     <select class="form-select" id="grading_system" name="grading_system">
-                                        <!-- ✨ 修正箇所：value を DBの選択肢（default）に合わせました -->
+                                        <!--  修正箇所：value を DBの選択肢（default）に合わせました -->
                                         <option value="default" {% if classroom.grading_system == 'default' %}selected{% endif %}>通常評価（積み上げ方式）</option>
                                         <option value="original" {% if classroom.grading_system == 'original' %}selected{% endif %}>オリジナル（カスタマイズ方式）</option>
                                         <option value="goal" {% if classroom.grading_system == 'goal' %}selected{% endif %}>目標管理（講師評価方式）</option>

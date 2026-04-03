@@ -28,7 +28,7 @@ def class_detail_view(request, class_id):
     for s in students:
         setattr(s, 'class_point', scp_map.get(s.id))
 
-    # ✨ 追加：このクラスの独自の評価項目（列）を取得
+    #  追加：このクラスの独自の評価項目（列）を取得
     point_columns = classroom.point_columns.all().order_by('created_at')
 
     context = {
@@ -39,11 +39,11 @@ def class_detail_view(request, class_id):
         'peer_evaluations': peer_evaluations,
         'recent_lessons': lessons,
         'total_sessions': all_sessions.count(),
-        'point_columns': point_columns,  # ✨ テンプレートに渡す
+        'point_columns': point_columns,  #  テンプレートに渡す
     }
     return render(request, 'school_management/class_detail.html', context)
 
-# ✨ 新規追加：評価項目の「追加」処理
+#  新規追加：評価項目の「追加」処理
 @login_required
 @require_POST
 def add_point_column(request, class_id):
@@ -61,7 +61,7 @@ def add_point_column(request, class_id):
     url = reverse('school_management:class_detail', args=[class_id])
     return redirect(f"{url}?active_tab=settings")
 
-# ✨ 新規追加：評価項目の「削除」処理
+#  新規追加：評価項目の「削除」処理
 @login_required
 @require_POST
 def delete_point_column(request, column_id):

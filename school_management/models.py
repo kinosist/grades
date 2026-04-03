@@ -171,7 +171,7 @@ class PointColumn(models.Model):
         return f"{self.classroom.class_name} - {self.column_title}"
 
 
-# ✨ 新規追加：学生ごとの独自項目の「得点」を保存するテーブル
+#  新規追加：学生ごとの独自項目の「得点」を保存するテーブル
 class StudentColumnScore(models.Model):
     """独自評価項目に対する学生の得点データ"""
     column = models.ForeignKey(PointColumn, on_delete=models.CASCADE, verbose_name='評価項目(列)', related_name='scores')
@@ -675,7 +675,7 @@ class StudentClassPoints(models.Model):
             if my_score > 0 and my_score in top_2_scores:
                 peer_total += my_score
                 
-        # ✨ 新規追加: 独自評価項目（列）の合計得点を計算
+        #  新規追加: 独自評価項目（列）の合計得点を計算
         custom_columns_total = StudentColumnScore.objects.filter(
             student=self.student,
             column__classroom=self.classroom
@@ -764,7 +764,7 @@ class StudentClassPoints(models.Model):
             if my_score > 0 and my_score in top_2_scores:
                 peer_total += my_score
                 
-        # ✨ 新規追加: 独自評価項目（列）の合計得点を計算
+        #  新規追加: 独自評価項目（列）の合計得点を計算
         custom_columns_total = StudentColumnScore.objects.filter(
             student=self.student,
             column__classroom=self.classroom
@@ -1149,7 +1149,7 @@ def update_class_points_from_group_member(sender, instance, **kwargs):
     except Exception:
         pass
 
-# ✨ 新規追加：独自評価項目の得点が変わった時も、自動で全体の成績を再計算する設定
+#  新規追加：独自評価項目の得点が変わった時も、自動で全体の成績を再計算する設定
 @receiver([post_save, post_delete], sender=StudentColumnScore)
 def update_class_points_from_column_score(sender, instance, **kwargs):
     """独自評価項目の得点更新時に成績を再計算"""

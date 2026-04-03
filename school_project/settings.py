@@ -226,3 +226,15 @@ AUTH_USER_MODEL = 'school_management.CustomUser'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+# Peer evaluation Google OAuth settings
+ALLOWED_GMAIL_DOMAINS = tuple(
+    domain.strip().lower()
+    for domain in os.environ.get('ALLOWED_GMAIL_DOMAINS', '').split(',')
+    if domain.strip()
+)
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '').strip()
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '').strip()
+PEER_EVAL_SESSION_COOKIE_NAME = 'peer_eval_session_id'
+PEER_EVAL_SESSION_TTL_HOURS = int(os.environ.get('PEER_EVAL_SESSION_TTL_HOURS', '24'))
+

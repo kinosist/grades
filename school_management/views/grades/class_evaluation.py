@@ -7,6 +7,7 @@ from django.db.models import Sum, Q
 import json
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+import statistics
 
 # ✨ StudentColumnScore を新しくインポートに追加！
 from ...models import (
@@ -174,6 +175,9 @@ def class_evaluation_view(request, class_id):
             score_points = total_combined_score + custom_columns_total
             total_points_calculated = (score_points * 2) + saved_attendance_points
 
+
+
+       
         # セッションごとのスコアをリスト化（テンプレート表示用）
         ordered_session_scores = []
         for session in sessions:
@@ -192,7 +196,42 @@ def class_evaluation_view(request, class_id):
             'attendance_rate': attendance_rate,
             'session_scores': ordered_session_scores,
         })
+
+    all_raw_scores = [e['total_points'] for e in student_evaluations]
+    if all_raw_scores:
+        # 中央値を取得
+        median_val = statistics.median(all_raw_scores)
+        # 中央値の半分を足切りラインに設定
+        cutoff_line = median_val / 2
+        
+        # 足切りをクリアした人の中での最高点を取得
+        passed_scores = [s for s in all_raw_scores if s > cutoff_line]
+        max_val = max(passed_scores) if passed_scores else 0
+    else:
+        median_val = 0
+        cutoff_line = 0
+        max_val = 0
+
+    for eval_data in student_evaluations:
+        current_raw = eval_data['total_points']
+        
+        # 足切り判定 (中央値の半分以下か)
+        if current_raw <= cutoff_line:
+            eval_data['is_below_cutoff'] = True
+            eval_data['final_score_100'] = 0  # 問答無用で0点
+        else:
+            eval_data['is_below_cutoff'] = False
+            # 換算処理: トップが100点になるように
+            if max_val > 0:
+                eval_data['final_score_100'] = round((current_raw / max_val) * 100, 1)
+            else:
+                eval_data['final_score_100'] = 0
     
+
+     # デバッグ用: 各学生の足切り判定と換算後点数をログに出力
+     # ⚠️ゆうとへここのis_below_cutoffとfinal_score_100の値を見てほしい
+    for eval_data in student_evaluations:
+        print(f"足切り(is_below_cutoff):{eval_data['is_below_cutoff']} | 換算後点数(final_score_100): {eval_data['final_score_100']}")
     total_sessions = sessions.count()
 
     # ✨ テーブルのカラム幅を調整（独自評価項目の数を足す）

@@ -92,17 +92,17 @@ body { background-color: #f8fafc; }
         box-shadow: 4px 0 5px -2px rgba(0,0,0,0.1);
     }
     .evaluation-table .input-col { background-color: #f0f7ff; width: 100px; min-width: 100px; }
+    
+    /* ✨ 変更：最終成績（100点換算）を表示する列のデザインを少し広めに確保 */
     .evaluation-table .total-col {
-        width: 100px;
-        min-width: 100px;
+        width: 120px;
+        min-width: 120px;
         background-color: #e9ecef;
         font-weight: bold;
-        color: #0d6efd;
-        font-size: 1.1em;
     }
     .evaluation-table .attendance-point-col { min-width: 80px; }
     
-    /* ✨ 新規追加：独自評価項目の列デザイン */
+    /* 独自評価項目の列デザイン */
     .evaluation-table .custom-col { 
         min-width: 90px; 
         background-color: #f1fcfa; /* 少し青みがかった色で差別化 */
@@ -295,8 +295,8 @@ body { background-color: #f8fafc; }
         .furigana-col { display: none; }
         
         .evaluation-table .total-col {
-            width: 80px;
-            min-width: 80px;
+            width: 90px;
+            min-width: 90px;
             font-size: 1em;
         }
     }
@@ -320,12 +320,19 @@ body { background-color: #f8fafc; }
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
+            <!-- ページ上部の情報表示エリア -->
             <div class="header-info">
                 <div class="class-title">
                     <div><i class="fas fa-chalkboard me-2 text-primary"></i>{{ classroom.class_name }}</div>
                     <span class="text-muted fs-5 ms-2 fw-normal">- 評価一覧</span>
+                    
+                    <!-- 評価システムの表示（バッジでどのモードかひと目でわかるように） -->
                     {% if grading_system == 'goal' %}
                         <span class="badge bg-info ms-2" style="font-size: 0.6em; vertical-align: middle;">目標管理モード</span>
+                    {% elif grading_system == 'original' %}
+                        <span class="badge bg-success ms-2" style="font-size: 0.6em; vertical-align: middle;">オリジナル(換算)</span>
+                    {% else %}
+                        <span class="badge bg-secondary ms-2" style="font-size: 0.6em; vertical-align: middle;">デフォルト(通常)</span>
                     {% endif %}
                 </div>
                 <div class="class-stats">
@@ -346,6 +353,7 @@ body { background-color: #f8fafc; }
                 </div>
             </div>
 
+            <!-- アクションボタンエリア -->
             <div class="mb-3 no-print action-area">
                 <div class="action-layout">
                     <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary back-btn">
@@ -368,6 +376,7 @@ body { background-color: #f8fafc; }
                 </div>
             </div>
 
+            <!-- 評価一覧テーブル -->
             <div class="table-container">
                 <table class="evaluation-table mode-{{ view_mode }}">
                     <thead>
@@ -375,14 +384,22 @@ body { background-color: #f8fafc; }
                             <th class="number-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>No.</th>
                             <th class="name-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>氏名</th>
                             <th class="furigana-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>フリガナ</th>
+                            
+                            <!-- ✨ 修正：合計列のヘッダーを評価システムによって動的に変更する -->
                             <th class="total-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
-                                合計
-                                {% if grading_system == 'goal' %}
-                                    <span class="header-sub-text">(講師評価 + 出席)</span>
+                                {% if grading_system == 'original' %}
+                                    最終成績
+                                    <span class="header-sub-text text-primary fw-bold">(100点換算)</span>
                                 {% else %}
-                                    <span class="header-sub-text">((授業点×2) + 出席)</span>
+                                    合計
+                                    {% if grading_system == 'goal' %}
+                                        <span class="header-sub-text">(講師評価 + 出席)</span>
+                                    {% else %}
+                                        <span class="header-sub-text">((授業点×2) + 出席)</span>
+                                    {% endif %}
                                 {% endif %}
                             </th>
+                            
                             <th class="input-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
                                 出席率
                                 <span class="header-sub-text">入力(%)</span>
@@ -404,7 +421,7 @@ body { background-color: #f8fafc; }
                                 {% endif %}
                             </th>
                             
-                            <!-- ✨ 新規追加：独自評価項目のヘッダー -->
+                            <!-- 独自評価項目のヘッダー -->
                             {% for col in point_columns %}
                                 <th class="custom-col text-center" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
                                     <div class="d-flex flex-column align-items-center">
@@ -434,7 +451,9 @@ body { background-color: #f8fafc; }
                     </thead>
                     <tbody>
                         {% for evaluation in student_evaluations %}
-                        <tr>
+                        
+                        <!-- ✨ 修正：オリジナルモードで足切りの場合のみ、行全体をグレーアウトして文字を薄くする -->
+                        <tr class="{% if grading_system == 'original' and evaluation.is_below_cutoff %}table-secondary text-muted{% endif %}">
                             <td class="number-col">{{ forloop.counter }}</td>
                             <td class="name-col">
                                 {{ evaluation.student.full_name }}
@@ -444,10 +463,29 @@ body { background-color: #f8fafc; }
                             </td>
                             <td class="furigana-col">{{ evaluation.student.furigana|default:"-" }}</td>
                             
-                            <td class="total-col">
-                                <span class="total-points">
-                                    {{ evaluation.total_points|floatformat:1 }}
-                                </span>
+                            <!-- ✨ 修正：合計スコアの表示を評価システムによって完全に切り替える -->
+                            <td class="total-col text-center">
+                                {% if grading_system == 'original' %}
+                                    <!-- ================= オリジナルモードの表示 ================= -->
+                                    {% if evaluation.is_below_cutoff %}
+                                        <!-- 足切りの場合：赤文字でNG表示 -->
+                                        <span class="text-danger fw-bold d-block" style="font-size: 1.1em;">NG (0.0)</span>
+                                    {% else %}
+                                        <!-- クリアした場合：100点換算の数値を青文字で大きく表示 -->
+                                        <span class="text-primary fw-bold d-block" style="font-size: 1.2em;">
+                                            {{ evaluation.final_score_100|floatformat:1 }}
+                                        </span>
+                                    {% endif %}
+                                    <!-- 先生が元の点数も確認できるように、小さく素点を表示 -->
+                                    <small class="text-muted" style="font-size: 0.75em;">
+                                        素点: <span class="total-points">{{ evaluation.total_points|floatformat:1 }}</span>
+                                    </small>
+                                {% else %}
+                                    <!-- ================= デフォルト・目標管理モードの表示 ================= -->
+                                    <span class="text-primary fw-bold d-block total-points" style="font-size: 1.2em;">
+                                        {{ evaluation.total_points|floatformat:1 }}
+                                    </span>
+                                {% endif %}
                             </td>
 
                             <td class="input-col">
@@ -479,7 +517,7 @@ body { background-color: #f8fafc; }
                                 </div>
                             </td>
                             
-                            <!-- ✨ 新規追加：独自評価項目の得点入力セル -->
+                            <!-- 独自評価項目の得点入力セル -->
                             {% for col_id, score in evaluation.custom_column_scores.items %}
                                 <td class="custom-col align-middle text-center">
                                   <input type="number" 
@@ -615,7 +653,8 @@ function saveAttendanceRate(input) {
     }
     
     // 計算ロジック
-    const ATTENDANCE_MAX_POINTS = {{ classroom.attendance_max_points }};
+    // ✨ JSエラー防止のため、Django変数をクォーテーションで囲んでNumber型に変換（修正箇所）
+    const ATTENDANCE_MAX_POINTS = Number("{{ classroom.attendance_max_points|default:'0' }}");
     const newAttendancePoints = (attendanceRate / 100) * ATTENDANCE_MAX_POINTS;
     const row = input.closest('tr');
     const scoreCell = row.querySelector('.score-col');
@@ -637,6 +676,10 @@ function saveAttendanceRate(input) {
     if (attendancePointsSpan) attendancePointsSpan.textContent = newAttendancePoints.toFixed(1);
     if (totalPointsSpan) {
         totalPointsSpan.textContent = newTotalPoints.toFixed(1);
+        
+        // 💡 備考: オリジナルモードの場合、出席率を変更すると「クラス全体の中央値」や「最高得点」が変わるため、
+        // 厳密な100点換算スコアを再計算するにはページリロードを推奨します。
+        // ここでは便宜上、画面上の「素点」のみを更新しています。
     }
     
     // サーバー送信
@@ -657,7 +700,6 @@ function saveAttendanceRate(input) {
     .then(r => r.json())
     .then(d => {
         if (d.success) {
-            // 保存成功時のチェックマーク表示を削除（スムーズな入力のため）
             console.log('保存成功');
         } else {
             input.classList.add('is-invalid');
@@ -767,7 +809,7 @@ function downloadCSV() {
     }
 }
 
-//独自評価システムのスコアの更新
+// 独自評価システムのスコアの更新
 function saveCustomScore(input) {
     let score = parseFloat(input.value);
     const studentId = input.dataset.studentId;

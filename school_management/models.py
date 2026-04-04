@@ -572,6 +572,7 @@ class QRCodeScan(models.Model):
     qr_code = models.ForeignKey(StudentQRCode, on_delete=models.CASCADE, verbose_name='QRコード', related_name='scans')
     scanned_by = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name='スキャン者', related_name='qr_scans')
     lesson_session = models.ForeignKey(LessonSession, on_delete=models.CASCADE, verbose_name='授業セッション', related_name='qr_scans', null=True, blank=True)
+    point_column = models.ForeignKey(PointColumn, on_delete=models.CASCADE, verbose_name='独自評価項目', related_name='qr_scans', null=True, blank=True)
     points_awarded = models.IntegerField(default=1, verbose_name='付与ポイント')
     scanned_at = models.DateTimeField(auto_now_add=True, verbose_name='スキャン日時')
     
@@ -1029,6 +1030,10 @@ def update_quiz_score_from_qr(sender, instance, **kwargs):
     """QRスキャン履歴の変更時（追加・削除）に小テストの点数を再集計して更新"""
     if not instance.lesson_session:
         return
+        
+    # 独自評価項目のスキャン履歴の場合は、QuizScoreの集計対象から除外する
+    if getattr(instance, 'point_column_id', None) is not None:
+        return
 
     # 連携小テストを探す
     quiz = Quiz.objects.filter(lesson_session=instance.lesson_session, is_qr_linked=True).first()
@@ -1062,7 +1067,8 @@ def update_quiz_score_from_qr(sender, instance, **kwargs):
     # 合計ポイントを再集計（集計元をQRCodeScanに一本化）
     total_points = QRCodeScan.objects.filter(
         lesson_session=instance.lesson_session,
-        qr_code__student=student
+        qr_code__student=student,
+        point_column__isnull=True
     ).aggregate(total=Sum('points_awarded'))['total'] or 0
     
     # QuizScoreを取得または作成
@@ -1090,6 +1096,9 @@ def update_quiz_score_from_qr(sender, instance, **kwargs):
 def set_qr_points_from_class_settings(sender, instance, **kwargs):
     """QRスキャン時にクラス設定のポイント値を適用"""
     if not instance.pk and instance.lesson_session and instance.lesson_session.classroom:
+        # 独自項目が指定されている場合、または明示的にポイントが指定されている場合は上書きしない
+        if getattr(instance, 'point_column_id', None) is not None or instance.points_awarded != 1:
+            return
         instance.points_awarded = instance.lesson_session.classroom.qr_point_value
 
 @receiver(pre_save, sender=PeerEvaluation)

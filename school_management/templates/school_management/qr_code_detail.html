@@ -24,25 +24,33 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h2 class="card-title mb-0">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+                        <h2 class="card-title mb-0 fs-4">
                             <i class="fas fa-qrcode me-2"></i>{{ student.full_name }}のQRコード詳細
                         </h2>
-                        {% if classroom %}
-                            <a href="{% url 'school_management:class_qr_codes' classroom.id %}" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left me-1"></i>{{ classroom.class_name }}のQRコード一覧に戻る
-                            </a>
-                        {% else %}
-                            <a href="{% url 'school_management:qr_code_list' %}" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left me-1"></i>一覧に戻る
-                            </a>
-                        {% endif %}
+                        <div>
+                            {% if classroom %}
+                                <a href="{% url 'school_management:class_qr_codes' classroom.id %}" class="btn btn-outline-secondary text-start">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-arrow-left me-2"></i>
+                                        <div>
+                                            <span class="d-block d-lg-inline">{{ classroom.class_name }}の</span>
+                                            <span class="d-block d-lg-inline">QRコード一覧に戻る</span>
+                                        </div>
+                                    </div>
+                                </a>
+                            {% else %}
+                                <a href="{% url 'school_management:qr_code_list' %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-1"></i>一覧に戻る
+                                </a>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="row">
+                    <div class="row g-4">
                         <!-- QRコード表示 -->
-                        <div class="col-md-6">
+                        <div class="col-lg-6">
                             <div class="card">
                                 <div class="card-header">
                                     <h5 class="card-title mb-0">QRコード</h5>
@@ -72,41 +80,71 @@
                         </div>
                         
                         <!-- 統計情報 -->
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5 class="card-title mb-0">統計情報</h5>
+                        <div class="col-lg-6">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-header bg-white py-3 border-bottom">
+                                    <h5 class="card-title mb-0 fw-bold"><i class="fas fa-chart-pie me-2 text-primary"></i>統計情報</h5>
                                 </div>
-                                <div class="card-body">
-                                    <div class="row">
+                                <div class="card-body p-4">
+                                    <!-- サマリー -->
+                                    <div class="row g-3 mb-4">
                                         <div class="col-6">
-                                            <div class="text-center">
-                                                <h3 class="text-primary">{{ scans.count }}</h3>
-                                                <p class="text-muted mb-0">総スキャン数</p>
+                                            <div class="p-3 bg-light rounded-3 text-center border h-100">
+                                                <i class="fas fa-qrcode fa-2x text-secondary mb-2 opacity-50"></i>
+                                                <h3 class="text-dark fw-bold mb-0">{{ scans.count }}</h3>
+                                                <p class="text-muted mb-0 small fw-bold">総スキャン数</p>
                                             </div>
                                         </div>
                                         <div class="col-6">
-                                            <div class="text-center">
-                                                <h3 class="text-success">{{ total_points }}pt</h3>
-                                                <p class="text-muted mb-0">QR獲得ポイント</p>
+                                            <div class="p-3 rounded-3 text-center border h-100" style="background-color: #f0fdf4; border-color: #d1fae5;">
+                                                <i class="fas fa-star fa-2x text-success mb-2 opacity-50"></i>
+                                                <h3 class="text-success fw-bold mb-0">{{ total_points }}<span class="fs-6 ms-1 text-muted">pt</span></h3>
+                                                <p class="text-success mb-0 small fw-bold opacity-75">総獲得ポイント</p>
                                             </div>
                                         </div>
                                     </div>
-                                    <hr>
-                                    <div class="row">
-                                        <div class="col-12">
-                                            <div class="text-center">
-                                                <h3 class="text-warning">
-                                                    {% if qr_code.last_used_at %}
-                                                        {{ qr_code.last_used_at|date:"m/d H:i" }}
-                                                    {% else %}
-                                                        -
-                                                    {% endif %}
-                                                </h3>
-                                                <p class="text-muted mb-0">最終スキャン</p>
+                                    
+                                    <!-- 内訳 -->
+                                    <h6 class="text-muted mb-3 small fw-bold text-uppercase"><i class="fas fa-list-ul me-2"></i>ポイント内訳</h6>
+                                    <div class="list-group list-group-flush mb-0 border-top border-bottom">
+                                        <div class="list-group-item d-flex justify-content-between align-items-center px-2 py-3 border-0 border-bottom border-light">
+                                            <div class="d-flex align-items-center">
+                                                <div class="bg-secondary bg-opacity-10 rounded p-2 me-3 text-secondary">
+                                                    <i class="fas fa-check-square"></i>
+                                                </div>
+                                                <div>
+                                                    <h6 class="mb-0 fw-bold text-dark">小テスト</h6>
+                                                    <small class="text-muted">{{ total_qr_action_scans }}回 スキャン</small>
+                                                </div>
                                             </div>
+                                            <span class="badge bg-secondary rounded-pill fs-6 px-3 py-2 shadow-sm">{{ total_qr_action_points }} pt</span>
                                         </div>
+                                        
+                                        {% for stat in custom_points_stats %}
+                                        <div class="list-group-item d-flex justify-content-between align-items-center px-2 py-3 border-0 {% if not forloop.last %}border-bottom border-light{% endif %}">
+                                            <div class="d-flex align-items-center">
+                                                <div class="bg-info bg-opacity-10 rounded p-2 me-3 text-info">
+                                                    <i class="fas fa-star"></i>
+                                                </div>
+                                                <div>
+                                                    <h6 class="mb-0 fw-bold text-dark">{{ stat.title }}</h6>
+                                                    <small class="text-muted">{{ stat.count }}回 スキャン</small>
+                                                </div>
+                                            </div>
+                                            <span class="badge bg-info text-dark rounded-pill fs-6 px-3 py-2 shadow-sm">{{ stat.points }} pt</span>
+                                        </div>
+                                        {% endfor %}
                                     </div>
+                                </div>
+                                <div class="card-footer bg-light text-center py-3 border-top-0 text-muted small">
+                                    <i class="fas fa-clock me-1"></i>最終スキャン: 
+                                    <span class="fw-bold text-dark">
+                                        {% if qr_code.last_used_at %}
+                                            {{ qr_code.last_used_at|date:"Y/m/d H:i" }}
+                                        {% else %}
+                                            未スキャン
+                                        {% endif %}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -116,57 +154,145 @@
                     <div class="row mt-4">
                         <div class="col-12">
                             <div class="card">
-                                <div class="card-header">
+                                <div class="card-header border-bottom-0 d-flex justify-content-between align-items-center">
                                     <h5 class="card-title mb-0">スキャン履歴</h5>
-                                </div>
-                                <div class="card-body">
                                     {% if scans %}
-                                        <div class="table-responsive">
-                                            <table class="table table-striped">
-                                                <thead>
-                                                    <tr>
-                                                        <th>スキャン者</th>
-                                                        <th>授業回</th>
-                                                        <th>付与ポイント</th>
-                                                        <th>スキャン日時</th>
-                                                        <th>操作</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for scan in scans %}
-                                                    <tr>
-                                                        <td>{{ scan.scanned_by.full_name }}</td>
-                                                        <td>
-                                                            {% if scan.lesson_session %}
-                                                                第{{ scan.lesson_session.session_number }}回
-                                                            {% else %}
-                                                                <span class="text-muted">-</span>
-                                                            {% endif %}
-                                                        </td>
-                                                        <td>
-                                                            <span class="badge bg-success">{{ scan.points_awarded }}点</span>
-                                                        </td>
-                                                        <td>{{ scan.scanned_at|date:"Y/m/d H:i" }}</td>
-                                                        <td>
-                                                            <form action="{% url 'school_management:delete_qr_scan' scan.id %}" method="post" onsubmit="return confirm('この履歴を削除しますか？\nポイントも自動的に減算されます。');" style="display:inline;">
-                                                                {% csrf_token %}
-                                                                <button type="submit" class="btn btn-outline-danger btn-sm" title="削除">
-                                                                    <i class="fas fa-trash"></i>
-                                                                </button>
-                                                            </form>
-                                                        </td>
-                                                    </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
+                                    <div id="normalActions">
+                                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="toggleDeleteMode(true)">
+                                            <i class="fas fa-trash-alt me-1"></i>履歴を削除
+                                        </button>
+                                    </div>
+                                    <div id="deleteActions" style="display: none;">
+                                        <button type="button" class="btn btn-secondary btn-sm me-2" onclick="toggleDeleteMode(false)">キャンセル</button>
+                                        <button type="button" class="btn btn-danger btn-sm shadow-sm" onclick="submitBulkDelete()">
+                                            <i class="fas fa-trash-alt me-1"></i>選択した項目を削除
+                                        </button>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                {% if scans %}
+                                    <div class="card-header bg-white p-0">
+                                        <ul class="nav nav-tabs px-2 px-md-3 border-bottom-0 flex-nowrap" style="overflow-x: auto; overflow-y: hidden; white-space: nowrap; -webkit-overflow-scrolling: touch;" id="scanHistoryTabs" role="tablist">
+                                            <li class="nav-item" role="presentation">
+                                                <button class="nav-link active" id="quiz-scans-tab" data-bs-toggle="tab" data-bs-target="#quiz-scans" type="button" role="tab" aria-controls="quiz-scans" aria-selected="true">
+                                                    <i class="fas fa-check-square me-1 text-secondary"></i>小テスト
+                                                </button>
+                                            </li>
+                                            <li class="nav-item" role="presentation">
+                                                <button class="nav-link" id="custom-scans-tab" data-bs-toggle="tab" data-bs-target="#custom-scans" type="button" role="tab" aria-controls="custom-scans" aria-selected="false">
+                                                    <i class="fas fa-star me-1 text-info"></i>独自項目
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <div class="card-body p-0">
+                                        <form id="bulkDeleteForm" action="{% url 'school_management:bulk_delete_qr_scans' student.id %}" method="post">
+                                            {% csrf_token %}
+                                        <div class="tab-content" id="scanHistoryTabsContent">
+                                            <!-- 小テストタブ -->
+                                            <div class="tab-pane fade show active" id="quiz-scans" role="tabpanel" aria-labelledby="quiz-scans-tab">
+                                                <div class="table-responsive m-0">
+                                                    <table class="table table-striped mb-0">
+                                                        <thead>
+                                                            <tr>
+                                                                <th class="delete-checkbox-col ps-3" style="display:none; width:40px;">
+                                                                    <input class="form-check-input select-all-cb" type="checkbox" onclick="toggleAllCheckboxes(this)">
+                                                                </th>
+                                                                <th class="ps-2 ps-md-4 text-nowrap">スキャン情報</th>
+                                                                <th class="text-nowrap">付与内容</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for scan in scans %}
+                                                                {% if not scan.point_column %}
+                                                                <tr>
+                                                                    <td class="delete-checkbox-col ps-3 align-middle" style="display:none;">
+                                                                        <input class="form-check-input scan-cb" type="checkbox" name="scan_ids" value="{{ scan.id }}">
+                                                                    </td>
+                                                                    <td class="ps-2 ps-md-4 text-nowrap">
+                                                                        <div class="fw-bold text-dark">{{ scan.scanned_by.full_name }}</div>
+                                                                        <div class="small text-muted"><i class="fas fa-clock me-1"></i>{{ scan.scanned_at|date:"m/d H:i" }}</div>
+                                                                    </td>
+                                                                    <td class="text-nowrap">
+                                                                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                                            {% if scan.lesson_session %}
+                                                                                <span class="badge bg-light text-dark border shadow-sm fs-6 px-2 py-1">第{{ scan.lesson_session.session_number }}回</span>
+                                                                            {% endif %}
+                                                                            <span class="badge bg-secondary">小テスト</span>
+                                                                            <span class="badge bg-success">{{ scan.points_awarded }}点</span>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                    {% if total_qr_action_scans == 0 %}
+                                                    <div class="text-center py-4">
+                                                        <p class="text-muted mb-0">小テストのスキャン履歴はありません。</p>
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- 独自項目タブ -->
+                                            <div class="tab-pane fade" id="custom-scans" role="tabpanel" aria-labelledby="custom-scans-tab">
+                                                <div class="table-responsive m-0">
+                                                    <table class="table table-striped mb-0">
+                                                        <thead>
+                                                            <tr>
+                                                                <th class="delete-checkbox-col ps-3" style="display:none; width:40px;">
+                                                                    <input class="form-check-input select-all-cb" type="checkbox" onclick="toggleAllCheckboxes(this)">
+                                                                </th>
+                                                                <th class="ps-2 ps-md-4 text-nowrap">スキャン情報</th>
+                                                                <th class="text-nowrap">付与内容</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for scan in scans %}
+                                                                {% if scan.point_column %}
+                                                                <tr>
+                                                                    <td class="delete-checkbox-col ps-3 align-middle" style="display:none;">
+                                                                        <input class="form-check-input scan-cb" type="checkbox" name="scan_ids" value="{{ scan.id }}">
+                                                                    </td>
+                                                                    <td class="ps-2 ps-md-4 text-nowrap">
+                                                                        <div class="fw-bold text-dark">{{ scan.scanned_by.full_name }}</div>
+                                                                        <div class="small text-muted"><i class="fas fa-clock me-1"></i>{{ scan.scanned_at|date:"m/d H:i" }}</div>
+                                                                    </td>
+                                                                    <td class="text-nowrap">
+                                                                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                                            {% if scan.lesson_session %}
+                                                                                <span class="badge bg-light text-dark border shadow-sm fs-6 px-2 py-1">第{{ scan.lesson_session.session_number }}回</span>
+                                                                            {% endif %}
+                                                                            <span class="badge bg-info text-dark">{{ scan.point_column.column_title }}</span>
+                                                                            <span class="badge bg-success">{{ scan.points_awarded }}点</span>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                    {% if not custom_points_stats %}
+                                                    <div class="text-center py-4">
+                                                        <p class="text-muted mb-0">独自項目のスキャン履歴はありません。</p>
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
                                         </div>
-                                    {% else %}
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <div class="card-body">
                                         <div class="text-center py-4">
                                             <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
                                             <p class="text-muted">まだスキャンされていません</p>
                                         </div>
+                                    </div>
                                     {% endif %}
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -185,6 +311,41 @@ function copyTestUrl() {
     copyText.setSelectionRange(0, 99999); 
     navigator.clipboard.writeText(copyText.value);
     alert("URLをコピーしました");
+}
+
+// --- 一括削除機能のJS ---
+function toggleDeleteMode(isDeleteMode) {
+    const normalActions = document.getElementById('normalActions');
+    const deleteActions = document.getElementById('deleteActions');
+    const checkboxCols = document.querySelectorAll('.delete-checkbox-col');
+    
+    if (isDeleteMode) {
+        normalActions.style.display = 'none';
+        deleteActions.style.display = 'block';
+        checkboxCols.forEach(col => col.style.display = 'table-cell');
+    } else {
+        normalActions.style.display = 'block';
+        deleteActions.style.display = 'none';
+        checkboxCols.forEach(col => col.style.display = 'none');
+        document.querySelectorAll('.scan-cb, .select-all-cb').forEach(cb => cb.checked = false);
+    }
+}
+
+function toggleAllCheckboxes(source) {
+    const table = source.closest('table');
+    const checkboxes = table.querySelectorAll('.scan-cb');
+    checkboxes.forEach(cb => cb.checked = source.checked);
+}
+
+function submitBulkDelete() {
+    const checkedCount = document.querySelectorAll('.scan-cb:checked').length;
+    if (checkedCount === 0) {
+        alert('削除する履歴が選択されていません。');
+        return;
+    }
+    if (confirm(`${checkedCount}件のスキャン履歴を削除しますか？\nポイントも自動的に減算されます。`)) {
+        document.getElementById('bulkDeleteForm').submit();
+    }
 }
 </script>
 {% endblock %}

@@ -66,7 +66,7 @@
 
                             <div class="d-grid gap-3">
                                 {% if target_classroom %}
-                                <a href="{% url 'school_management:class_qr_codes' target_classroom.id %}{% if selected_session %}?session_id={{ selected_session.id }}{% endif %}&auto_start=true" class="btn btn-primary btn-lg fw-bold shadow-sm">
+                                <a href="{% url 'school_management:class_qr_codes' target_classroom.id %}{% if selected_session %}?session_id={{ selected_session.id }}&auto_start=true{% else %}?auto_start=true{% endif %}" class="btn btn-primary btn-lg fw-bold shadow-sm">
                                     <i class="fas fa-camera me-2"></i>続けてカメラで読み取る
                                 </a>
                                 {% if selected_session %}
@@ -102,8 +102,7 @@
                             
                             <div class="mb-4">
                                 <label class="form-label fw-bold"><i class="fas fa-calendar-day me-2 text-info"></i>対象の授業回</label>
-                                <select name="session_id" class="form-select border-info bg-light">
-                                    <option value="">授業回を指定しない（スキャン記録のみ）</option>
+                                <select name="session_id" class="form-select border-info bg-light" required>
                                     {% for session in sessions %}
                                         <option value="{{ session.id }}" {% if current_session and current_session.id == session.id %}selected{% endif %}>
                                             第{{ session.session_number }}回 ({{ session.date|date:"m/d" }}) - {{ session.topic|default:"トピックなし" }}
@@ -115,7 +114,7 @@
                             <div class="mb-4">
                                 <label class="form-label fw-bold"><i class="fas fa-tasks me-2 text-warning"></i>付与する項目（採点枠）</label>
                                 <select name="point_type" class="form-select border-warning bg-light">
-                                    <option value="qr_action">QRアクション点 (小テスト枠)</option>
+                                    <option value="qr_action">小テスト</option>
                                     {% for column in custom_columns %}
                                         <option value="custom_{{ column.id }}">独自項目: {{ column.column_title }}</option>
                                     {% endfor %}
@@ -132,7 +131,7 @@
 
                             <div class="d-flex justify-content-between mt-5">
                                 {% if target_classroom %}
-                                    <a href="{% url 'school_management:class_qr_codes' target_classroom.id %}{% if current_session %}?session_id={{ current_session.id }}{% endif %}&auto_start=true" class="btn btn-outline-secondary px-4">
+                                    <a href="{% url 'school_management:class_qr_codes' target_classroom.id %}{% if current_session %}?session_id={{ current_session.id }}&auto_start=true{% else %}?auto_start=true{% endif %}" class="btn btn-outline-secondary px-4">
                                         キャンセル
                                     </a>
                                 {% else %}

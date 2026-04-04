@@ -55,9 +55,14 @@ def qr_code_scan(request, qr_code_id):
                 points_to_add = 1
 
             posted_session_id = request.POST.get('session_id')
-            selected_session = None
-            if posted_session_id:
-                selected_session = LessonSession.objects.filter(id=posted_session_id, classroom=target_classroom).first()
+            if not posted_session_id:
+                messages.error(request, '対象の授業回を選択してください。')
+                return redirect('school_management:qr_code_scan', qr_code_id=qr_code_id)
+                
+            selected_session = LessonSession.objects.filter(id=posted_session_id, classroom=target_classroom).first()
+            if not selected_session:
+                messages.error(request, '無効な授業回です。')
+                return redirect('school_management:qr_code_scan', qr_code_id=qr_code_id)
 
             added_target = ""
 
@@ -71,11 +76,21 @@ def qr_code_scan(request, qr_code_id):
                     scan.points_awarded = points_to_add
                     scan.save(update_fields=['points_awarded'])
                 
-                added_target = "QRアクション点 (小テスト枠)"
-                messages.success(request, f'{qr_code.student.full_name}さんにQRアクション点（{points_to_add}pt）を付与しました。')
+                added_target = "小テスト"
+                messages.success(request, f'{qr_code.student.full_name}さんの「小テスト」に{points_to_add}ptを追加しました。')
             elif point_type.startswith('custom_'):
                 column_id = point_type.split('_')[1]
                 column = get_object_or_404(PointColumn, id=column_id, classroom=target_classroom)
+                
+                # 独自評価項目へのポイント付与もスキャン履歴として保存する
+                scan = QRCodeScan.objects.create(
+                    qr_code=qr_code, 
+                    scanned_by=request.user,
+                    lesson_session=selected_session,
+                    point_column=column,
+                    points_awarded=points_to_add
+                )
+                
                 score_obj, created = StudentColumnScore.objects.get_or_create(
                     student=qr_code.student,
                     column=column,

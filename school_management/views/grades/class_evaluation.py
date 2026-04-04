@@ -236,9 +236,6 @@ def class_evaluation_view(request, class_id):
             eval_data['is_below_cutoff'] = False
             eval_data['final_score_100'] = round(current_raw, 1)
 
-    # デバッグ用: 計算結果のログ出力
-    for eval_data in student_evaluations:
-        print(f"[{eval_data['student'].full_name}] 足切り: {eval_data['is_below_cutoff']} | 最終成績: {eval_data['final_score_100']}")
         
     total_sessions = sessions.count()
 

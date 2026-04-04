@@ -25,7 +25,7 @@ def qr_code_list(request):
         for student in students:
             qr_code = StudentQRCode.objects.filter(student=student).first()
             if qr_code:
-                total_scans += qr_code.scans.count()
+                total_scans += qr_code.scans.filter(scanned_by=request.user).count()
         
         class_data.append({
             'classroom': classroom,
@@ -74,7 +74,7 @@ def class_qr_codes(request, class_id):
         qr_codes.append({
             'student': student,
             'qr_code': qr_code,
-            'scan_count': qr_code.scans.count(),
+            'scan_count': qr_code.scans.filter(scanned_by=request.user).count(),
             'qr_image': generate_qr_code_image(scan_url),
             'class_points': class_points
         })
@@ -92,7 +92,7 @@ def qr_code_detail(request, student_id):
     student = get_object_or_404(Student, id=student_id)
     qr_code, created = StudentQRCode.objects.get_or_create(student=student, defaults={'is_active': True})
     
-    scans = qr_code.scans.select_related('scanned_by', 'lesson_session', 'point_column').order_by('-scanned_at')
+    scans = qr_code.scans.filter(scanned_by=request.user).select_related('scanned_by', 'lesson_session', 'point_column').order_by('-scanned_at')
     scan_url = request.build_absolute_uri(
         reverse('school_management:qr_code_scan', kwargs={'qr_code_id': qr_code.qr_code_id})
     )
@@ -143,7 +143,7 @@ def delete_qr_scan(request, scan_id):
         messages.error(request, '権限がありません。')
         return redirect('school_management:dashboard')
     
-    scan = get_object_or_404(QRCodeScan, id=scan_id)
+    scan = get_object_or_404(QRCodeScan, id=scan_id, scanned_by=request.user)
     student_id = scan.qr_code.student.id
     
     # 独自評価項目のスキャンの場合は、関連するStudentColumnScoreを減算する
@@ -176,7 +176,7 @@ def bulk_delete_qr_scans(request, student_id):
         messages.warning(request, '削除する履歴が選択されていません。')
         return redirect('school_management:qr_code_detail', student_id=student_id)
         
-    scans = QRCodeScan.objects.filter(id__in=scan_ids, qr_code__student_id=student_id)
+    scans = QRCodeScan.objects.filter(id__in=scan_ids, qr_code__student_id=student_id, scanned_by=request.user)
     
     # 独自評価項目の減算処理
     for scan in scans:

@@ -1,145 +1,154 @@
 {% extends 'school_management/base.html' %}
 
-{% block title %}QRコードスキャン{% endblock %}
-{% block page_title %}QRコードスキャン{% endblock %}
+{% block title %}ポイント付与設定{% endblock %}
+{% block page_title %}ポイント付与設定{% endblock %}
 
 {% block breadcrumbs %}
-{% if classroom %}
+{% if target_classroom %}
 <li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
-<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
-<li class="breadcrumb-item"><a href="{% url 'school_management:class_qr_codes' classroom.id %}">QRコード一覧</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' target_classroom.id %}">{{ target_classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_qr_codes' target_classroom.id %}">QRコード一覧</a></li>
 {% else %}
 <li class="breadcrumb-item"><a href="{% url 'school_management:qr_code_list' %}">QRコード管理</a></li>
 {% endif %}
-<li class="breadcrumb-item active" aria-current="page">スキャン結果</li>
+<li class="breadcrumb-item active" aria-current="page">ポイント付与</li>
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title mb-0">
-                        <i class="fas fa-camera me-2"></i>QRコードスキャン
-                    </h2>
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-qrcode me-2"></i>ポイント付与設定</h5>
                 </div>
-                <div class="card-body text-center">
-                    {% if qr_code %}
-                        <div class="alert alert-success">
-                            <i class="fas fa-check-circle fa-2x mb-3"></i>
-                            <h4>🎉 スキャン成功！</h4>
-                            <p class="mb-2">{{ qr_code.student.full_name }}さんのQRコードをスキャンしました。</p>
-                            {% if classroom %}
-                                <p class="mb-2">
-                                    <strong class="text-primary">
-                                        <i class="fas fa-chalkboard me-1"></i>
-                                        クラス: {{ classroom.class_name }}
-                                    </strong>
-                                </p>
-                            {% endif %}
-                            {% if lesson_session %}
-                                <p class="mb-2">
-                                    <span class="badge bg-info text-dark">第{{ lesson_session.session_number }}回</span>
-                                    QRアクション点として記録されました
-                                </p>
-                            {% endif %}
-                            {% if points_added %}
-                                <p class="mb-2">
-                                    <strong class="text-success">
-                                        <i class="fas fa-star me-1"></i>
-                                        {{ qr_code.student.full_name }}さんのクラスポイントが <span class="badge bg-success fs-6">+{{ points_awarded }}</span> 増加しました！
-                                    </strong>
-                                </p>
-                                <p class="mb-0">
-                                    <strong>この授業の獲得ポイント:</strong> 
-                                    <span class="badge bg-primary fs-6">{{ current_quiz_points }}pt</span>
-                                </p>
-                            {% else %}
-                                <div class="alert alert-warning mt-2">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>
-                                    授業回が指定されていないため、スキャン記録のみ保存されました（ポイント付与なし）。
-                                </div>
-                            {% endif %}
-                            <p class="mt-2 mb-0">
-                                <small class="text-muted">
-                                    <i class="fas fa-user-tie me-1"></i>
-                                    先生としてポイントを付与しました
-                                </small>
-                            </p>
-                        </div>
-                        
-                        <div class="row mt-4">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h5 class="card-title">スキャン情報</h5>
-                                        <p class="mb-1"><strong>QRコード所有者:</strong> {{ qr_code.student.full_name }}</p>
-                                        <p class="mb-1"><strong>学籍番号:</strong> {{ qr_code.student.student_number }}</p>
-                                        {% if classroom %}
-                                            <p class="mb-1"><strong>クラス:</strong> {{ classroom.class_name }}</p>
-                                        {% endif %}
-                                        <p class="mb-1">
-                                            <strong>付与ポイント:</strong> 
-                                            {% if points_added %}
-                                                <span class="badge bg-success fs-6">+{{ points_awarded }}点</span>
-                                            {% else %}
-                                                <span class="badge bg-secondary fs-6">0点</span>
-                                            {% endif %}
-                                        </p>
-                                        <p class="mb-0"><strong>スキャン日時:</strong> {{ scan_time }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                                                    <div class="card">
-                                        <div class="card-body">
-                                            <h5 class="card-title">先生の情報</h5>
-                                            <p class="mb-1"><strong>名前:</strong> {{ request.user.full_name }}</p>
-                                            <p class="mb-1"><strong>教員ID:</strong> {{ request.user.teacher_id|default:"-" }}</p>
-                                            <p class="mb-1"><strong>役割:</strong> {{ request.user.get_role_display }}</p>
-                                            <p class="mb-0"><strong>スキャンした回数:</strong> {{ user_scan_count }}回</p>
+                <div class="card-body p-4">
+                    {% if success %}
+                        <!-- 結果表示画面 -->
+                        <div class="text-center mb-4">
+                            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                            <h4 class="fw-bold mb-3">ポイント付与完了</h4>
+                            
+                            <div class="card bg-light border-0 mb-4 text-start">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="d-inline-flex justify-content-center align-items-center bg-white rounded-circle me-3 border shadow-sm" style="width: 50px; height: 50px;">
+                                            <i class="fas fa-user-graduate text-primary fs-5"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="fw-bold text-dark mb-0">{{ qr_code.student.full_name }}</h5>
+                                            <small class="text-muted">{{ qr_code.student.student_number }}</small>
                                         </div>
                                     </div>
+                                    
+                                    <hr class="mt-0 mb-3 border-secondary opacity-25">
+                                    
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-4 text-muted small">授業回</div>
+                                        <div class="col-8 fw-bold">
+                                            {% if selected_session %}
+                                                第{{ selected_session.session_number }}回 ({{ selected_session.date|date:"m/d" }})
+                                            {% else %}
+                                                指定なし
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-4 text-muted small">付与項目</div>
+                                        <div class="col-8 fw-bold text-primary">{{ added_target }}</div>
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-4 text-muted small">追加ポイント</div>
+                                        <div class="col-8"><span class="badge bg-success fs-6">+{{ points_added }}pt</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-grid gap-3">
+                                {% if target_classroom %}
+                                <a href="{% url 'school_management:class_qr_codes' target_classroom.id %}{% if selected_session %}?session_id={{ selected_session.id }}{% endif %}&auto_start=true" class="btn btn-primary btn-lg fw-bold shadow-sm">
+                                    <i class="fas fa-camera me-2"></i>続けてカメラで読み取る
+                                </a>
+                                {% if selected_session %}
+                                <a href="{% url 'school_management:session_detail' selected_session.id %}?active_tab=qr" class="btn btn-outline-primary shadow-sm">
+                                    <i class="fas fa-qrcode me-2"></i>授業回のQR巡回タブに戻る
+                                </a>
+                                {% endif %}
+                                <a href="{% url 'school_management:class_qr_codes' target_classroom.id %}{% if selected_session %}?session_id={{ selected_session.id }}{% endif %}" class="btn btn-outline-secondary shadow-sm">
+                                    <i class="fas fa-list me-2"></i>QRコード一覧に戻る
+                                </a>
+                                {% else %}
+                                <a href="{% url 'school_management:qr_code_list' %}" class="btn btn-outline-secondary shadow-sm">
+                                    <i class="fas fa-home me-2"></i>QRコード管理に戻る
+                                </a>
+                                {% endif %}
                             </div>
                         </div>
+                    {% elif qr_code %}
+                        <!-- 設定画面 -->
+                        <div class="text-center mb-4">
+                            <div class="d-inline-flex justify-content-center align-items-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
+                                <i class="fas fa-user-graduate fa-2x text-primary"></i>
+                            </div>
+                            <h4 class="fw-bold mb-1">{{ qr_code.student.full_name }}</h4>
+                            <p class="text-muted">{{ qr_code.student.student_number }}</p>
+                        </div>
                         
-                        <div class="mt-4">
-                            {% if classroom %}
-                                {% if lesson_session %}
-                                    <a href="{% url 'school_management:session_detail' lesson_session.id %}?active_tab=qr" class="btn btn-outline-primary me-2">
-                                        <i class="fas fa-arrow-left me-1"></i>授業回詳細（QR採点）に戻る
+                        <form method="post">
+                            {% csrf_token %}
+                            {% if target_classroom %}
+                                <input type="hidden" name="class_id" value="{{ target_classroom.id }}">
+                            {% endif %}
+                            
+                            <div class="mb-4">
+                                <label class="form-label fw-bold"><i class="fas fa-calendar-day me-2 text-info"></i>対象の授業回</label>
+                                <select name="session_id" class="form-select border-info bg-light">
+                                    <option value="">授業回を指定しない（スキャン記録のみ）</option>
+                                    {% for session in sessions %}
+                                        <option value="{{ session.id }}" {% if current_session and current_session.id == session.id %}selected{% endif %}>
+                                            第{{ session.session_number }}回 ({{ session.date|date:"m/d" }}) - {{ session.topic|default:"トピックなし" }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-bold"><i class="fas fa-tasks me-2 text-warning"></i>付与する項目（採点枠）</label>
+                                <select name="point_type" class="form-select border-warning bg-light">
+                                    <option value="qr_action">QRアクション点 (小テスト枠)</option>
+                                    {% for column in custom_columns %}
+                                        <option value="custom_{{ column.id }}">独自項目: {{ column.column_title }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-bold"><i class="fas fa-star me-2 text-success"></i>付与ポイント</label>
+                                <div class="input-group w-50">
+                                    <input type="number" name="points" class="form-control text-center fw-bold text-primary" value="{{ default_points }}" min="1" required style="font-size: 1.25rem;">
+                                    <span class="input-group-text">pt</span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between mt-5">
+                                {% if target_classroom %}
+                                    <a href="{% url 'school_management:class_qr_codes' target_classroom.id %}{% if current_session %}?session_id={{ current_session.id }}{% endif %}&auto_start=true" class="btn btn-outline-secondary px-4">
+                                        キャンセル
                                     </a>
                                 {% else %}
-                                    <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-primary me-2">
-                                        <i class="fas fa-arrow-left me-1"></i>{{ classroom.class_name }}の詳細に戻る
-                                    </a>
+                                    <a href="{% url 'school_management:qr_code_list' %}" class="btn btn-outline-secondary px-4">キャンセル</a>
                                 {% endif %}
-                                <a href="{% url 'school_management:class_qr_codes' classroom.id %}{% if lesson_session %}?session_id={{ lesson_session.id }}{% endif %}" class="btn btn-success">
-                                    <i class="fas fa-qrcode me-1"></i>続けてスキャンする（QR一覧へ）
-                                </a>
-                            {% else %}
-                                <a href="{% url 'school_management:qr_code_list' %}" class="btn btn-primary me-2">
-                                    <i class="fas fa-home me-1"></i>QRコード一覧に戻る
-                                </a>
-                                {% if qr_code.student.classroom_set.first %}
-                                    <a href="{% url 'school_management:class_qr_codes' qr_code.student.classroom_set.first.id %}" class="btn btn-outline-primary">
-                                        <i class="fas fa-chalkboard me-1"></i>クラスQRコード
-                                    </a>
-                                {% endif %}
-                            {% endif %}
-                        </div>
+                                <button type="submit" class="btn btn-success px-5 fw-bold shadow-sm" autofocus>
+                                    <i class="fas fa-plus-circle me-2"></i>ポイントを付与する
+                                </button>
+                            </div>
+                        </form>
                     {% else %}
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
-                            <h4>スキャンエラー</h4>
-                            <p class="mb-0">{{ error_message }}</p>
+                        <div class="alert alert-danger text-center">
+                            <i class="fas fa-exclamation-triangle me-2"></i> {{ error_message|default:"QRコードが無効です。" }}
                         </div>
-                        
-                        <div class="mt-4">
-                            <a href="{% url 'school_management:student_dashboard' %}" class="btn btn-primary">
-                                <i class="fas fa-home me-1"></i>ダッシュボードに戻る
-                            </a>
+                        <div class="text-center mt-4">
+                            <a href="{% url 'school_management:dashboard' %}" class="btn btn-primary">ダッシュボードに戻る</a>
                         </div>
                     {% endif %}
                 </div>

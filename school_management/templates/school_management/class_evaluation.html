@@ -523,6 +523,7 @@ body { background-color: #f8fafc; }
                                   <input type="number" 
                                          class="form-control form-control-sm text-center mx-auto custom-score-input"
                                          value="{{ score }}" 
+                                         min="0"
                                          data-student-id="{{ evaluation.student.id }}" 
                                          data-column-id="{{ col_id }}" 
                                          onchange="saveCustomScore(this)"
@@ -814,7 +815,9 @@ function saveCustomScore(input) {
     let score = parseFloat(input.value);
     const studentId = input.dataset.studentId;
     const columnId = input.dataset.columnId;
-    if (isNaN(score)) {
+    
+    // 入力値が空、または0未満の場合は0に補正する
+    if (isNaN(score) || score < 0) {
         score = 0;
         input.value = 0;
     }

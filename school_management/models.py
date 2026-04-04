@@ -110,6 +110,7 @@ class ClassRoom(models.Model):
     ]
     GRADING_SYSTEM_CHOICES = [
         ('default', 'デフォルト（通常）'),
+        ('goal', '目標管理（講師評価）'),
         ('original', 'オリジナル（カスタマイズ）'),
     ]
     

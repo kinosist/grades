@@ -22,8 +22,16 @@ def class_create_view(request):
         year = request.POST.get('year')
         semester = request.POST.get('semester')
         
-        # 新規追加：UIで選択された評価システム（採点方式）を取得。指定がない場合は 'default' とする。
-        grading_system = request.POST.get('grading_system', 'default')
+        # 画面から送信された評価システムの値を取得
+        raw_grading_system = request.POST.get('grading_system', 'default')
+        
+        # バリデーション: モデルで許可されている値か検証を行う
+        # 許可されていない不正な値が送信された場合は、安全のため強制的に'default'を設定する
+        valid_systems = [choice[0] for choice in ClassRoom.GRADING_SYSTEM_CHOICES]
+        if raw_grading_system in valid_systems:
+            grading_system = raw_grading_system
+        else:
+            grading_system = 'default'
         
         if class_name and year and semester:
             try:
@@ -32,7 +40,7 @@ def class_create_view(request):
                     class_name=class_name,
                     year=int(year),
                     semester=semester,
-                    grading_system=grading_system  # 選択された評価システムを保存
+                    grading_system=grading_system  # 検証済みの値を保存
                 )
                 # 担当教員として現在のユーザーを追加
                 classroom.teachers.add(request.user)

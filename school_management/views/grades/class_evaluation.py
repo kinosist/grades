@@ -257,30 +257,44 @@ def class_evaluation_view(request, class_id):
     return render(request, 'school_management/class_evaluation.html', context)
 
 
+@login_required
 @require_POST
 def update_custom_score(request, class_id):
-    """
-    教員が入力した独自の評価項目（列）の得点を非同期でデータベースに保存するAPIビュー
-    """
     try:
         data = json.loads(request.body)
         student_id = data.get('student_id')
         column_id = data.get('column_id')
         score = data.get('score', 0)
-        
-        student = get_object_or_404(Student, id=student_id)
-        column = get_object_or_404(PointColumn, id=column_id)
 
-        # 学生と評価項目の組み合わせが存在すれば更新し、なければ新規作成する
+        # クラス取得（担当教員かチェック）
+        classroom = get_object_or_404(
+            ClassRoom,
+            id=class_id,
+            teachers=request.user
+        )
+
+        # クラスに属する学生かチェック
+        student = get_object_or_404(
+            Student,
+            id=student_id,
+            classroom=classroom
+        )
+
+        # クラスに属する評価項目かチェック
+        column = get_object_or_404(
+            PointColumn,
+            id=column_id,
+            classroom=classroom
+        )
+
+        # 更新 or 作成
         StudentColumnScore.objects.update_or_create(
             student=student,
             column=column,
             defaults={'score': score}
         )
-        return JsonResponse({'success': True})
+
+        return JsonResponse({'status': 'success'})
 
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        })
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)

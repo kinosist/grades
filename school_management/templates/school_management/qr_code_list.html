@@ -45,9 +45,6 @@
                                     <span class="badge badge-semester {% if class_data.classroom.semester == 'first' %}bg-spring{% else %}bg-fall{% endif %}">
                                         {{ class_data.classroom.year }} {{ class_data.classroom.get_semester_display }}
                                     </span>
-                                    <span class="badge bg-success rounded-pill px-3">
-                                        Scan: {{ class_data.total_scans }}
-                                    </span>
                                 </div>
                                 
                                 <h4 class="fw-bold text-dark mb-2">

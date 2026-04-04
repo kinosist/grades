@@ -34,15 +34,9 @@
                             {% endif %}
                         </div>
                         <div class="d-flex gap-2 flex-column flex-sm-row">
-                            {% if lesson_session %}
-                                <button class="btn btn-primary w-100 w-sm-auto shadow-sm" onclick="openCameraScanner()">
-                                    <i class="fas fa-camera me-2"></i>カメラでスキャン
-                                </button>
-                            {% else %}
-                                <button class="btn btn-secondary w-100 w-sm-auto shadow-sm" disabled title="授業回詳細からアクセスしてください">
-                                    <i class="fas fa-camera me-2"></i>カメラでスキャン
-                                </button>
-                            {% endif %}
+                            <button class="btn btn-primary w-100 w-sm-auto shadow-sm" onclick="openCameraScanner()">
+                                <i class="fas fa-camera me-2"></i>カメラでスキャン
+                            </button>
                             <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary w-100 w-sm-auto shadow-sm">
                                 <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
                             </a>
@@ -52,11 +46,6 @@
                         <p class="text-muted mb-0">
                             {{ classroom.year }}年度 {{ classroom.get_semester_display }} - 在籍学生数: {{ qr_codes|length }}名
                         </p>
-                        {% if not lesson_session %}
-                            <div class="alert alert-warning py-1 px-2 mb-0 small d-flex align-items-center">
-                                <i class="fas fa-exclamation-circle me-1"></i>授業回が指定されていません。スキャンするには授業詳細からアクセスしてください。
-                            </div>
-                        {% endif %}
                         <div class="bg-light rounded px-2 py-1 border align-self-start align-self-lg-center">
                             <span class="text-muted small">QRアクション: <strong>{{ classroom.qr_point_value }}pt/回</strong></span>
                         </div>
@@ -81,12 +70,12 @@
                                         
                                         <div class="d-flex justify-content-between align-items-center">
                                             <span class="badge bg-primary">スキャン数: {{ qr_data.scan_count }}</span>
-                                            <span class="badge bg-success">ポイント: {{ qr_data.scan_count }}pt</span>
+                                            <span class="badge bg-success">ポイント: {{ qr_data.scan_points }}pt</span>
                                         </div>
                                     </div>
                                     <div class="card-footer">
                                         <div class="d-grid gap-2">
-                                            <a href="{% url 'school_management:qr_code_detail' qr_data.student.id %}?class_id={{ classroom.id }}" 
+                                            <a href="{% url 'school_management:qr_code_detail' qr_data.student.id %}?class_id={{ classroom.id }}{% if lesson_session %}&session_id={{ lesson_session.id }}{% endif %}" 
                                                class="btn btn-outline-primary btn-sm">
                                                 <i class="fas fa-eye me-1"></i>詳細を見る
                                             </a>
@@ -125,13 +114,6 @@
                 <div id="camera-container" style="position: relative; overflow: hidden; border-radius: 8px; background: #000;">
                     <video id="qr-video" width="100%" height="400" autoplay muted style="object-fit: cover;"></video>
                     <canvas id="qr-canvas" style="display: none;"></canvas>
-                    
-                    <!-- 結果表示オーバーレイ -->
-                    <div id="scan-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 10;">
-                        <div id="overlay-content" class="text-center p-3">
-                            <!-- JSで内容を挿入 -->
-                        </div>
-                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -209,84 +191,28 @@ function showScanResult(data) {
     // URLパラメータからsession_idを取得
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('session_id');
+    const classId = "{{ classroom.id }}";
     
     // QRコードのURLを処理
     if (data.includes('qr-codes/scan/')) {
         let targetUrl = data;
-        // session_idがある場合は付与して遷移
-        if (sessionId) {
-            const separator = targetUrl.includes('?') ? '&' : '?';
-            targetUrl += `${separator}session_id=${sessionId}`;
+        const params = new URLSearchParams();
+        if (sessionId) params.append('session_id', sessionId);
+        if (classId) params.append('class_id', classId);
+        
+        const queryString = params.toString();
+        if (queryString) {
+            targetUrl += (targetUrl.includes('?') ? '&' : '?') + queryString;
         }
         
-        // スキャン一時停止
+        // スキャン一時停止して画面遷移
         clearInterval(scanInterval);
-        
-        // AJAXで送信（画面遷移なし）
-        fetch(targetUrl, {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                showOverlay('success', result);
-            } else {
-                showOverlay('error', { error: result.error });
-            }
-        })
-        .catch(err => {
-            showOverlay('error', { error: '通信エラーが発生しました' });
-        });
+        window.location.href = targetUrl;
         
     } else {
         // 無効なQRコードの場合も少し待って再開
         setTimeout(startQRScan, 1000);
     }
-}
-
-function nextScan() {
-    hideOverlay();
-    startQRScan();
-}
-
-function showOverlay(type, data) {
-    const overlay = document.getElementById('scan-overlay');
-    const content = document.getElementById('overlay-content');
-    
-    let html = '';
-    if (type === 'success') {
-        html = `
-            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
-            <h3 class="fw-bold">${data.student_name}</h3>
-            <div class="mt-2">
-                <span class="badge bg-success fs-4">+${data.points_awarded}pt</span>
-            </div>
-            <p class="mt-2 text-white-50">合計: <span class="fw-bold text-white">${data.current_quiz_points}</span>pt</p>
-        `;
-    } else {
-        html = `
-            <i class="fas fa-times-circle fa-4x text-danger mb-3"></i>
-            <h4 class="fw-bold">エラー</h4>
-            <p class="mt-2">${data.error || '読み取りに失敗しました'}</p>
-        `;
-    }
-    
-    html += `
-        <div class="mt-4">
-            <button class="btn btn-light btn-lg px-5 rounded-pill fw-bold shadow-sm" onclick="nextScan()">
-                次へ <i class="fas fa-chevron-right ms-2"></i>
-            </button>
-        </div>
-    `;
-    
-    content.innerHTML = html;
-    overlay.style.display = 'flex';
-}
-
-function hideOverlay() {
-    document.getElementById('scan-overlay').style.display = 'none';
 }
 
 function stopCamera() {
@@ -298,7 +224,6 @@ function stopCamera() {
         clearInterval(scanInterval);
         scanInterval = null;
     }
-    hideOverlay();
 }
 
 // 手動URL入力ボタンのイベント
@@ -306,12 +231,17 @@ document.getElementById('manualInputBtn').addEventListener('click', function() {
     let url = prompt('QRコードのURLを入力してください:');
     if (url) {
         if (url.includes('qr-codes/scan/')) {
-            // URLパラメータからsession_idを取得して付与
             const urlParams = new URLSearchParams(window.location.search);
             const sessionId = urlParams.get('session_id');
-            if (sessionId) {
-                const separator = url.includes('?') ? '&' : '?';
-                url += `${separator}session_id=${sessionId}`;
+            const classId = "{{ classroom.id }}";
+            
+            const params = new URLSearchParams();
+            if (sessionId) params.append('session_id', sessionId);
+            if (classId) params.append('class_id', classId);
+            
+            const queryString = params.toString();
+            if (queryString) {
+                url += (url.includes('?') ? '&' : '?') + queryString;
             }
             window.location.href = url;
         } else {

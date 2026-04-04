@@ -70,12 +70,12 @@
                                         
                                         <div class="d-flex justify-content-between align-items-center">
                                             <span class="badge bg-primary">スキャン数: {{ qr_data.scan_count }}</span>
-                                            <span class="badge bg-success">ポイント: {{ qr_data.scan_count }}pt</span>
+                                            <span class="badge bg-success">ポイント: {{ qr_data.scan_points }}pt</span>
                                         </div>
                                     </div>
                                     <div class="card-footer">
                                         <div class="d-grid gap-2">
-                                            <a href="{% url 'school_management:qr_code_detail' qr_data.student.id %}?class_id={{ classroom.id }}" 
+                                            <a href="{% url 'school_management:qr_code_detail' qr_data.student.id %}?class_id={{ classroom.id }}{% if lesson_session %}&session_id={{ lesson_session.id }}{% endif %}" 
                                                class="btn btn-outline-primary btn-sm">
                                                 <i class="fas fa-eye me-1"></i>詳細を見る
                                             </a>

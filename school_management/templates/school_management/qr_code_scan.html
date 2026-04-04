@@ -96,10 +96,22 @@
                         
                         <form method="post">
                             {% csrf_token %}
-                            {% if target_classroom %}
+                            
+                            {% if teacher_classrooms|length > 1 %}
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold"><i class="fas fa-chalkboard me-2 text-primary"></i>対象のクラス</label>
+                                    <select name="class_id" class="form-select border-primary bg-light" onchange="if(this.value) window.location.href='?class_id='+this.value" required>
+                                        <option value="">クラスを選択してください...</option>
+                                        {% for c in teacher_classrooms %}
+                                            <option value="{{ c.id }}" {% if target_classroom and target_classroom.id == c.id %}selected{% endif %}>{{ c.class_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            {% elif target_classroom %}
                                 <input type="hidden" name="class_id" value="{{ target_classroom.id }}">
                             {% endif %}
                             
+                            {% if target_classroom %}
                             <div class="mb-4">
                                 <label class="form-label fw-bold"><i class="fas fa-calendar-day me-2 text-info"></i>対象の授業回</label>
                                 <select name="session_id" class="form-select border-info bg-light" required>
@@ -124,10 +136,15 @@
                             <div class="mb-4">
                                 <label class="form-label fw-bold"><i class="fas fa-star me-2 text-success"></i>付与ポイント</label>
                                 <div class="input-group w-50">
-                                    <input type="number" name="points" class="form-control text-center fw-bold text-primary" value="{{ default_points }}" min="1" required style="font-size: 1.25rem;">
+                                    <input type="number" name="points" class="form-control text-center fw-bold text-primary" value="{{ default_points }}" min="1" max="100" required style="font-size: 1.25rem;">
                                     <span class="input-group-text">pt</span>
                                 </div>
                             </div>
+                            {% else %}
+                            <div class="alert alert-info text-start">
+                                <i class="fas fa-info-circle me-2"></i>対象のクラスを選択してください。
+                            </div>
+                            {% endif %}
 
                             <div class="d-flex justify-content-between mt-5">
                                 {% if target_classroom %}
@@ -137,9 +154,12 @@
                                 {% else %}
                                     <a href="{% url 'school_management:qr_code_list' %}" class="btn btn-outline-secondary px-4">キャンセル</a>
                                 {% endif %}
-                                <button type="submit" class="btn btn-success px-5 fw-bold shadow-sm" autofocus>
-                                    <i class="fas fa-plus-circle me-2"></i>ポイントを付与する
-                                </button>
+                                
+                                {% if target_classroom %}
+                                    <button type="submit" class="btn btn-success px-5 fw-bold shadow-sm" autofocus>
+                                        <i class="fas fa-plus-circle me-2"></i>ポイントを付与する
+                                    </button>
+                                {% endif %}
                             </div>
                         </form>
                     {% else %}

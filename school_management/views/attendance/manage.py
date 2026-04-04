@@ -20,17 +20,10 @@ def qr_code_list(request):
     class_data = []
     for classroom in classrooms:
         student_count = classroom.students.count()
-        students = classroom.students.all()
-        total_scans = 0
-        for student in students:
-            qr_code = StudentQRCode.objects.filter(student=student).first()
-            if qr_code:
-                total_scans += qr_code.scans.filter(scanned_by=request.user).count()
         
         class_data.append({
             'classroom': classroom,
             'student_count': student_count,
-            'total_scans': total_scans,
         })
     
     context = {'classes': class_data}
@@ -59,6 +52,13 @@ def class_qr_codes(request, class_id):
     for student in students:
         qr_code, created = StudentQRCode.objects.get_or_create(student=student, defaults={'is_active': True})
         
+        scans_query = qr_code.scans.filter(scanned_by=request.user, lesson_session__classroom=classroom)
+        if session_id:
+            scans_query = scans_query.filter(lesson_session_id=session_id)
+            
+        scan_count = scans_query.count()
+        scan_points = scans_query.aggregate(total=models.Sum('points_awarded'))['total'] or 0
+        
         base_url = reverse('school_management:qr_code_scan', kwargs={'qr_code_id': qr_code.qr_code_id})
         params = f'?class_id={class_id}'
         if session_id:
@@ -74,7 +74,8 @@ def class_qr_codes(request, class_id):
         qr_codes.append({
             'student': student,
             'qr_code': qr_code,
-            'scan_count': qr_code.scans.filter(scanned_by=request.user).count(),
+            'scan_count': scan_count,
+            'scan_points': scan_points,
             'qr_image': generate_qr_code_image(scan_url),
             'class_points': class_points
         })
@@ -92,18 +93,26 @@ def qr_code_detail(request, student_id):
     student = get_object_or_404(Student, id=student_id)
     qr_code, created = StudentQRCode.objects.get_or_create(student=student, defaults={'is_active': True})
     
-    scans = qr_code.scans.filter(scanned_by=request.user).select_related('scanned_by', 'lesson_session', 'point_column').order_by('-scanned_at')
+    class_id = request.GET.get('class_id')
+    session_id = request.GET.get('session_id')
+    
+    classroom = None
+    lesson_session = None
+    scans = qr_code.scans.filter(scanned_by=request.user)
+    
+    if session_id:
+        lesson_session = get_object_or_404(LessonSession, id=session_id)
+        classroom = lesson_session.classroom
+        scans = scans.filter(lesson_session=lesson_session)
+    elif class_id:
+        classroom = get_object_or_404(ClassRoom, id=class_id)
+        scans = scans.filter(lesson_session__classroom=classroom)
+            
+    scans = scans.select_related('scanned_by', 'lesson_session', 'point_column').order_by('-scanned_at')
+    
     scan_url = request.build_absolute_uri(
         reverse('school_management:qr_code_scan', kwargs={'qr_code_id': qr_code.qr_code_id})
     )
-    
-    class_id = request.GET.get('class_id')
-    classroom = None
-    if class_id:
-        try:
-            classroom = ClassRoom.objects.get(id=class_id)
-        except ClassRoom.DoesNotExist:
-            pass
             
     # スキャン履歴の詳細な集計
     total_qr_action_points = scans.filter(point_column__isnull=True).aggregate(total=models.Sum('points_awarded'))['total'] or 0
@@ -133,6 +142,7 @@ def qr_code_detail(request, student_id):
         'total_qr_action_scans': total_qr_action_scans,
         'custom_points_stats': custom_points_stats,
         'classroom': classroom,
+        'lesson_session': lesson_session,
     }
     return render(request, 'school_management/qr_code_detail.html', context)
 

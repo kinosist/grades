@@ -39,9 +39,12 @@ def qr_code_scan(request, qr_code_id):
             except ClassRoom.DoesNotExist:
                 pass
 
-        # 2. セッション・クラス指定がない場合、学生の所属クラスから探す
+        teacher_classrooms = ClassRoom.objects.filter(students=qr_code.student, teachers=request.user)
+
+        # 2. セッション・クラス指定がない場合、学生の所属クラスから探す（1つの場合のみ自動選択）
         if not target_classroom:
-            target_classroom = ClassRoom.objects.filter(students=qr_code.student, teachers=request.user).first()
+            if teacher_classrooms.count() == 1:
+                target_classroom = teacher_classrooms.first()
             
         if target_classroom and not current_session:
             today = timezone.now().date()
@@ -122,6 +125,7 @@ def qr_code_scan(request, qr_code_id):
         context = {
             'qr_code': qr_code,
             'target_classroom': target_classroom,
+            'teacher_classrooms': teacher_classrooms,
             'current_session': current_session,
             'sessions': sessions,
             'custom_columns': custom_columns,

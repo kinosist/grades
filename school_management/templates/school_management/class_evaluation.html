@@ -495,7 +495,7 @@ body { background-color: #f8fafc; }
                                            name="attendance_rate_{{ evaluation.student.id }}" 
                                            value="{{ evaluation.attendance_rate }}" 
                                            min="0" max="100" step="1"
-                                           data-student-id="{{ evaluation.student.id }}"
+                                           step="any"  data-student-id="{{ evaluation.student.id }}"
                                            data-class-id="{{ classroom.id }}"
                                            onchange="saveAttendanceRate(this)">
                                 </div>
@@ -524,7 +524,7 @@ body { background-color: #f8fafc; }
                                          class="form-control form-control-sm text-center mx-auto custom-score-input"
                                          value="{{ score }}" 
                                          min="0"
-                                         data-student-id="{{ evaluation.student.id }}" 
+                                         step="any"  data-student-id="{{ evaluation.student.id }}"
                                          data-column-id="{{ col_id }}" 
                                          onchange="saveCustomScore(this)"
                                          placeholder="0"
@@ -811,12 +811,15 @@ function downloadCSV() {
 }
 
 // 独自評価システムのスコアの更新
+// 742行目付近：saveCustomScore 関数の中身を以下に差し替え
 function saveCustomScore(input) {
+    // 1. まずは赤い枠を一度消す（リセット）
+    input.classList.remove('is-invalid');
+
     let score = parseFloat(input.value);
     const studentId = input.dataset.studentId;
     const columnId = input.dataset.columnId;
     
-    // 入力値が空、または0未満の場合は0に補正する
     if (isNaN(score) || score < 0) {
         score = 0;
         input.value = 0;
@@ -838,11 +841,15 @@ function saveCustomScore(input) {
     })
     .then(r => r.json())
     .then(d => {
+        // 2. Python側の return JsonResponse({'success': True}) と合わせる
         if (d.success) {
             console.log('カスタムスコア保存成功');
         } else {
             input.classList.add('is-invalid');
         }
+    })
+    .catch(error => {
+        input.classList.add('is-invalid');
     });
 }
 </script>

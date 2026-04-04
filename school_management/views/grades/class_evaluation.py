@@ -294,7 +294,7 @@ def update_custom_score(request, class_id):
             defaults={'score': score}
         )
 
-        return JsonResponse({'status': 'success'})
+        return JsonResponse({'success': True})
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)

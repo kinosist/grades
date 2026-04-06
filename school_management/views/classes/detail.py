@@ -1,6 +1,9 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from ...models import ClassRoom, LessonSession, PeerEvaluation, StudentClassPoints
+from django.views.decorators.http import require_POST
+from django.contrib import messages
+from django.urls import reverse
+from ...models import ClassRoom, LessonSession, PeerEvaluation, StudentClassPoints, PointColumn
 
 @login_required
 def class_detail_view(request, class_id):
@@ -25,6 +28,9 @@ def class_detail_view(request, class_id):
     for s in students:
         setattr(s, 'class_point', scp_map.get(s.id))
 
+    #  追加：このクラスの独自の評価項目（列）を取得
+    point_columns = classroom.point_columns.all().order_by('created_at')
+
     context = {
         'classroom': classroom,
         'students': students,
@@ -33,5 +39,40 @@ def class_detail_view(request, class_id):
         'peer_evaluations': peer_evaluations,
         'recent_lessons': lessons,
         'total_sessions': all_sessions.count(),
+        'point_columns': point_columns,  #  テンプレートに渡す
     }
     return render(request, 'school_management/class_detail.html', context)
+
+#  新規追加：評価項目の「追加」処理
+@login_required
+@require_POST
+def add_point_column(request, class_id):
+    """独自の評価項目を追加"""
+    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+    column_title = request.POST.get('column_title', '').strip()
+    
+    if column_title:
+        PointColumn.objects.create(classroom=classroom, column_title=column_title)
+        messages.success(request, f'評価項目「{column_title}」を追加しました。')
+    else:
+        messages.error(request, '項目名を入力してください。')
+        
+    # 保存後は設定タブを開いた状態のままリダイレクト
+    url = reverse('school_management:class_detail', args=[class_id])
+    return redirect(f"{url}?active_tab=settings")
+
+#  新規追加：評価項目の「削除」処理
+@login_required
+@require_POST
+def delete_point_column(request, column_id):
+    """独自の評価項目を削除"""
+    # セキュリティ: 自分のクラスの項目しか削除できないようにする
+    column = get_object_or_404(PointColumn, id=column_id, classroom__teachers=request.user)
+    class_id = column.classroom.id
+    title = column.column_title
+    
+    column.delete()
+    messages.success(request, f'評価項目「{title}」を削除しました。')
+    
+    url = reverse('school_management:class_detail', args=[class_id])
+    return redirect(f"{url}?active_tab=settings")

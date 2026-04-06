@@ -23,7 +23,7 @@
 <style>
     body { background-color: #f8fafc; }
 
-    /* --- 【修正】タブを絶対に一列にして青いバーを出す --- */
+    /* --- タブの横スクロール対応（スマホ・縮小画面用） --- */
     .nav-tabs-wrapper {
         overflow-x: auto; /* 横スクロールを許可 */
         overflow-y: hidden;
@@ -60,8 +60,8 @@
     .nav-link {
         white-space: nowrap;
     }
-    /* ------------------------------------------- */
 
+    /* --- テーブル・カード要素のホバーエフェクト --- */
     .clickable-row {
         cursor: pointer;
         transition: background-color 0.2s;
@@ -80,13 +80,13 @@
         box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
         border-color: #0d6efd;
     }
-    
 </style>
 {% endblock %}
 
 {% block content %}
 {% csrf_token %}
 
+<!-- タブナビゲーション -->
 <div class="nav-tabs-wrapper">
     <ul class="nav nav-tabs" id="classTabs" role="tablist">
         <li class="nav-item" role="presentation">
@@ -112,7 +112,10 @@
     </ul>
 </div>
 
+<!-- タブコンテンツ -->
 <div class="tab-content" id="classTabsContent">
+    
+    <!-- 1. 授業回一覧タブ -->
     <div class="tab-pane fade {% if not active_tab and not request.GET.active_tab or not active_tab and request.GET.active_tab == 'lessons' %}show active{% endif %}" id="lessons" role="tabpanel" aria-labelledby="lessons-tab">
         <div class="card shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -164,6 +167,7 @@
         </div>
     </div>
 
+    <!-- 2. 在籍学生一覧タブ -->
     <div class="tab-pane fade {% if request.GET.active_tab == 'students' %}show active{% endif %}" id="students" role="tabpanel" aria-labelledby="students-tab">
         <div class="card shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -217,11 +221,13 @@
                             </tbody>
                         </table>
                     </div>
+                {% else %}
                 {% endif %}
             </div>
         </div>
     </div>
 
+    <!-- 3. 成績・評価メニュータブ -->
     <div class="tab-pane fade {% if request.GET.active_tab == 'grades' %}show active{% endif %}" id="grades" role="tabpanel" aria-labelledby="grades-tab">
         <div class="row">
             <div class="col-md-4 mb-3">
@@ -263,8 +269,10 @@
         </div>
     </div>
 
+    <!-- 4. クラス管理（設定）タブ -->
     <div class="tab-pane fade {% if request.GET.active_tab == 'settings' %}show active{% endif %}" id="settings" role="tabpanel" aria-labelledby="settings-tab">
         <div class="row">
+            <!-- クラス基本情報 -->
             <div class="col-12 mb-3">
                 <div class="card bg-light border-0">
                     <div class="card-body py-2 d-flex align-items-center">
@@ -275,19 +283,24 @@
                 </div>
             </div>
             
+            <!-- 左カラム：設定フォーム -->
             <div class="col-md-6 mb-3">
                 <div class="card h-100 shadow-sm">
                     <div class="card-header">
                         <h6><i class="fas fa-sliders-h me-2"></i>クラス設定</h6>
                     </div>
                     <div class="list-group list-group-flush">
+                        
+                        <!-- 評価システムの変更フォーム -->
                         <div class="list-group-item p-3">
                             <form action="{% url 'school_management:update_class_settings' classroom.id %}" method="post">
                                 {% csrf_token %}
                                 <label for="grading_system" class="form-label fw-bold"><i class="fas fa-balance-scale me-2 text-primary"></i>評価システム</label>
                                 <div class="input-group">
                                     <select class="form-select" id="grading_system" name="grading_system">
-                                        <option value="standard" {% if classroom.grading_system == 'standard' %}selected{% endif %}>通常評価（積み上げ方式）</option>
+                                        <!--  修正箇所：value を DBの選択肢（default）に合わせました -->
+                                        <option value="default" {% if classroom.grading_system == 'default' %}selected{% endif %}>通常評価（積み上げ方式）</option>
+                                        <option value="original" {% if classroom.grading_system == 'original' %}selected{% endif %}>オリジナル（カスタマイズ方式）</option>
                                         <option value="goal" {% if classroom.grading_system == 'goal' %}selected{% endif %}>目標管理（講師評価方式）</option>
                                     </select>
                                     <button class="btn btn-outline-primary" type="submit">更新</button>
@@ -296,6 +309,7 @@
                             </form>
                         </div>
 
+                        <!-- QRアクションポイントの変更フォーム -->
                         <div class="list-group-item p-3">
                             <form action="{% url 'school_management:update_class_settings' classroom.id %}" method="post">
                                 {% csrf_token %}
@@ -308,6 +322,7 @@
                             </form>
                         </div>
 
+                        <!-- 出席点満点の変更フォーム -->
                         <div class="list-group-item p-3">
                             <form action="{% url 'school_management:update_class_settings' classroom.id %}" method="post">
                                 {% csrf_token %}
@@ -319,12 +334,49 @@
                                 <div class="form-text text-muted small mt-2">出席率100%のときに付与される最大ポイント数です。</div>
                             </form>
                         </div>
+
+                        <!-- 独自の評価項目（列）の管理 -->
+                        <div class="list-group-item p-3 bg-light">
+                            <label class="form-label fw-bold mb-3"><i class="fas fa-columns me-2 text-info"></i>独自の評価項目（列）</label>
+                            
+                            {% if point_columns %}
+                                <ul class="list-group mb-3">
+                                    {% for column in point_columns %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center py-2 border-0 shadow-sm mb-2 rounded">
+                                            <span class="fw-bold text-dark">{{ column.column_title }}</span>
+                                            <form action="{% url 'school_management:delete_point_column' column.id %}" method="post" class="d-inline m-0">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="削除" onclick="return confirm('項目「{{ column.column_title }}」を削除しますか？\n※すでに入力されたこの項目の点数もすべて消去されます。');">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </form>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <div class="alert alert-secondary py-2 small border-0 shadow-sm">
+                                    <i class="fas fa-info-circle me-1"></i>追加された項目はありません。
+                                </div>
+                            {% endif %}
+
+                            <!-- 項目の追加フォーム -->
+                            <form action="{% url 'school_management:add_point_column' classroom.id %}" method="post" class="mt-2">
+                                {% csrf_token %}
+                                <div class="input-group shadow-sm">
+                                    <input type="text" class="form-control border-info" name="column_title" placeholder="例: プレゼン加点、良い質問..." required>
+                                    <button class="btn btn-info text-white" type="submit"><i class="fas fa-plus me-1"></i>追加</button>
+                                </div>
+                                <div class="form-text text-muted small mt-2">※追加した項目は成績・評価一覧の「列」として表示されます。</div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
             
+            <!-- 右カラム：グループ設定・危険な操作 -->
             <div class="col-md-6">
                 <div class="row">
+                    <!-- グループマスタ管理 -->
                     <div class="col-12 mb-3">
                         <div class="card h-100 shadow-sm">
                             <div class="card-header">
@@ -338,6 +390,7 @@
                             </div>
                         </div>
                     </div>
+                    <!-- クラス削除（危険な操作） -->
                     <div class="col-12 mb-3">
                         <div class="card h-100 border-danger shadow-sm">
                             <div class="card-header bg-danger text-white">

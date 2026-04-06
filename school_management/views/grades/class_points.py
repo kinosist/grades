@@ -13,7 +13,9 @@ from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPo
 @login_required
 @require_POST
 def update_attendance_rate(request, class_id):
-    """出席率を更新するAPI"""
+    """
+    出席率を非同期で更新するAPI
+    """
     import json
 
     # JSONリクエストを受け取る
@@ -60,7 +62,9 @@ def update_attendance_rate(request, class_id):
 @login_required
 @require_POST
 def update_goal_score(request, class_id):
-    """目標管理モード時の講師評価点を更新するAPI"""
+    """
+    目標管理モード時の講師評価点を非同期で更新するAPI
+    """
     import json
 
     # JSONリクエストを受け取る
@@ -97,7 +101,9 @@ def update_goal_score(request, class_id):
 
 @login_required
 def class_points_view(request, class_id):
-    """クラスごとのポイント一覧"""
+    """
+    クラスごとのポイント一覧を表示するビュー
+    """
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
     grading_system = classroom.grading_system
     students = classroom.students.all().order_by('student_number')
@@ -213,7 +219,7 @@ def class_points_view(request, class_id):
                 my_score = ranking_info['group_scores'].get(group.id, 0)
                 top_2_scores = ranking_info['top_2_scores']
 
-                # 上位2位のみポイント付与
+                # 上位2位のみポイント付付与
                 vote_points = my_score if (my_score > 0 and my_score in top_2_scores) else 0
 
                 # 表示用に記録
@@ -318,13 +324,17 @@ def class_points_view(request, class_id):
 
 @login_required
 def update_class_settings(request, class_id):
-    """クラス設定（QRポイントなど）を更新"""
+    """
+    クラス設定（評価システム、QRポイント、出席点など）を更新するビュー
+    """
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
 
-    # 評価システムの更新
+    # 1. 評価システムの更新
     grading_system = request.POST.get('grading_system')
     recalculate_points = False
-    if grading_system in ['standard', 'goal']:
+    
+    #  修正ポイント：models.py の GRADING_SYSTEM_CHOICES に合わせて許可リストを更新
+    if grading_system in ['default', 'original', 'goal']:
         if classroom.grading_system != grading_system:
             classroom.grading_system = grading_system
             recalculate_points = True
@@ -332,7 +342,7 @@ def update_class_settings(request, class_id):
         else:
             messages.info(request, '評価システムは変更されていません。')
 
-    # QRポイントの更新
+    # 2. QRポイントの更新
     qr_point_value = request.POST.get('qr_point_value')
     if qr_point_value:
         try:
@@ -348,7 +358,7 @@ def update_class_settings(request, class_id):
         except ValueError:
             pass
 
-    # 出席点満点の更新
+    # 3. 出席点満点の更新
     attendance_max_points = request.POST.get('attendance_max_points')
     recalculate_attendance = False
     if attendance_max_points:

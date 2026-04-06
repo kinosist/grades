@@ -109,8 +109,9 @@ class ClassRoom(models.Model):
         ('second', '後期'),
     ]
     GRADING_SYSTEM_CHOICES = [
-        ('standard', '通常評価（積み上げ）'),
+        ('default', 'デフォルト（通常）'),
         ('goal', '目標管理（講師評価）'),
+        ('original', 'オリジナル（カスタマイズ）'),
     ]
     
     class_name = models.CharField(max_length=100, verbose_name='クラス名')
@@ -119,7 +120,7 @@ class ClassRoom(models.Model):
     grading_system = models.CharField(
         max_length=20, 
         choices=GRADING_SYSTEM_CHOICES, 
-        default='standard',
+        default='default',
         verbose_name='評価システム'
     )
     qr_point_value = models.IntegerField(
@@ -155,6 +156,36 @@ class ClassRoom(models.Model):
         # 各学生のtotal_pointsプロパティ（出席点 + 授業点*2）の合計を計算
         total_sum = sum(sp.total_points for sp in points_list)
         return round(total_sum / count, 1)
+
+
+class PointColumn(models.Model):
+    """独自の評価項目（列）マスタ"""
+    classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス', related_name='point_columns')
+    column_title = models.CharField(max_length=100, verbose_name='項目名')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = '評価項目(列)'
+        verbose_name_plural = '評価項目(列)'
+        
+    def __str__(self):
+        return f"{self.classroom.class_name} - {self.column_title}"
+
+
+#  新規追加：学生ごとの独自項目の「得点」を保存するテーブル
+class StudentColumnScore(models.Model):
+    """独自評価項目に対する学生の得点データ"""
+    column = models.ForeignKey(PointColumn, on_delete=models.CASCADE, verbose_name='評価項目(列)', related_name='scores')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name='学生', related_name='column_scores')
+    score = models.IntegerField(default=0, verbose_name='得点')
+
+    class Meta:
+        verbose_name = '独自評価項目の得点'
+        verbose_name_plural = '独自評価項目の得点'
+        unique_together = ['column', 'student']
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.column.column_title}: {self.score}pt"
 
 
 class LessonSession(models.Model):
@@ -542,6 +573,7 @@ class QRCodeScan(models.Model):
     qr_code = models.ForeignKey(StudentQRCode, on_delete=models.CASCADE, verbose_name='QRコード', related_name='scans')
     scanned_by = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name='スキャン者', related_name='qr_scans')
     lesson_session = models.ForeignKey(LessonSession, on_delete=models.CASCADE, verbose_name='授業セッション', related_name='qr_scans', null=True, blank=True)
+    point_column = models.ForeignKey(PointColumn, on_delete=models.CASCADE, verbose_name='独自評価項目', related_name='qr_scans', null=True, blank=True)
     points_awarded = models.IntegerField(default=1, verbose_name='付与ポイント')
     scanned_at = models.DateTimeField(auto_now_add=True, verbose_name='スキャン日時')
     
@@ -676,10 +708,16 @@ class StudentClassPoints(models.Model):
             # 上位2位以内（スコアがtop_2_scoresに含まれる）かつ0点より大きい場合のみ加算
             if my_score > 0 and my_score in top_2_scores:
                 peer_total += my_score
+                
+        #  新規追加: 独自評価項目（列）の合計得点を計算
+        custom_columns_total = StudentColumnScore.objects.filter(
+            student=self.student,
+            column__classroom=self.classroom
+        ).aggregate(total=Sum('score'))['total'] or 0
 
         # 合計を計算
-        # 式: (小テスト(QR含む) + ピア評価 + 授業内ポイント) * 倍率(2) + 出席点
-        class_only_points = quiz_total + peer_total + lesson_total
+        # 式: (小テスト(QR含む) + ピア評価 + 授業内ポイント + 独自評価項目) * 倍率(2) + 出席点
+        class_only_points = quiz_total + peer_total + lesson_total + custom_columns_total
         self.points = int((class_only_points * 2) + self.attendance_points)
 
     @property
@@ -759,8 +797,14 @@ class StudentClassPoints(models.Model):
             
             if my_score > 0 and my_score in top_2_scores:
                 peer_total += my_score
+                
+        #  新規追加: 独自評価項目（列）の合計得点を計算
+        custom_columns_total = StudentColumnScore.objects.filter(
+            student=self.student,
+            column__classroom=self.classroom
+        ).aggregate(total=Sum('score'))['total'] or 0
         
-        return int(quiz_total + lesson_total + peer_total)
+        return int(quiz_total + lesson_total + peer_total + custom_columns_total)
 
     @property
     def class_points(self):
@@ -987,6 +1031,10 @@ def update_quiz_score_from_qr(sender, instance, **kwargs):
     """QRスキャン履歴の変更時（追加・削除）に小テストの点数を再集計して更新"""
     if not instance.lesson_session:
         return
+        
+    # 独自評価項目のスキャン履歴の場合は、QuizScoreの集計対象から除外する
+    if getattr(instance, 'point_column_id', None) is not None:
+        return
 
     # 連携小テストを探す
     quiz = Quiz.objects.filter(lesson_session=instance.lesson_session, is_qr_linked=True).first()
@@ -1020,7 +1068,8 @@ def update_quiz_score_from_qr(sender, instance, **kwargs):
     # 合計ポイントを再集計（集計元をQRCodeScanに一本化）
     total_points = QRCodeScan.objects.filter(
         lesson_session=instance.lesson_session,
-        qr_code__student=student
+        qr_code__student=student,
+        point_column__isnull=True
     ).aggregate(total=Sum('points_awarded'))['total'] or 0
     
     # QuizScoreを取得または作成
@@ -1048,6 +1097,9 @@ def update_quiz_score_from_qr(sender, instance, **kwargs):
 def set_qr_points_from_class_settings(sender, instance, **kwargs):
     """QRスキャン時にクラス設定のポイント値を適用"""
     if not instance.pk and instance.lesson_session and instance.lesson_session.classroom:
+        # 独自項目が指定されている場合、または明示的にポイントが指定されている場合は上書きしない
+        if getattr(instance, 'point_column_id', None) is not None or instance.points_awarded != 1:
+            return
         instance.points_awarded = instance.lesson_session.classroom.qr_point_value
 
 @receiver(pre_save, sender=PeerEvaluation)
@@ -1138,3 +1190,22 @@ def update_class_points_from_group_member(sender, instance, **kwargs):
                     scp.recalculate_total()
     except Exception:
         pass
+
+#  新規追加：独自評価項目の得点が変わった時も、自動で全体の成績を再計算する設定
+@receiver([post_save, post_delete], sender=StudentColumnScore)
+def update_class_points_from_column_score(sender, instance, **kwargs):
+    """独自評価項目の得点更新時に成績を再計算"""
+    if instance.column.classroom:
+        try:
+            scp = StudentClassPoints.objects.get(
+                student=instance.student,
+                classroom=instance.column.classroom
+            )
+            scp.recalculate_total()
+        except StudentClassPoints.DoesNotExist:
+            if kwargs.get('signal') == post_save:
+                scp = StudentClassPoints.objects.create(
+                    student=instance.student,
+                    classroom=instance.column.classroom
+                )
+                scp.recalculate_total()

@@ -27,6 +27,11 @@ urlpatterns = [
     path('classes/<int:class_id>/', classes.class_detail_view, name='class_detail'),
     path('classes/<int:class_id>/delete/', classes.class_delete_view, name='class_delete'),
     
+    # 独自の評価項目（列）管理用ルーティングを追加
+    path('classes/<int:class_id>/point-columns/add/', classes.add_point_column, name='add_point_column'),
+    path('point-columns/<int:column_id>/delete/', classes.delete_point_column, name='delete_point_column'),
+    path('classes/<int:class_id>/update-custom-score/', grades.update_custom_score,name='update_custom_score'),
+    
     # --- 成績・評価（Grades） ---
     path('classes/<int:class_id>/points/', grades.class_points_view, name='class_points'),
     path('classes/<int:class_id>/evaluation/', grades.class_evaluation_view, name='class_evaluation'),
@@ -112,6 +117,7 @@ urlpatterns = [
     path('qr-codes/student/<int:student_id>/', attendance.qr_code_detail, name='qr_code_detail'),
     path('qr-codes/scan/<uuid:qr_code_id>/', attendance.qr_code_scan, name='qr_code_scan'),
     path('qr-codes/history/<int:scan_id>/delete/', attendance.delete_qr_scan, name='delete_qr_scan'),
+    path('qr-codes/student/<int:student_id>/history/bulk-delete/', attendance.bulk_delete_qr_scans, name='bulk_delete_qr_scans'),
     path('my-qr-code/', attendance.student_qr_code_view, name='student_qr_code'),
     path('classes/<int:class_id>/qr-codes/', attendance.class_qr_codes, name='class_qr_codes'),
 ]

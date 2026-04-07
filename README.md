@@ -52,6 +52,9 @@
 # uvによる仮想環境作成と依存関係インストール
 uv sync
 
+# ユーザー作成
+uv run python manage.py createsuperuser
+
 # データベースマイグレーション
 uv run python manage.py migrate
 

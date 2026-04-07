@@ -237,4 +237,3 @@ GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '').strip()
 GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '').strip()
 PEER_EVAL_SESSION_COOKIE_NAME = 'peer_eval_session_id'
 PEER_EVAL_SESSION_TTL_HOURS = int(os.environ.get('PEER_EVAL_SESSION_TTL_HOURS', '24'))
-

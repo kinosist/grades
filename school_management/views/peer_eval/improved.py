@@ -235,15 +235,37 @@ def peer_evaluation_common_form(request, session_id):
         return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
 
     evaluator_group = memberships.first().group
-    evaluator_group_member_names = list(
+    evaluator_group_members = list(
         GroupMember.objects.filter(group=evaluator_group)
         .exclude(student=student)
         .select_related('student')
         .values_list('student__full_name', flat=True)
     )
+    evaluator_group_member_names = evaluator_group_members
     
     # 他グループを取得（グループ評価用）
     other_groups = groups.exclude(id=evaluator_group.id)
+    
+    # ===== 上位N名/Xグループの制限ロジック =====
+    # チーム人数 / 2 (切り捨て) = 順位付け対象人数
+    team_member_count = len(evaluator_group_members)
+    max_member_rank = max(1, team_member_count // 2)
+    
+    # グループ数 / 2 (切り捨て) = 順位付け対象グループ数
+    total_group_count = other_groups.count()
+    max_group_rank = max(1, total_group_count // 2)
+    
+    # member_ranking_listで上位N名のみを保持（スコアは仮、表示用）
+    member_ranking_list = [
+        {'rank': i, 'points': lesson_session.member_scores.get(str(i), 0)}
+        for i in range(1, min(max_member_rank + 1, lesson_session.member_ranking_count + 1))
+    ]
+    
+    # group_ranking_listで上位Xグループのみを保持
+    group_ranking_list = [
+        {'rank': i, 'points': lesson_session.group_scores.get(str(i), 0)}
+        for i in range(1, min(max_group_rank + 1, lesson_session.group_ranking_count + 1))
+    ]
 
     # 既存提出チェック
     existing_submission = PeerEvaluation.objects.filter(
@@ -262,6 +284,27 @@ def peer_evaluation_common_form(request, session_id):
     # POST処理
     if request.method == 'POST':
         try:
+            # グループ評価の保存処理
+            first_place_group = None
+            second_place_group = None
+            
+            if lesson_session.enable_group_evaluation:
+                first_rank = request.POST.get('group_rank_1')
+                second_rank = request.POST.get('group_rank_2')
+                
+                # 上位Xグループのみのみ投票可能（制限を確認）
+                if first_rank:
+                    try:
+                        first_place_group = Group.objects.get(id=first_rank, lesson_session=lesson_session)
+                    except (Group.DoesNotExist, ValueError):
+                        pass
+                
+                if second_rank and second_rank != first_rank:
+                    try:
+                        second_place_group = Group.objects.get(id=second_rank, lesson_session=lesson_session)
+                    except (Group.DoesNotExist, ValueError):
+                        pass
+            
             # ピア評価を保存
             peer_evaluation = PeerEvaluation.objects.create(
                 lesson_session=lesson_session,
@@ -269,12 +312,14 @@ def peer_evaluation_common_form(request, session_id):
                 email=_normalize_email(oauth_session.email),
                 evaluator_token=str(uuid.uuid4()),
                 evaluator_group=evaluator_group,
+                first_place_group=first_place_group,
+                second_place_group=second_place_group,
                 general_comment=request.POST.get('general_comment', ''),
             )
             
-            # メンバー評価の保存
+            # メンバー評価の保存（上位N名のみ）
             if lesson_session.enable_member_evaluation:
-                for rank in range(1, lesson_session.member_ranking_count + 1):
+                for rank in range(1, max_member_rank + 1):  # 制限：上位N名のみ
                     member_name = request.POST.get(f'member_rank_{rank}')
                     if member_name:
                         try:
@@ -287,9 +332,6 @@ def peer_evaluation_common_form(request, session_id):
                             )
                         except (Student.DoesNotExist, ValueError):
                             pass
-            
-            # グループ評価の保存（別テーブルが必要な場合は後で実装）
-            # 今回はコメントのみにしておきます
             
             messages.success(request, '評価を提出しました。ご協力ありがとうございます。')
             return render(request, 'school_management/peer_evaluation_thanks.html', {
@@ -308,16 +350,6 @@ def peer_evaluation_common_form(request, session_id):
     member_scores_json = json.dumps(lesson_session.member_scores)
     group_scores_json = json.dumps(lesson_session.group_scores)
     
-    # 配点リストを作成（テンプレート用）
-    member_ranking_list = [
-        {'rank': i, 'points': lesson_session.member_scores.get(str(i), 0)}
-        for i in range(1, lesson_session.member_ranking_count + 1)
-    ]
-    group_ranking_list = [
-        {'rank': i, 'points': lesson_session.group_scores.get(str(i), 0)}
-        for i in range(1, lesson_session.group_ranking_count + 1)
-    ]
-    
     context.update({
         'authenticated_student': student,
         'evaluator_group': evaluator_group,
@@ -329,6 +361,8 @@ def peer_evaluation_common_form(request, session_id):
         'group_scores_json': group_scores_json,
         'member_ranking_list': member_ranking_list,
         'group_ranking_list': group_ranking_list,
+        'max_member_rank': max_member_rank,
+        'max_group_rank': max_group_rank,
     })
     return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
 

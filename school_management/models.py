@@ -199,6 +199,13 @@ class LessonSession(models.Model):
     peer_evaluation_configured = models.BooleanField(default=False, verbose_name='ピア評価設定済み')
     peer_evaluation_closed = models.BooleanField(default=False, verbose_name='ピア評価締切済み')
     enable_comments = models.BooleanField(default=False, verbose_name='コメント機能有効')
+    enable_member_evaluation = models.BooleanField(default=False, verbose_name='メンバー評価有効')
+    member_ranking_count = models.IntegerField(default=2, verbose_name='メンバー順位数')
+    member_scores = models.JSONField(default=dict, verbose_name='メンバー評価配点', help_text='例: {"1": 2, "2": 1}')
+    enable_group_evaluation = models.BooleanField(default=False, verbose_name='グループ評価有効')
+    group_ranking_count = models.IntegerField(default=2, verbose_name='グループ順位数')
+    group_scores = models.JSONField(default=dict, verbose_name='グループ評価配点', help_text='例: {"1": 2, "2": 1}')
+    enable_feedback = models.BooleanField(default=False, verbose_name='感想欄有効')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

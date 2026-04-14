@@ -179,7 +179,7 @@ def peer_evaluation_links(request, session_id):
 # ---------------------------------------------------------
 
 def peer_evaluation_common_form(request, session_id):
-    """シンプル版ピア評価フォーム"""
+    """ピア評価フォーム（設定に基づいて動的に生成）"""
     lesson_session = get_object_or_404(LessonSession, id=session_id)
     
     # ピア評価設定が完了しているか確認
@@ -189,7 +189,7 @@ def peer_evaluation_common_form(request, session_id):
             'error_message': '教員がピア評価を設定していません。',
             'is_configuration_error': True,
         }
-        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
+        return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
     
     groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student')
     oauth_session, student = _load_verified_oauth_session(request, lesson_session)
@@ -199,22 +199,27 @@ def peer_evaluation_common_form(request, session_id):
         'groups': groups,
         'requires_google_auth': False,
         'enable_comments': lesson_session.enable_comments,
+        'enable_member_evaluation': lesson_session.enable_member_evaluation,
+        'enable_group_evaluation': lesson_session.enable_group_evaluation,
+        'enable_feedback': lesson_session.enable_feedback,
+        'member_ranking_count': lesson_session.member_ranking_count,
+        'group_ranking_count': lesson_session.group_ranking_count,
     }
 
     if not settings.ALLOWED_GMAIL_DOMAINS:
         context['requires_google_auth'] = True
         context['auth_error'] = 'ALLOWED_GMAIL_DOMAINS が未設定です。教員に連絡してください。'
-        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
+        return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
 
     if not _google_config_ready():
         context['requires_google_auth'] = True
         context['auth_error'] = 'Google認証設定が未設定です。教員に連絡してください。'
-        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
+        return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
 
     if not student:
         context['requires_google_auth'] = True
         context['google_auth_url'] = reverse('school_management:peer_evaluation_google_start', kwargs={'session_id': lesson_session.id})
-        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
+        return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
 
     memberships = GroupMember.objects.filter(
         group__lesson_session=lesson_session,
@@ -227,9 +232,18 @@ def peer_evaluation_common_form(request, session_id):
             'group_resolution_error': True,
             'auth_error': 'あなたの所属グループを特定できませんでした。担当教員に連絡してください。',
         })
-        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
+        return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
 
     evaluator_group = memberships.first().group
+    evaluator_group_member_names = list(
+        GroupMember.objects.filter(group=evaluator_group)
+        .exclude(student=student)
+        .select_related('student')
+        .values_list('student__full_name', flat=True)
+    )
+    
+    # 他グループを取得（グループ評価用）
+    other_groups = groups.exclude(id=evaluator_group.id)
 
     # 既存提出チェック
     existing_submission = PeerEvaluation.objects.filter(
@@ -243,11 +257,12 @@ def peer_evaluation_common_form(request, session_id):
             'authenticated_student': student,
             'evaluator_group': evaluator_group,
         })
-        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
+        return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
     
-    # POST処理：シンプル版（コメントのみ）
+    # POST処理
     if request.method == 'POST':
         try:
+            # ピア評価を保存
             peer_evaluation = PeerEvaluation.objects.create(
                 lesson_session=lesson_session,
                 student=student,
@@ -256,6 +271,26 @@ def peer_evaluation_common_form(request, session_id):
                 evaluator_group=evaluator_group,
                 general_comment=request.POST.get('general_comment', ''),
             )
+            
+            # メンバー評価の保存
+            if lesson_session.enable_member_evaluation:
+                for rank in range(1, lesson_session.member_ranking_count + 1):
+                    member_name = request.POST.get(f'member_rank_{rank}')
+                    if member_name:
+                        try:
+                            member = Student.objects.get(full_name=member_name, group_memberships__group=evaluator_group)
+                            score = lesson_session.member_scores.get(str(rank), 0)
+                            ContributionEvaluation.objects.create(
+                                peer_evaluation=peer_evaluation,
+                                evaluatee=member,
+                                contribution_score=score
+                            )
+                        except (Student.DoesNotExist, ValueError):
+                            pass
+            
+            # グループ評価の保存（別テーブルが必要な場合は後で実装）
+            # 今回はコメントのみにしておきます
+            
             messages.success(request, '評価を提出しました。ご協力ありがとうございます。')
             return render(request, 'school_management/peer_evaluation_thanks.html', {
                 'lesson_session': lesson_session,
@@ -267,13 +302,35 @@ def peer_evaluation_common_form(request, session_id):
                 'authenticated_student': student,
                 'evaluator_group': evaluator_group,
             })
-            return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
+            return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
+    
+    # JSONをJavaScript用に変換
+    member_scores_json = json.dumps(lesson_session.member_scores)
+    group_scores_json = json.dumps(lesson_session.group_scores)
+    
+    # 配点リストを作成（テンプレート用）
+    member_ranking_list = [
+        {'rank': i, 'points': lesson_session.member_scores.get(str(i), 0)}
+        for i in range(1, lesson_session.member_ranking_count + 1)
+    ]
+    group_ranking_list = [
+        {'rank': i, 'points': lesson_session.group_scores.get(str(i), 0)}
+        for i in range(1, lesson_session.group_ranking_count + 1)
+    ]
     
     context.update({
         'authenticated_student': student,
         'evaluator_group': evaluator_group,
+        'evaluator_group_member_names': evaluator_group_member_names,
+        'other_groups': other_groups,
+        'member_scores': lesson_session.member_scores,
+        'group_scores': lesson_session.group_scores,
+        'member_scores_json': member_scores_json,
+        'group_scores_json': group_scores_json,
+        'member_ranking_list': member_ranking_list,
+        'group_ranking_list': group_ranking_list,
     })
-    return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
+    return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
 
 
 def peer_evaluation_google_start(request, session_id):
@@ -575,18 +632,56 @@ def peer_evaluation_settings_view(request, session_id):
     )
     
     if request.method == 'POST':
-        # 設定を保存
-        enable_comments = request.POST.get('enable_comments') == 'on'
+        # 一般設定
+        lesson_session.enable_comments = request.POST.get('enable_comments') == 'on'
+        lesson_session.enable_feedback = request.POST.get('enable_feedback') == 'on'
         
-        lesson_session.enable_comments = enable_comments
+        # メンバー評価設定
+        lesson_session.enable_member_evaluation = request.POST.get('enable_member_evaluation') == 'on'
+        if lesson_session.enable_member_evaluation:
+            member_ranking_count = int(request.POST.get('member_ranking_count', 2))
+            lesson_session.member_ranking_count = member_ranking_count
+            
+            # メンバー配点をJSONで保存
+            member_scores = {}
+            for i in range(1, member_ranking_count + 1):
+                score = request.POST.get(f'member_score_{i}', 0)
+                member_scores[str(i)] = int(score)
+            lesson_session.member_scores = member_scores
+        
+        # グループ評価設定
+        lesson_session.enable_group_evaluation = request.POST.get('enable_group_evaluation') == 'on'
+        if lesson_session.enable_group_evaluation:
+            group_ranking_count = int(request.POST.get('group_ranking_count', 2))
+            lesson_session.group_ranking_count = group_ranking_count
+            
+            # グループ配点をJSONで保存
+            group_scores = {}
+            for i in range(1, group_ranking_count + 1):
+                score = request.POST.get(f'group_score_{i}', 0)
+                group_scores[str(i)] = int(score)
+            lesson_session.group_scores = group_scores
+        
         lesson_session.peer_evaluation_configured = True
         lesson_session.save()
         
         messages.success(request, 'ピア評価設定を保存しました。')
         return redirect('school_management:session_detail', session_id=session_id)
     
+    # JSONをJavaScript用に変換
+    import json
+    member_scores_json = json.dumps({str(k): v for k, v in lesson_session.member_scores.items()})
+    group_scores_json = json.dumps({str(k): v for k, v in lesson_session.group_scores.items()})
+    
     context = {
         'lesson_session': lesson_session,
         'enable_comments': lesson_session.enable_comments,
+        'enable_feedback': lesson_session.enable_feedback,
+        'enable_member_evaluation': lesson_session.enable_member_evaluation,
+        'member_ranking_count': lesson_session.member_ranking_count,
+        'member_scores_json': member_scores_json,
+        'enable_group_evaluation': lesson_session.enable_group_evaluation,
+        'group_ranking_count': lesson_session.group_ranking_count,
+        'group_scores_json': group_scores_json,
     }
-    return render(request, 'school_management/peer_evaluation_settings.html', context)
+    return render(request, 'school_management/peer_evaluation_settings_full.html', context)

@@ -1,0 +1,268 @@
+{% extends 'school_management/base.html' %}
+
+{% block title %}ピア評価設定 - 学校管理システム{% endblock %}
+{% block page_title %}
+    ピア評価管理設定
+{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:session_detail' lesson_session.id %}">{{ lesson_session.classroom.class_name }} 第{{ lesson_session.session_number }}回</a></li>
+<li class="breadcrumb-item active" aria-current="page">ピア評価設定</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .score-input-group {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .score-input-group input {
+        width: 100px;
+    }
+    .rank-label {
+        min-width: 60px;
+        font-weight: bold;
+        color: #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <form method="post">
+            {% csrf_token %}
+
+            <!-- 一般設定 -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-cog me-2"></i>一般設定</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check form-switch mb-3">
+                        <input 
+                            class="form-check-input"
+                            type="checkbox"
+                            id="enable_comments"
+                            name="enable_comments"
+                            value="on"
+                            {% if enable_comments %}checked{% endif %}
+                        >
+                        <label class="form-check-label" for="enable_comments">
+                            <strong>コメント機能を有効にする</strong>
+                        </label>
+                    </div>
+                    <small class="text-muted">生徒がグループワークについての感想を記入できます。</small>
+
+                    <hr class="my-4">
+
+                    <div class="form-check form-switch mb-3">
+                        <input 
+                            class="form-check-input"
+                            type="checkbox"
+                            id="enable_feedback"
+                            name="enable_feedback"
+                            value="on"
+                            {% if enable_feedback %}checked{% endif %}
+                        >
+                        <label class="form-check-label" for="enable_feedback">
+                            <strong>感想欄を有効にする</strong>
+                        </label>
+                    </div>
+                    <small class="text-muted">生徒が授業全体の感想を記入できます。</small>
+                </div>
+            </div>
+
+            <!-- メンバー評価設定 -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>チームメンバー評価設定</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check form-switch mb-3">
+                        <input 
+                            class="form-check-input"
+                            type="checkbox"
+                            id="enable_member_evaluation"
+                            name="enable_member_evaluation"
+                            value="on"
+                            onchange="toggleMemberEvaluation()"
+                            {% if enable_member_evaluation %}checked{% endif %}
+                        >
+                        <label class="form-check-label" for="enable_member_evaluation">
+                            <strong>メンバー評価を有効にする</strong>
+                        </label>
+                    </div>
+
+                    <div id="member_eval_settings" style="{% if not enable_member_evaluation %}display: none;{% endif %}">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">順位の最大数</label>
+                            <input 
+                                type="number" 
+                                class="form-control" 
+                                name="member_ranking_count"
+                                min="1"
+                                max="10"
+                                value="{{ member_ranking_count }}"
+                                onchange="updateMemberScoreInputs()"
+                            >
+                            <small class="text-muted">例：2を設定すると、1位と2位を評価対象にします</small>
+                        </div>
+
+                        <label class="form-label fw-bold">配点設定</label>
+                        <div id="member_scores_container">
+                            <!-- JavaScriptで動的生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- グループ評価設定 -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>グループ評価設定</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check form-switch mb-3">
+                        <input 
+                            class="form-check-input"
+                            type="checkbox"
+                            id="enable_group_evaluation"
+                            name="enable_group_evaluation"
+                            value="on"
+                            onchange="toggleGroupEvaluation()"
+                            {% if enable_group_evaluation %}checked{% endif %}
+                        >
+                        <label class="form-check-label" for="enable_group_evaluation">
+                            <strong>グループ評価を有効にする</strong>
+                        </label>
+                    </div>
+
+                    <div id="group_eval_settings" style="{% if not enable_group_evaluation %}display: none;{% endif %}">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">順位の最大数</label>
+                            <input 
+                                type="number" 
+                                class="form-control" 
+                                name="group_ranking_count"
+                                min="1"
+                                max="10"
+                                value="{{ group_ranking_count }}"
+                                onchange="updateGroupScoreInputs()"
+                            >
+                            <small class="text-muted">例：2を設定すると、1位と2位を評価対象にします</small>
+                        </div>
+
+                        <label class="form-label fw-bold">配点設定</label>
+                        <div id="group_scores_container">
+                            <!-- JavaScriptで動的生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ボタン -->
+            <div class="d-flex gap-2 mb-4">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-save me-2"></i>設定を保存
+                </button>
+                <a href="{% url 'school_management:session_detail' lesson_session.id %}" class="btn btn-outline-secondary btn-lg">
+                    <i class="fas fa-arrow-left me-2"></i>キャンセル
+                </a>
+            </div>
+
+            <!-- 注記 -->
+            <div class="alert alert-warning" role="alert">
+                <i class="fas fa-lightbulb me-2"></i>
+                <strong>設定後の流れ：</strong>
+                <ol class="mb-0 mt-2">
+                    <li>生徒が学生共有リンクからピア評価フォームにアクセス</li>
+                    <li>このページで設定した内容が動的に表示される</li>
+                    <li>生徒が評価と記入を完了して提出</li>
+                    <li>成績に自動的に反映される</li>
+                </ol>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const memberScoresData = {{ member_scores_json|safe }};
+    const groupScoresData = {{ group_scores_json|safe }};
+
+    function toggleMemberEvaluation() {
+        const enabled = document.getElementById('enable_member_evaluation').checked;
+        document.getElementById('member_eval_settings').style.display = enabled ? 'block' : 'none';
+        if (enabled) {
+            updateMemberScoreInputs();
+        }
+    }
+
+    function toggleGroupEvaluation() {
+        const enabled = document.getElementById('enable_group_evaluation').checked;
+        document.getElementById('group_eval_settings').style.display = enabled ? 'block' : 'none';
+        if (enabled) {
+            updateGroupScoreInputs();
+        }
+    }
+
+    function updateMemberScoreInputs() {
+        const count = parseInt(document.querySelector('input[name="member_ranking_count"]').value);
+        const container = document.getElementById('member_scores_container');
+        container.innerHTML = '';
+
+        for (let i = 1; i <= count; i++) {
+            const currentScore = memberScoresData[i] || (i === 1 ? 2 : i === 2 ? 1 : 0);
+            const html = `
+                <div class="score-input-group">
+                    <span class="rank-label">${i}位</span>
+                    <input 
+                        type="number" 
+                        class="form-control"
+                        name="member_score_${i}"
+                        value="${currentScore}"
+                        min="0"
+                        max="100"
+                    >
+                    <span>点</span>
+                </div>
+            `;
+            container.innerHTML += html;
+        }
+    }
+
+    function updateGroupScoreInputs() {
+        const count = parseInt(document.querySelector('input[name="group_ranking_count"]').value);
+        const container = document.getElementById('group_scores_container');
+        container.innerHTML = '';
+
+        for (let i = 1; i <= count; i++) {
+            const currentScore = groupScoresData[i] || (i === 1 ? 2 : i === 2 ? 1 : 0);
+            const html = `
+                <div class="score-input-group">
+                    <span class="rank-label">${i}位</span>
+                    <input 
+                        type="number" 
+                        class="form-control"
+                        name="group_score_${i}"
+                        value="${currentScore}"
+                        min="0"
+                        max="100"
+                    >
+                    <span>点</span>
+                </div>
+            `;
+            container.innerHTML += html;
+        }
+    }
+
+    // ページロード時に初期化
+    document.addEventListener('DOMContentLoaded', function() {
+        updateMemberScoreInputs();
+        updateGroupScoreInputs();
+    });
+</script>
+{% endblock %}

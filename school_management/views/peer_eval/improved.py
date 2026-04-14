@@ -283,6 +283,49 @@ def peer_evaluation_common_form(request, session_id):
     
     # POST処理
     if request.method == 'POST':
+        # ===== バリデーション =====
+        validation_errors = []
+        
+        # グループ評価の重複チェック
+        if lesson_session.enable_group_evaluation:
+            first_rank = request.POST.get('group_rank_1')
+            second_rank = request.POST.get('group_rank_2')
+            if first_rank and second_rank and first_rank == second_rank:
+                validation_errors.append('❌ グループ評価：1位と2位に同じグループを選ぶことはできません')
+        
+        # メンバー評価の重複チェック
+        if lesson_session.enable_member_evaluation:
+            member_selections = {}
+            for rank in range(1, max_member_rank + 1):
+                member_name = request.POST.get(f'member_rank_{rank}')
+                if member_name:
+                    if member_name in member_selections.values():
+                        validation_errors.append(
+                            f'❌ チームメンバー評価：「{member_name}」を複数の順位に違択することはできません。'
+                        )
+                        break
+                    member_selections[rank] = member_name
+        
+        # バリデーションエラーがあれば、フォームを再表示
+        if validation_errors:
+            context.update({
+                'authenticated_student': student,
+                'evaluator_group': evaluator_group,
+                'evaluator_group_member_names': evaluator_group_member_names,
+                'other_groups': other_groups,
+                'member_scores': lesson_session.member_scores,
+                'group_scores': lesson_session.group_scores,
+                'member_scores_json': json.dumps(lesson_session.member_scores),
+                'group_scores_json': json.dumps(lesson_session.group_scores),
+                'member_ranking_list': member_ranking_list,
+                'group_ranking_list': group_ranking_list,
+                'max_member_rank': max_member_rank,
+                'max_group_rank': max_group_rank,
+                'validation_errors': validation_errors,
+            })
+            return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
+        
+        # バリデーション成功後、評価を保存
         try:
             # グループ評価の保存処理
             first_place_group = None
@@ -292,14 +335,13 @@ def peer_evaluation_common_form(request, session_id):
                 first_rank = request.POST.get('group_rank_1')
                 second_rank = request.POST.get('group_rank_2')
                 
-                # 上位Xグループのみのみ投票可能（制限を確認）
                 if first_rank:
                     try:
                         first_place_group = Group.objects.get(id=first_rank, lesson_session=lesson_session)
                     except (Group.DoesNotExist, ValueError):
                         pass
                 
-                if second_rank and second_rank != first_rank:
+                if second_rank:
                     try:
                         second_place_group = Group.objects.get(id=second_rank, lesson_session=lesson_session)
                     except (Group.DoesNotExist, ValueError):

@@ -196,7 +196,9 @@ class LessonSession(models.Model):
     topic = models.CharField(max_length=200, blank=True, verbose_name='テーマ・内容')
     has_quiz = models.BooleanField(default=False, verbose_name='小テストあり')
     has_peer_evaluation = models.BooleanField(default=False, verbose_name='ピア評価あり')
+    peer_evaluation_configured = models.BooleanField(default=False, verbose_name='ピア評価設定済み')
     peer_evaluation_closed = models.BooleanField(default=False, verbose_name='ピア評価締切済み')
+    enable_comments = models.BooleanField(default=False, verbose_name='コメント機能有効')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -179,54 +179,59 @@ def peer_evaluation_links(request, session_id):
 # ---------------------------------------------------------
 
 def peer_evaluation_common_form(request, session_id):
-    """共通ピア評価フォーム"""
+    """シンプル版ピア評価フォーム"""
     lesson_session = get_object_or_404(LessonSession, id=session_id)
+    
+    # ピア評価設定が完了しているか確認
+    if not lesson_session.peer_evaluation_configured:
+        context = {
+            'lesson_session': lesson_session,
+            'error_message': '教員がピア評価を設定していません。',
+            'is_configuration_error': True,
+        }
+        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
+    
     groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student')
-    is_closed = lesson_session.peer_evaluation_closed
     oauth_session, student = _load_verified_oauth_session(request, lesson_session)
 
     context = {
         'lesson_session': lesson_session,
         'groups': groups,
-        'is_closed': is_closed,
         'requires_google_auth': False,
+        'enable_comments': lesson_session.enable_comments,
     }
 
     if not settings.ALLOWED_GMAIL_DOMAINS:
         context['requires_google_auth'] = True
-        context['auth_error'] = 'ALLOWED_GMAIL_DOMAINS が未設定のため、このフォームは利用できません。'
-        return render(request, 'school_management/improved_peer_evaluation_form.html', context)
+        context['auth_error'] = 'ALLOWED_GMAIL_DOMAINS が未設定です。教員に連絡してください。'
+        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
 
     if not _google_config_ready():
         context['requires_google_auth'] = True
         context['auth_error'] = 'Google認証設定が未設定です。教員に連絡してください。'
-        return render(request, 'school_management/improved_peer_evaluation_form.html', context)
+        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
 
     if not student:
         context['requires_google_auth'] = True
         context['google_auth_url'] = reverse('school_management:peer_evaluation_google_start', kwargs={'session_id': lesson_session.id})
-        return render(request, 'school_management/improved_peer_evaluation_form.html', context)
+        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
 
     memberships = GroupMember.objects.filter(
         group__lesson_session=lesson_session,
         student=student,
     ).select_related('group')
+    
     if memberships.count() != 1:
         context.update({
             'authenticated_student': student,
             'group_resolution_error': True,
             'auth_error': 'あなたの所属グループを特定できませんでした。担当教員に連絡してください。',
         })
-        return render(request, 'school_management/improved_peer_evaluation_form.html', context)
+        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
 
     evaluator_group = memberships.first().group
-    evaluator_group_member_names = list(
-        GroupMember.objects.filter(group=evaluator_group)
-        .exclude(student=student)
-        .select_related('student')
-        .values_list('student__full_name', flat=True)
-    )
 
+    # 既存提出チェック
     existing_submission = PeerEvaluation.objects.filter(
         lesson_session=lesson_session,
         student=student,
@@ -237,96 +242,38 @@ def peer_evaluation_common_form(request, session_id):
             'submission': existing_submission,
             'authenticated_student': student,
             'evaluator_group': evaluator_group,
-            'evaluator_group_member_names': evaluator_group_member_names,
         })
-        return render(request, 'school_management/improved_peer_evaluation_form.html', context)
+        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
     
-    if request.method == 'POST' and not is_closed:
+    # POST処理：シンプル版（コメントのみ）
+    if request.method == 'POST':
         try:
-            participant_count = int(request.POST.get('participant_count', 0))
-        except (TypeError, ValueError):
-            participant_count = 0
-        first_place_id = request.POST.get('first_place_group')
-        second_place_id = request.POST.get('second_place_group')
-        
-        if first_place_id and second_place_id:
-            first_place = get_object_or_404(Group, id=first_place_id, lesson_session=lesson_session)
-            second_place = get_object_or_404(Group, id=second_place_id, lesson_session=lesson_session)
-            
-            try:
-                peer_evaluation = PeerEvaluation.objects.create(
-                    lesson_session=lesson_session,
-                    student=student,
-                    email=_normalize_email(oauth_session.email),
-                    evaluator_token=str(uuid.uuid4()),
-                    evaluator_group=evaluator_group,
-                    first_place_group=first_place,
-                    second_place_group=second_place,
-                    first_place_reason=request.POST.get('first_place_reason', ''),
-                    second_place_reason=request.POST.get('second_place_reason', ''),
-                    general_comment=request.POST.get('general_comment', '')
-                )
-            except IntegrityError:
-                messages.error(request, 'この授業回のピア評価はすでに提出済みです。再提出はできません。')
-                context.update({
-                    'submission_exists': True,
-                    'authenticated_student': student,
-                    'evaluator_group': evaluator_group,
-                    'evaluator_group_member_names': evaluator_group_member_names,
-                })
-                return render(request, 'school_management/improved_peer_evaluation_form.html', context)
-
-            valid_member_ids = set(
-                GroupMember.objects.filter(group=evaluator_group).values_list('student_id', flat=True)
+            peer_evaluation = PeerEvaluation.objects.create(
+                lesson_session=lesson_session,
+                student=student,
+                email=_normalize_email(oauth_session.email),
+                evaluator_token=str(uuid.uuid4()),
+                evaluator_group=evaluator_group,
+                general_comment=request.POST.get('general_comment', ''),
             )
-            valid_member_ids.discard(student.id)
-            
-            # 貢献度評価の保存
-            if participant_count > 1:
-                # 自分以外の人数分ループ (participant_count - 1)
-                evaluation_count = participant_count - 1
-                for i in range(evaluation_count):
-                    member_id = request.POST.get(f'participant_{i}_member')
-                    score = request.POST.get(f'participant_{i}_contribution')
-                    
-                    if member_id and score:
-                        try:
-                            member_id_int = int(member_id)
-                            if member_id_int not in valid_member_ids:
-                                continue
-                            evaluatee = Student.objects.get(id=member_id_int)
-                            ContributionEvaluation.objects.create(
-                                peer_evaluation=peer_evaluation,
-                                evaluatee=evaluatee,
-                                contribution_score=int(score)
-                            )
-                        except (Student.DoesNotExist, ValueError):
-                            pass
-            
+            messages.success(request, '評価を提出しました。ご協力ありがとうございます。')
             return render(request, 'school_management/peer_evaluation_thanks.html', {
                 'lesson_session': lesson_session,
-                'first_place_group': first_place,
-                'second_place_group': second_place,
-                'show_evaluation_preview': True
             })
-
-    # JSONデータ準備
-    groups_data = []
-    for group in groups:
-        members_data = [{'id': m.student.id, 'name': m.student.full_name} for m in group.groupmember_set.all()]
-        groups_data.append({
-            'id': group.id, 
-            'name': group.group_name or f'{group.group_number}グループ', 
-            'members': members_data
-        })
+        except IntegrityError:
+            messages.error(request, 'この授業回のピア評価はすでに提出済みです。再提出はできません。')
+            context.update({
+                'submission_exists': True,
+                'authenticated_student': student,
+                'evaluator_group': evaluator_group,
+            })
+            return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
     
     context.update({
-        'groups_json': json.dumps(groups_data),
         'authenticated_student': student,
         'evaluator_group': evaluator_group,
-        'evaluator_group_member_names': evaluator_group_member_names,
     })
-    return render(request, 'school_management/improved_peer_evaluation_form.html', context)
+    return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
 
 
 def peer_evaluation_google_start(request, session_id):
@@ -471,8 +418,9 @@ def improved_peer_evaluation_form(request, token):
             'other_groups': other_groups,
             'group_members': group_members,
             'peer_evaluation': peer_evaluation,
+            'enable_comments': lesson_session.enable_comments,
         }
-        return render(request, 'school_management/improved_peer_evaluation_form.html', context)
+        return render(request, 'school_management/improved_peer_evaluation_form_simple.html', context)
         
     except (ValueError, PeerEvaluation.DoesNotExist):
         return render(request, 'school_management/peer_evaluation_error.html', {'error_message': '無効なリンクです。'})
@@ -616,3 +564,29 @@ def delete_all_peer_evaluations(request, session_id):
         messages.success(request, f'{count}件のピア評価データを削除し、リセットしました。')
         
     return redirect('school_management:peer_evaluation_results', session_id=session_id)
+
+@login_required
+def peer_evaluation_settings_view(request, session_id):
+    """ピア評価設定管理画面（管理者用）"""
+    lesson_session = get_object_or_404(
+        LessonSession,
+        id=session_id,
+        classroom__teachers=request.user
+    )
+    
+    if request.method == 'POST':
+        # 設定を保存
+        enable_comments = request.POST.get('enable_comments') == 'on'
+        
+        lesson_session.enable_comments = enable_comments
+        lesson_session.peer_evaluation_configured = True
+        lesson_session.save()
+        
+        messages.success(request, 'ピア評価設定を保存しました。')
+        return redirect('school_management:session_detail', session_id=session_id)
+    
+    context = {
+        'lesson_session': lesson_session,
+        'enable_comments': lesson_session.enable_comments,
+    }
+    return render(request, 'school_management/peer_evaluation_settings.html', context)

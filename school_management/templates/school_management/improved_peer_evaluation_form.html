@@ -48,6 +48,25 @@
                     </div>
                 </div>
 
+                <!-- 設定未完了エラー -->
+                {% if is_configuration_error %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>設定エラー：</strong>{{ error_message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-cog fa-3x text-muted mb-3 d-block"></i>
+                        <h5 class="text-muted mb-3">教員がまだピア評価を設定していません</h5>
+                        <p class="text-muted mb-3">教員が設定を完了してから、もう一度このリンクにアクセスしてください。</p>
+                        <p class="small text-muted">
+                            問題が継続する場合は、教員に連絡してください。
+                        </p>
+                    </div>
+                </div>
+                {% else %}
+
                 {% if messages %}
                 <div class="mb-3">
                     {% for message in messages %}
@@ -547,5 +566,9 @@
 
     </script>
     {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </body>
 </html>

@@ -251,8 +251,9 @@ def peer_evaluation_common_form(request, session_id):
     team_member_count = len(evaluator_group_members)
     max_member_rank = max(1, team_member_count // 2)
     
-    # グループ数 / 2 (切り捨て) = 順位付け対象グループ数
-    total_group_count = other_groups.count()
+    # ✅ グループ数（クラス全体）/ 2 (切り捨て) = 順位付け対象グループ数
+    # クラス全体のグループ数から計算（自分を含めた全グループ数）
+    total_group_count = groups.count()  # クラス内の全グループ数
     max_group_rank = max(1, total_group_count // 2)
     
     # member_ranking_listで上位N名のみを保持（スコアは仮、表示用）
@@ -266,6 +267,17 @@ def peer_evaluation_common_form(request, session_id):
         {'rank': i, 'points': lesson_session.group_scores.get(str(i), 0)}
         for i in range(1, min(max_group_rank + 1, lesson_session.group_ranking_count + 1))
     ]
+    
+    # ✅ 制限対象のグループIDリストを作成
+    restricted_group_ids = set()
+    if lesson_session.enable_group_evaluation and max_group_rank > 0:
+        # 他グループの中から、上位max_group_rankまでのグループを取得
+        # （IDでしか判定できないため、とりあえずother_groupsの最初のmax_group_rankを取得）
+        restricted_groups = other_groups[:max_group_rank]
+        restricted_group_ids = set(g.id for g in restricted_groups)
+    
+    # テンプレート用：制限されたグループのみ
+    restricted_other_groups = other_groups.filter(id__in=restricted_group_ids) if restricted_group_ids else []
 
     # 既存提出チェック
     existing_submission = PeerEvaluation.objects.filter(
@@ -286,12 +298,23 @@ def peer_evaluation_common_form(request, session_id):
         # ===== バリデーション =====
         validation_errors = []
         
-        # グループ評価の重複チェック
+        # ✅ グループ評価の重複チェック（全ランク間での重複をチェック）
         if lesson_session.enable_group_evaluation:
-            first_rank = request.POST.get('group_rank_1')
-            second_rank = request.POST.get('group_rank_2')
-            if first_rank and second_rank and first_rank == second_rank:
-                validation_errors.append('❌ グループ評価：1位と2位に同じグループを選ぶことはできません')
+            group_selections = {}
+            for rank_item in group_ranking_list:
+                rank = rank_item['rank']
+                group_id = request.POST.get(f'group_rank_{rank}')
+                
+                if group_id:
+                    # 全ランク間の重複チェック
+                    if group_id in group_selections.values():
+                        validation_errors.append('❌ グループ評価：同じグループを複数の順位に選ぶことはできません')
+                        break
+                    group_selections[rank] = group_id
+                    
+                    # 制限範囲外のグループが選ばれていないかチェック
+                    if group_id not in [str(g.id) for g in restricted_other_groups]:
+                        validation_errors.append(f'❌ グループ評価の{rank}位：評価対象外のグループが選ばれています。最大上位' + str(max_group_rank) + 'グループまで評価できます。')
         
         # メンバー評価の重複チェック
         if lesson_session.enable_member_evaluation:
@@ -301,7 +324,7 @@ def peer_evaluation_common_form(request, session_id):
                 if member_name:
                     if member_name in member_selections.values():
                         validation_errors.append(
-                            f'❌ チームメンバー評価：「{member_name}」を複数の順位に違択することはできません。'
+                            f'❌ チームメンバー評価：「{member_name}」を複数の順位に選択することはできません。'
                         )
                         break
                     member_selections[rank] = member_name
@@ -312,7 +335,7 @@ def peer_evaluation_common_form(request, session_id):
                 'authenticated_student': student,
                 'evaluator_group': evaluator_group,
                 'evaluator_group_member_names': evaluator_group_member_names,
-                'other_groups': other_groups,
+                'other_groups': restricted_other_groups,
                 'member_scores': lesson_session.member_scores,
                 'group_scores': lesson_session.group_scores,
                 'member_scores_json': json.dumps(lesson_session.member_scores),
@@ -396,7 +419,7 @@ def peer_evaluation_common_form(request, session_id):
         'authenticated_student': student,
         'evaluator_group': evaluator_group,
         'evaluator_group_member_names': evaluator_group_member_names,
-        'other_groups': other_groups,
+        'other_groups': restricted_other_groups,
         'member_scores': lesson_session.member_scores,
         'group_scores': lesson_session.group_scores,
         'member_scores_json': member_scores_json,

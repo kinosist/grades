@@ -191,6 +191,15 @@ def peer_evaluation_common_form(request, session_id):
         }
         return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
     
+    # ✅ ピア評価の締切を確認
+    if lesson_session.peer_evaluation_closed:
+        context = {
+            'lesson_session': lesson_session,
+            'error_message': 'ピア評価の締切が過ぎています。提出はできません。',
+            'is_closed': True,
+        }
+        return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
+    
     groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student')
     oauth_session, student = _load_verified_oauth_session(request, lesson_session)
 
@@ -241,14 +250,22 @@ def peer_evaluation_common_form(request, session_id):
         .select_related('student')
         .values_list('student__full_name', flat=True)
     )
+    # ✅ テンプレート用：student_idとfull_nameを含むオブジェクトリスト
+    evaluator_group_member_objects = list(
+        GroupMember.objects.filter(group=evaluator_group)
+        .exclude(student=student)
+        .select_related('student')
+        .values('student__id', 'student__full_name')
+    )
     evaluator_group_member_names = evaluator_group_members
     
     # 他グループを取得（グループ評価用）
     other_groups = groups.exclude(id=evaluator_group.id)
     
     # ===== 上位N名/Xグループの制限ロジック =====
-    # チーム人数 / 2 (切り捨て) = 順位付け対象人数
-    team_member_count = len(evaluator_group_members)
+    # ✅ 自分を含めたグループメンバー数 / 2 (切り捨て) = 順位付け対象人数
+    # evaluator_group_members は自分を除いたメンバーなので、+1して自分を含める
+    team_member_count = len(evaluator_group_members) + 1
     max_member_rank = max(1, team_member_count // 2)
     
     # ✅ グループ数（クラス全体）/ 2 (切り捨て) = 順位付け対象グループ数
@@ -272,8 +289,9 @@ def peer_evaluation_common_form(request, session_id):
     restricted_group_ids = set()
     if lesson_session.enable_group_evaluation and max_group_rank > 0:
         # 他グループの中から、上位max_group_rankまでのグループを取得
-        # （IDでしか判定できないため、とりあえずother_groupsの最初のmax_group_rankを取得）
-        restricted_groups = other_groups[:max_group_rank]
+        # ✅ order_by で確定的な順序でsorting（group_number → id）
+        ordered_other_groups = other_groups.order_by('group_number', 'id')
+        restricted_groups = list(ordered_other_groups[:max_group_rank])
         restricted_group_ids = set(g.id for g in restricted_groups)
     
     # テンプレート用：制限されたグループのみ
@@ -295,6 +313,16 @@ def peer_evaluation_common_form(request, session_id):
     
     # POST処理
     if request.method == 'POST':
+        # ✅ POST前に再度締切チェック（セキュリティ）
+        if lesson_session.peer_evaluation_closed:
+            messages.error(request, 'ピア評価の締切が過ぎています。提出はできません。')
+            context.update({
+                'authenticated_student': student,
+                'evaluator_group': evaluator_group if 'evaluator_group' in locals() else None,
+                'is_closed': True,
+            })
+            return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
+        
         # ===== バリデーション =====
         validation_errors = []
         
@@ -320,14 +348,14 @@ def peer_evaluation_common_form(request, session_id):
         if lesson_session.enable_member_evaluation:
             member_selections = {}
             for rank in range(1, max_member_rank + 1):
-                member_name = request.POST.get(f'member_rank_{rank}')
-                if member_name:
-                    if member_name in member_selections.values():
+                member_id = request.POST.get(f'member_rank_{rank}')  # ✅ IDで確認
+                if member_id:
+                    if member_id in member_selections.values():
                         validation_errors.append(
-                            f'❌ チームメンバー評価：「{member_name}」を複数の順位に選択することはできません。'
+                            f'❌ チームメンバー評価：同じメンバーを複数の順位に選択することはできません。'
                         )
                         break
-                    member_selections[rank] = member_name
+                    member_selections[rank] = member_id
         
         # バリデーションエラーがあれば、フォームを再表示
         if validation_errors:
@@ -335,6 +363,7 @@ def peer_evaluation_common_form(request, session_id):
                 'authenticated_student': student,
                 'evaluator_group': evaluator_group,
                 'evaluator_group_member_names': evaluator_group_member_names,
+                'evaluator_group_member_objects': evaluator_group_member_objects,  # ✅ 追加
                 'other_groups': restricted_other_groups,
                 'member_scores': lesson_session.member_scores,
                 'group_scores': lesson_session.group_scores,
@@ -355,20 +384,20 @@ def peer_evaluation_common_form(request, session_id):
             second_place_group = None
             
             if lesson_session.enable_group_evaluation:
-                first_rank = request.POST.get('group_rank_1')
-                second_rank = request.POST.get('group_rank_2')
+                # ✅ group_ranking_count に合わせて動的にランクを処理（最大2位まで対応）
+                max_group_save_rank = min(lesson_session.group_ranking_count, 2)
+                group_ranks = {}
                 
-                if first_rank:
-                    try:
-                        first_place_group = Group.objects.get(id=first_rank, lesson_session=lesson_session)
-                    except (Group.DoesNotExist, ValueError):
-                        pass
+                for rank in range(1, max_group_save_rank + 1):
+                    group_id = request.POST.get(f'group_rank_{rank}')
+                    if group_id:
+                        try:
+                            group_ranks[rank] = Group.objects.get(id=group_id, lesson_session=lesson_session)
+                        except (Group.DoesNotExist, ValueError):
+                            pass
                 
-                if second_rank:
-                    try:
-                        second_place_group = Group.objects.get(id=second_rank, lesson_session=lesson_session)
-                    except (Group.DoesNotExist, ValueError):
-                        pass
+                first_place_group = group_ranks.get(1)
+                second_place_group = group_ranks.get(2)
             
             # ピア評価を保存
             peer_evaluation = PeerEvaluation.objects.create(
@@ -385,10 +414,10 @@ def peer_evaluation_common_form(request, session_id):
             # メンバー評価の保存（上位N名のみ）
             if lesson_session.enable_member_evaluation:
                 for rank in range(1, max_member_rank + 1):  # 制限：上位N名のみ
-                    member_name = request.POST.get(f'member_rank_{rank}')
-                    if member_name:
+                    member_id = request.POST.get(f'member_rank_{rank}')  # ✅ IDで受け取る
+                    if member_id:
                         try:
-                            member = Student.objects.get(full_name=member_name, group_memberships__group=evaluator_group)
+                            member = Student.objects.get(id=int(member_id), group_memberships__group=evaluator_group)
                             score = lesson_session.member_scores.get(str(rank), 0)
                             ContributionEvaluation.objects.create(
                                 peer_evaluation=peer_evaluation,
@@ -419,6 +448,7 @@ def peer_evaluation_common_form(request, session_id):
         'authenticated_student': student,
         'evaluator_group': evaluator_group,
         'evaluator_group_member_names': evaluator_group_member_names,
+        'evaluator_group_member_objects': evaluator_group_member_objects,  # ✅ 追加
         'other_groups': restricted_other_groups,
         'member_scores': lesson_session.member_scores,
         'group_scores': lesson_session.group_scores,

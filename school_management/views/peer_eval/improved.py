@@ -261,41 +261,43 @@ def peer_evaluation_common_form(request, session_id):
     
     # 他グループを取得（グループ評価用）
     other_groups = groups.exclude(id=evaluator_group.id)
+    # ✅ order_by で確定的な順序でsorting（group_number → id）
+    ordered_other_groups = list(other_groups.order_by('group_number', 'id'))
     
     # ===== 上位N名/Xグループの制限ロジック =====
-    # ✅ 自分を含めたグループメンバー数 / 2 (切り捨て) = 順位付け対象人数
-    # evaluator_group_members は自分を除いたメンバーなので、+1して自分を含める
-    team_member_count = len(evaluator_group_members) + 1
-    max_member_rank = max(1, team_member_count // 2)
+    # ✅ メンバー評価対象数: 設定値(member_ranking_count) と利用可能メンバー数(自分以外)の少ない方
+    # 例: member_ranking_count=3, チーム6人(自分以外5人) → 3位まで表示・選択可能
+    # 例: member_ranking_count=10, チーム4人(自分以外3人) → 3位まで表示・選択可能
+    max_member_rank = min(lesson_session.member_ranking_count, len(evaluator_group_members))
     
-    # ✅ グループ数（クラス全体）/ 2 (切り捨て) = 順位付け対象グループ数
-    # クラス全体のグループ数から計算（自分を含めた全グループ数）
-    total_group_count = groups.count()  # クラス内の全グループ数
-    max_group_rank = max(1, total_group_count // 2)
+    # ✅ グループ評価対象数: 「自分以外のすべてのグループ」が選択可能
+    # ユーザーが設定する「グループ順位数」は「フォームに表示する最大ランク数」として機能
+    # 実際の選択肢は「すべての他グループ」を対象にする
+    max_group_rank = other_groups.count()  # 自分以外のグループすべてが対象
     
-    # member_ranking_listで上位N名のみを保持（スコアは仮、表示用）
+    # ✅ メンバー順位リスト: lesson_session.member_ranking_count に従う
     member_ranking_list = [
         {'rank': i, 'points': lesson_session.member_scores.get(str(i), 0)}
-        for i in range(1, min(max_member_rank + 1, lesson_session.member_ranking_count + 1))
+        for i in range(1, lesson_session.member_ranking_count + 1)
     ]
     
-    # group_ranking_listで上位Xグループのみを保持
+    # ✅ グループ順位リスト: lesson_session.group_ranking_count に従う（最大10位）
     group_ranking_list = [
         {'rank': i, 'points': lesson_session.group_scores.get(str(i), 0)}
-        for i in range(1, min(max_group_rank + 1, lesson_session.group_ranking_count + 1))
+        for i in range(1, lesson_session.group_ranking_count + 1)
     ]
     
     # ✅ 制限対象のグループIDリストを作成
+    # バリデーション用：表示ランク数（lesson_session.group_ranking_count）までのグループを記録
     restricted_group_ids = set()
-    if lesson_session.enable_group_evaluation and max_group_rank > 0:
-        # 他グループの中から、上位max_group_rankまでのグループを取得
-        # ✅ order_by で確定的な順序でsorting（group_number → id）
-        ordered_other_groups = other_groups.order_by('group_number', 'id')
-        restricted_groups = list(ordered_other_groups[:max_group_rank])
-        restricted_group_ids = set(g.id for g in restricted_groups)
+    if lesson_session.enable_group_evaluation and len(ordered_other_groups) > 0:
+        # display_group_rank = lesson_session.group_ranking_count を表示ランク数とする
+        display_group_rank = min(lesson_session.group_ranking_count, len(ordered_other_groups))
+        for i in range(display_group_rank):
+            restricted_group_ids.add(ordered_other_groups[i].id)
     
-    # テンプレート用：制限されたグループのみ
-    restricted_other_groups = other_groups.filter(id__in=restricted_group_ids) if restricted_group_ids else []
+    # テンプレート用：すべての他グループを表示（ドロップダウン用）
+    restricted_other_groups = ordered_other_groups
 
     # 既存提出チェック
     existing_submission = PeerEvaluation.objects.filter(
@@ -326,36 +328,49 @@ def peer_evaluation_common_form(request, session_id):
         # ===== バリデーション =====
         validation_errors = []
         
-        # ✅ グループ評価の重複チェック（全ランク間での重複をチェック）
+        # ✅ グループ評価の必須チェック + 重複チェック
         if lesson_session.enable_group_evaluation:
             group_selections = {}
             for rank_item in group_ranking_list:
                 rank = rank_item['rank']
                 group_id = request.POST.get(f'group_rank_{rank}')
                 
-                if group_id:
-                    # 全ランク間の重複チェック
-                    if group_id in group_selections.values():
-                        validation_errors.append('❌ グループ評価：同じグループを複数の順位に選ぶことはできません')
-                        break
-                    group_selections[rank] = group_id
-                    
-                    # 制限範囲外のグループが選ばれていないかチェック
-                    if group_id not in [str(g.id) for g in restricted_other_groups]:
-                        validation_errors.append(f'❌ グループ評価の{rank}位：評価対象外のグループが選ばれています。最大上位' + str(max_group_rank) + 'グループまで評価できます。')
+                # ✅ 必須チェック: グループ評価の各ランクが入力されているか
+                if not group_id:
+                    validation_errors.append(f'❌ グループ評価の{rank}位：グループを選択してください。')
+                    continue
+                
+                # 全ランク間の重複チェック
+                if group_id in group_selections.values():
+                    validation_errors.append(f'❌ グループ評価：{rank}位に選ばれたグループは既に別の順位で選択されています。')
+                    continue
+                
+                group_selections[rank] = group_id
+                
+                # ✅ 制限範囲外のグループが選ばれていないかチェック
+                # 表示ランク数（lesson_session.group_ranking_count）までのグループのみOK
+                allowed_group_ids = [str(g.id) for g in ordered_other_groups[:min(lesson_session.group_ranking_count, len(ordered_other_groups))]]
+                if group_id not in allowed_group_ids:
+                    max_allowed_rank = min(lesson_session.group_ranking_count, len(ordered_other_groups))
+                    validation_errors.append(f'❌ グループ評価の{rank}位：評価対象外のグループが選ばれています。最大{max_allowed_rank}位までのグループを選択してください。')
         
-        # メンバー評価の重複チェック
+        # ✅ メンバー評価の必須チェック + 重複チェック
         if lesson_session.enable_member_evaluation:
             member_selections = {}
             for rank in range(1, max_member_rank + 1):
-                member_id = request.POST.get(f'member_rank_{rank}')  # ✅ IDで確認
-                if member_id:
-                    if member_id in member_selections.values():
-                        validation_errors.append(
-                            f'❌ チームメンバー評価：同じメンバーを複数の順位に選択することはできません。'
-                        )
-                        break
-                    member_selections[rank] = member_id
+                member_id = request.POST.get(f'member_rank_{rank}')
+                
+                # ✅ 必須チェック: メンバー評価の各ランクが入力されているか
+                if not member_id:
+                    validation_errors.append(f'❌ チームメンバー評価の{rank}位：メンバーを選択してください。')
+                    continue
+                
+                # 全ランク間の重複チェック
+                if member_id in member_selections.values():
+                    validation_errors.append(f'❌ チームメンバー評価：{rank}位に選ばれたメンバーは既に別の順位で選択されています。')
+                    continue
+                
+                member_selections[rank] = member_id
         
         # バリデーションエラーがあれば、フォームを再表示
         if validation_errors:
@@ -384,20 +399,36 @@ def peer_evaluation_common_form(request, session_id):
             second_place_group = None
             
             if lesson_session.enable_group_evaluation:
-                # ✅ group_ranking_count に合わせて動的にランクを処理（最大2位まで対応）
-                max_group_save_rank = min(lesson_session.group_ranking_count, 2)
+                # ✅ group_ranking_count に合わせて動的にランクを処理（最大10位まで対応）
                 group_ranks = {}
+                group_selections_dict = {}  # JSON保存用
                 
-                for rank in range(1, max_group_save_rank + 1):
+                for rank in range(1, lesson_session.group_ranking_count + 1):
                     group_id = request.POST.get(f'group_rank_{rank}')
                     if group_id:
                         try:
-                            group_ranks[rank] = Group.objects.get(id=group_id, lesson_session=lesson_session)
+                            group_obj = Group.objects.get(id=group_id, lesson_session=lesson_session)
+                            group_ranks[rank] = group_obj
+                            group_selections_dict[str(rank)] = int(group_id)  # JSON用：文字列キーで保存
                         except (Group.DoesNotExist, ValueError):
                             pass
                 
                 first_place_group = group_ranks.get(1)
                 second_place_group = group_ranks.get(2)
+            else:
+                group_selections_dict = {}
+            
+            # ✅ メンバー選択をJSON保存用に準備
+            member_selections_dict = {}
+            if lesson_session.enable_member_evaluation:
+                for rank in range(1, max_member_rank + 1):
+                    member_id = request.POST.get(f'member_rank_{rank}')
+                    if member_id:
+                        try:
+                            int(member_id)  # 検証のみ
+                            member_selections_dict[str(rank)] = int(member_id)  # JSON用
+                        except (ValueError, TypeError):
+                            pass
             
             # ピア評価を保存
             peer_evaluation = PeerEvaluation.objects.create(
@@ -409,12 +440,16 @@ def peer_evaluation_common_form(request, session_id):
                 first_place_group=first_place_group,
                 second_place_group=second_place_group,
                 general_comment=request.POST.get('general_comment', ''),
+                # ✅ enable_feedback 有効時は feedback を class_comment に保存
+                class_comment=request.POST.get('feedback', '') if lesson_session.enable_feedback else '',
+                group_selections=group_selections_dict,
+                member_selections=member_selections_dict,
             )
             
-            # メンバー評価の保存（上位N名のみ）
+            # ✅ メンバー評価と貢献度スコアを保存
             if lesson_session.enable_member_evaluation:
-                for rank in range(1, max_member_rank + 1):  # 制限：上位N名のみ
-                    member_id = request.POST.get(f'member_rank_{rank}')  # ✅ IDで受け取る
+                for rank in range(1, max_member_rank + 1):
+                    member_id = request.POST.get(f'member_rank_{rank}')
                     if member_id:
                         try:
                             member = Student.objects.get(id=int(member_id), group_memberships__group=evaluator_group)
@@ -765,30 +800,56 @@ def peer_evaluation_settings_view(request, session_id):
         lesson_session.enable_comments = request.POST.get('enable_comments') == 'on'
         lesson_session.enable_feedback = request.POST.get('enable_feedback') == 'on'
         
-        # メンバー評価設定
+        # ✅ メンバー評価設定（バリデーション付き）
         lesson_session.enable_member_evaluation = request.POST.get('enable_member_evaluation') == 'on'
         if lesson_session.enable_member_evaluation:
-            member_ranking_count = int(request.POST.get('member_ranking_count', 2))
+            try:
+                member_ranking_count = int(request.POST.get('member_ranking_count', 2))
+                # 範囲チェック: 1～10位
+                if not (1 <= member_ranking_count <= 10):
+                    messages.error(request, 'メンバー順位数は1～10の間で設定してください。')
+                    member_ranking_count = lesson_session.member_ranking_count
+            except (ValueError, TypeError):
+                messages.error(request, 'メンバー順位数が無効な値です。')
+                member_ranking_count = lesson_session.member_ranking_count
+            
             lesson_session.member_ranking_count = member_ranking_count
             
-            # メンバー配点をJSONで保存
+            # メンバー配点をJSONで保存（バリデーション付き）
             member_scores = {}
             for i in range(1, member_ranking_count + 1):
-                score = request.POST.get(f'member_score_{i}', 0)
-                member_scores[str(i)] = int(score)
+                try:
+                    score = int(request.POST.get(f'member_score_{i}', 0))
+                    member_scores[str(i)] = max(0, score)  # 負の値を0に
+                except (ValueError, TypeError):
+                    messages.error(request, f'メンバー{i}位のスコアが無効です。')
+                    member_scores[str(i)] = 0
             lesson_session.member_scores = member_scores
         
-        # グループ評価設定
+        # ✅ グループ評価設定（バリデーション付き）
         lesson_session.enable_group_evaluation = request.POST.get('enable_group_evaluation') == 'on'
         if lesson_session.enable_group_evaluation:
-            group_ranking_count = int(request.POST.get('group_ranking_count', 2))
+            try:
+                group_ranking_count = int(request.POST.get('group_ranking_count', 2))
+                # 範囲チェック: 1～10位
+                if not (1 <= group_ranking_count <= 10):
+                    messages.error(request, 'グループ順位数は1～10の間で設定してください。')
+                    group_ranking_count = lesson_session.group_ranking_count
+            except (ValueError, TypeError):
+                messages.error(request, 'グループ順位数が無効な値です。')
+                group_ranking_count = lesson_session.group_ranking_count
+            
             lesson_session.group_ranking_count = group_ranking_count
             
-            # グループ配点をJSONで保存
+            # グループ配点をJSONで保存（バリデーション付き）
             group_scores = {}
             for i in range(1, group_ranking_count + 1):
-                score = request.POST.get(f'group_score_{i}', 0)
-                group_scores[str(i)] = int(score)
+                try:
+                    score = int(request.POST.get(f'group_score_{i}', 0))
+                    group_scores[str(i)] = max(0, score)  # 負の値を0に
+                except (ValueError, TypeError):
+                    messages.error(request, f'グループ{i}位のスコアが無効です。')
+                    group_scores[str(i)] = 0
             lesson_session.group_scores = group_scores
         
         lesson_session.peer_evaluation_configured = True

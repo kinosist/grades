@@ -460,6 +460,12 @@ class PeerEvaluation(models.Model):
     second_place_reason = models.TextField(blank=True, verbose_name='2位選択理由')
     class_comment = models.TextField(blank=True, verbose_name='授業コメント')
     general_comment = models.TextField(blank=True, verbose_name='全般コメント')
+    
+    # ✅ グループ評価ランク拡張: 複数ランクをJSON保存 (例: {1: group_id, 2: group_id, ...})
+    group_selections = models.JSONField(default=dict, blank=True, verbose_name='グループ選択（全ランク）')
+    # ✅ メンバー評価ランク拡張: 複数ランクをJSON保存 (例: {1: student_id, 2: student_id, ...})
+    member_selections = models.JSONField(default=dict, blank=True, verbose_name='メンバー選択（全ランク）')
+    
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='評価日時')
 
     class Meta:

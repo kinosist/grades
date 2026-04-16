@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Max
-from ...models import LessonSession, Group, GroupMember, CustomUser
+from ...models import LessonSession, Group, GroupMember, CustomUser, PeerEvaluation
 
 @login_required
 def group_management(request, session_id):
@@ -17,6 +17,13 @@ def group_management(request, session_id):
         max_group_number = groups.aggregate(Max('group_number'))['group_number__max'] or 0
     
     if request.method == 'POST':
+        # ✅ グループ削除前に、そのグループを参照している PeerEvaluation も削除
+        groups_to_delete = Group.objects.filter(lesson_session=lesson_session)
+        PeerEvaluation.objects.filter(
+            lesson_session=lesson_session,
+            evaluator_group__in=groups_to_delete
+        ).delete()
+        
         # 既存のグループを削除
         Group.objects.filter(lesson_session=lesson_session).delete()
         

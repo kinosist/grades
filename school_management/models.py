@@ -196,7 +196,16 @@ class LessonSession(models.Model):
     topic = models.CharField(max_length=200, blank=True, verbose_name='テーマ・内容')
     has_quiz = models.BooleanField(default=False, verbose_name='小テストあり')
     has_peer_evaluation = models.BooleanField(default=False, verbose_name='ピア評価あり')
+    peer_evaluation_configured = models.BooleanField(default=False, verbose_name='ピア評価設定済み')
     peer_evaluation_closed = models.BooleanField(default=False, verbose_name='ピア評価締切済み')
+    enable_comments = models.BooleanField(default=False, verbose_name='コメント機能有効')
+    enable_member_evaluation = models.BooleanField(default=False, verbose_name='メンバー評価有効')
+    member_ranking_count = models.IntegerField(default=2, verbose_name='メンバー順位数')
+    member_scores = models.JSONField(default=dict, verbose_name='メンバー評価配点', help_text='例: {"1": 2, "2": 1}')
+    enable_group_evaluation = models.BooleanField(default=False, verbose_name='グループ評価有効')
+    group_ranking_count = models.IntegerField(default=2, verbose_name='グループ順位数')
+    group_scores = models.JSONField(default=dict, verbose_name='グループ評価配点', help_text='例: {"1": 2, "2": 1}')
+    enable_feedback = models.BooleanField(default=False, verbose_name='感想欄有効')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -451,6 +460,12 @@ class PeerEvaluation(models.Model):
     second_place_reason = models.TextField(blank=True, verbose_name='2位選択理由')
     class_comment = models.TextField(blank=True, verbose_name='授業コメント')
     general_comment = models.TextField(blank=True, verbose_name='全般コメント')
+    
+    # ✅ グループ評価ランク拡張: 複数ランクをJSON保存 (例: {1: group_id, 2: group_id, ...})
+    group_selections = models.JSONField(default=dict, blank=True, verbose_name='グループ選択（全ランク）')
+    # ✅ メンバー評価ランク拡張: 複数ランクをJSON保存 (例: {1: student_id, 2: student_id, ...})
+    member_selections = models.JSONField(default=dict, blank=True, verbose_name='メンバー選択（全ランク）')
+    
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='評価日時')
 
     class Meta:

@@ -1,0 +1,301 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ピア評価フォーム - {{ lesson_session.classroom.class_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8fafc; }
+        .group-card, .member-card { transition: all 0.3s ease; }
+        .group-card:hover, .member-card:hover { 
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+            border-color: #0d6efd !important;
+        }
+        .rank-badge {
+            font-weight: bold;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+        }
+        .rank-1 { background-color: #ffd700; color: #000; }
+        .rank-2 { background-color: #c0c0c0; color: #000; }
+        .rank-3 { background-color: #cd7f32; color: #fff; }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                
+                <!-- ページヘッダー -->
+                <div class="card mb-4">
+                    <div class="card-body text-center">
+                        <h2 class="text-primary mb-3">
+                            <i class="fas fa-users-cog me-2"></i>グループワーク ピア評価フォーム
+                        </h2>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>クラス:</strong> {{ lesson_session.classroom.class_name }}<br>
+                                <strong>授業回:</strong> 第{{ lesson_session.session_number }}回
+                            </div>
+                            <div class="col-md-6">
+                                <strong>実施日:</strong> {{ lesson_session.date|date:"Y年m月d日" }}<br>
+                                {% if lesson_session.topic %}
+                                    <strong>トピック:</strong> {{ lesson_session.topic }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 設定未完了エラー -->
+                {% if is_configuration_error %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>設定エラー：</strong>{{ error_message }}
+                </div>
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-cog fa-3x text-muted mb-3 d-block"></i>
+                        <h5 class="text-muted mb-3">教員がまだピア評価を設定していません</h5>
+                        <p class="text-muted mb-3">教員が設定を完了してから、もう一度このリンクにアクセスしてください。</p>
+                    </div>
+                </div>
+
+                <!-- 認証必須 -->
+                {% elif requires_google_auth %}
+                <div class="alert alert-primary text-center">
+                    <h4><i class="fab fa-google me-2"></i>認証が必要です</h4>
+                    <p class="mb-3">{{ auth_error|default:"学校用Googleアカウントで認証してください。" }}</p>
+                    {% if google_auth_url %}
+                    <a href="{{ google_auth_url }}" class="btn btn-primary btn-lg">
+                        <i class="fab fa-google me-2"></i>Googleでログイン
+                    </a>
+                    {% endif %}
+                </div>
+
+                <!-- 提出済み -->
+                {% elif submission_exists %}
+                <div class="alert alert-success text-center">
+                    <h4><i class="fas fa-check-circle me-2"></i>提出済みです</h4>
+                    <p class="mb-1">{{ authenticated_student.full_name }} さんのピア評価は提出済みです。ご協力ありがとうございます！</p>
+                    {% if submission.created_at %}
+                    <p class="mb-0 small text-muted">提出日時: {{ submission.created_at|date:"Y年m月d日 H:i" }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- グループ未編成 -->
+                {% elif not groups %}
+                <div class="alert alert-warning text-center">
+                    <h4><i class="fas fa-exclamation-triangle me-2"></i>グループが設定されていません</h4>
+                    <p class="mb-0">担当教員にお問い合わせください。</p>
+                </div>
+
+                <!-- グループ解決エラー -->
+                {% elif group_resolution_error %}
+                <div class="alert alert-danger text-center">
+                    <h4><i class="fas fa-user-slash me-2"></i>所属グループを確認できません</h4>
+                    <p class="mb-0">{{ auth_error }}</p>
+                </div>
+
+                <!-- ✅ 締切エラー -->
+                {% elif is_closed %}
+                <div class="alert alert-warning text-center">
+                    <h4><i class="fas fa-clock me-2"></i>締切が過ぎています</h4>
+                    <p class="mb-0">{{ error_message }}</p>
+                </div>
+
+                <!-- メインフォーム -->
+                {% else %}
+                {% if validation_errors %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <h5 class="alert-heading mb-3">
+                        <i class="fas fa-exclamation-circle me-2"></i>入力エラーがあります
+                    </h5>
+                    <ul class="mb-0">
+                        {% for error in validation_errors %}
+                        <li class="mb-2">{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endif %}
+                
+                <div class="alert alert-info mb-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>{{ authenticated_student.full_name }}</strong> さんがグループ <strong>{{ evaluator_group.display_name }}</strong> のメンバーとして評価を行います。
+                </div>
+
+                <form method="post" id="evaluationForm">
+                    {% csrf_token %}
+
+                    <!-- グループ一覧（常に表示） -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-users me-2"></i>グループ一覧</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                {% for group in groups %}
+                                <div class="col-md-6">
+                                    <div class="card group-card">
+                                        <div class="card-body">
+                                            <h6 class="card-title">{{ group.display_name }}</h6>
+                                            <div class="small text-muted">
+                                                <strong>メンバー:</strong><br>
+                                                {% for member in group.groupmember_set.all %}
+                                                    {{ member.student.full_name }}<br>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- メンバー評価セクション -->
+                    {% if enable_member_evaluation %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-medal me-2"></i>チームメンバー評価</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                今日のグループワークに参加したメンバーを評価してください。
+                            </p>
+                            
+                            {% for rank_item in member_ranking_list %}
+                            <div class="mb-4 p-3 border rounded" style="background-color: #f9f9f9;">
+                                <label class="form-label fw-bold mb-3">
+                                    <span class="rank-badge rank-{{ rank_item.rank }}">{{ rank_item.rank }}位</span>
+                                    <span class="ms-2">({{ rank_item.points }}点)</span>
+                                </label>
+                                <select 
+                                    class="form-select"
+                                    name="member_rank_{{ rank_item.rank }}"
+                                    required
+                                >
+                                    <option value="">選択してください</option>
+                                    {% for member_obj in evaluator_group_member_objects %}
+                                    <option value="{{ member_obj.student__id }}">{{ member_obj.student__full_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- グループ評価セクション -->
+                    {% if enable_group_evaluation %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>他グループ評価</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                今日のグループワークにおいて、他グループの成果を評価してください。
+                            </p>
+                            
+                            {% for rank_item in group_ranking_list %}
+                            <div class="mb-4 p-3 border rounded" style="background-color: #f9f9f9;">
+                                <label class="form-label fw-bold mb-3">
+                                    <span class="rank-badge rank-{{ rank_item.rank }}">{{ rank_item.rank }}位</span>
+                                    <span class="ms-2">({{ rank_item.points }}点)</span>
+                                </label>
+                                <select 
+                                    class="form-select"
+                                    name="group_rank_{{ rank_item.rank }}"
+                                    required
+                                >
+                                    <option value="">選択してください</option>
+                                    {% for group in other_groups %}
+                                    <option value="{{ group.id }}">{{ group.display_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- コメント欄 -->
+                    {% if enable_comments %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-comment me-2"></i>コメント</h5>
+                        </div>
+                        <div class="card-body">
+                            <label class="form-label">今日のグループワークについての感想やコメント（任意）</label>
+                            <textarea 
+                                class="form-control" 
+                                name="general_comment" 
+                                rows="3"
+                                placeholder="グループの成果や改善点など、自由に記入してください..."
+                                style="max-height: 150px; resize: vertical; overflow-y: auto;"
+                            ></textarea>
+                            <small class="text-muted d-block mt-2">
+                                教員のみがこのコメントを確認します。
+                            </small>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- 感想欄 -->
+                    {% if enable_feedback %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>授業の感想</h5>
+                        </div>
+                        <div class="card-body">
+                            <label class="form-label">本日の授業全体での感想（任意）</label>
+                            <textarea 
+                                class="form-control" 
+                                name="feedback" 
+                                rows="3"
+                                placeholder="本日の授業での学び、感想など..."
+                                style="max-height: 150px; resize: vertical; overflow-y: auto;"
+                            ></textarea>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- 提出ボタン -->
+                    <div class="text-center mb-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-paper-plane me-2"></i>評価を提出する
+                        </button>
+                    </div>
+
+                    <!-- 注記 -->
+                    <div class="alert alert-light border-start border-4 border-info">
+                        <small>
+                            <i class="fas fa-shield-alt me-1"></i>
+                            提出管理のため認証済みメールを記録します。評価内容は教員のみが閲覧できます。
+                        </small>
+                    </div>
+                </form>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // テンプレート フィルタ dict_lookup の代わりにJavaScriptで実装
+        function getMemberScore(rank) {
+            const scores = {{ member_scores_json|safe }};
+            return scores[rank] || 0;
+        }
+        function getGroupScore(rank) {
+            const scores = {{ group_scores_json|safe }};
+            return scores[rank] || 0;
+        }
+    </script>
+</body>
+</html>

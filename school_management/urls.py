@@ -98,6 +98,7 @@ urlpatterns = [
     path('lesson-sessions/<int:session_id>/peer-evaluation/google/start/', peer_eval.peer_evaluation_google_start, name='peer_evaluation_google_start'),
     path('peer-evaluation/google/callback/', peer_eval.peer_evaluation_google_callback, name='peer_evaluation_google_callback'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/close/', peer_eval.close_peer_evaluation, name='close_peer_evaluation'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/settings/', peer_eval.peer_evaluation_settings_view, name='peer_evaluation_settings'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/reopen/', peer_eval.reopen_peer_evaluation, name='reopen_peer_evaluation'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results, name='peer_evaluation_results'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/delete-all/', peer_eval.delete_all_peer_evaluations, name='delete_all_peer_evaluations'),

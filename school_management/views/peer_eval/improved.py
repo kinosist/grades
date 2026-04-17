@@ -275,16 +275,16 @@ def peer_evaluation_common_form(request, session_id):
     # 実際の選択肢は「すべての他グループ」を対象にする
     max_group_rank = other_groups.count()  # 自分以外のグループすべてが対象
     
-    # ✅ メンバー順位リスト: lesson_session.member_ranking_count に従う
+    # ✅ メンバー順位リスト: 実行する機構数に応じた最大順位数まで表示する
     member_ranking_list = [
         {'rank': i, 'points': lesson_session.member_scores.get(str(i), 0)}
-        for i in range(1, lesson_session.member_ranking_count + 1)
+        for i in range(1, max_member_rank + 1)
     ]
     
-    # ✅ グループ順位リスト: lesson_session.group_ranking_count に従う（最大10位）
+    # ✅ グループ順位リスト: 実行する他グループ数に応じた最大順位数まで表示する
     group_ranking_list = [
         {'rank': i, 'points': lesson_session.group_scores.get(str(i), 0)}
-        for i in range(1, lesson_session.group_ranking_count + 1)
+        for i in range(1, max_group_rank + 1)
     ]
     
     # ✅ 制限対象のグループIDリストを作成
@@ -859,7 +859,6 @@ def peer_evaluation_settings_view(request, session_id):
         return redirect('school_management:session_detail', session_id=session_id)
     
     # JSONをJavaScript用に変換
-    import json
     member_scores_json = json.dumps({str(k): v for k, v in lesson_session.member_scores.items()})
     group_scores_json = json.dumps({str(k): v for k, v in lesson_session.group_scores.items()})
     

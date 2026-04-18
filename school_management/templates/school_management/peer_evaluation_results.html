@@ -94,6 +94,7 @@
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
+                        <p class="m-1">提出した学生名をクリックして、提出内容を確認することができます。</p>
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
@@ -105,8 +106,16 @@
                             </thead>
                             <tbody>
                                 {% for row in submission_rows %}
-                                <tr>
-                                    <td>{{ row.student.full_name }}</td>
+                                <tr {% if row.submitted %}role="button" data-bs-toggle="modal" data-bs-target="#submissionDetailModal{{ row.student.id }}" style="cursor: pointer;"{% endif %}>
+                                    <td>
+                                        {% if row.submitted %}
+                                            <span class="text-primary fw-semibold">
+                                                {{ row.student.full_name }}
+                                            </span>
+                                        {% else %}
+                                            {{ row.student.full_name }}
+                                        {% endif %}
+                                    </td>
                                     <td>{{ row.email|default:'-' }}</td>
                                     <td>
                                         {% if row.submitted_at %}
@@ -135,6 +144,70 @@
             </div>
         </div>
     </div>
+
+    {% for row in submission_rows %}
+        {% if row.submitted %}
+        <div class="modal fade" id="submissionDetailModal{{ row.student.id }}" tabindex="-1" aria-labelledby="submissionDetailModalLabel{{ row.student.id }}" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="submissionDetailModalLabel{{ row.student.id }}">
+                            {{ row.student.full_name }} さんの提出内容
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% if row.submission_detail.has_content %}
+                            {% if row.submission_detail.group_evaluations %}
+                            <div class="mb-4">
+                                <h6 class="fw-bold text-warning"><i class="fas fa-layer-group me-2"></i>他グループ評価</h6>
+                                {% for item in row.submission_detail.group_evaluations %}
+                                <div class="border rounded p-2 mb-2">
+                                    <div><strong>{{ item.rank }}位:</strong> {{ item.target_name }}</div>
+                                    {% if item.reason %}
+                                    <div class="small text-muted mt-1">{{ item.reason }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% if row.submission_detail.member_evaluations %}
+                            <div class="mb-4">
+                                <h6 class="fw-bold text-success"><i class="fas fa-user-friends me-2"></i>チームメンバー評価</h6>
+                                {% for item in row.submission_detail.member_evaluations %}
+                                <div class="border rounded p-2 mb-2">
+                                    <div><strong>{{ item.rank }}位:</strong> {{ item.target_name }}</div>
+                                    {% if item.reason %}
+                                    <div class="small text-muted mt-1">{{ item.reason }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% if row.submission_detail.general_comment %}
+                            <div class="mb-3">
+                                <h6 class="fw-bold text-info"><i class="fas fa-comment me-2"></i>コメント</h6>
+                                <p class="mb-0">{{ row.submission_detail.general_comment }}</p>
+                            </div>
+                            {% endif %}
+
+                            {% if row.submission_detail.class_comment %}
+                            <div class="mb-0">
+                                <h6 class="fw-bold text-secondary"><i class="fas fa-lightbulb me-2"></i>授業の感想</h6>
+                                <p class="mb-0">{{ row.submission_detail.class_comment }}</p>
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            <p class="text-muted mb-0">提出内容の詳細データはありません。</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    {% endfor %}
 
     <!-- グループランキング -->
     <div class="row">

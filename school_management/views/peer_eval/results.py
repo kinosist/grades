@@ -3,6 +3,46 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from ...models import LessonSession, PeerEvaluationSettings
 
+
+def _safe_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_submission_detail(evaluation, group_name_map, student_name_map):
+    response = evaluation.response_json or {}
+    group_evaluations = []
+    for entry in response.get('other_group_eval', []):
+        group_id = _safe_int(entry.get('group_id'))
+        group_evaluations.append({
+            'rank': entry.get('rank'),
+            'target_name': group_name_map.get(group_id, f'グループID:{group_id}' if group_id else '不明'),
+            'reason': (entry.get('reason') or '').strip(),
+        })
+
+    member_evaluations = []
+    for entry in response.get('group_members_eval', []):
+        member_id = _safe_int(entry.get('member_id'))
+        member_evaluations.append({
+            'rank': entry.get('rank'),
+            'target_name': student_name_map.get(member_id, f'学生ID:{member_id}' if member_id else '不明'),
+            'reason': (entry.get('reason') or '').strip(),
+        })
+
+    general_comment = (evaluation.general_comment or '').strip()
+    class_comment = (evaluation.class_comment or '').strip()
+
+    return {
+        'group_evaluations': group_evaluations,
+        'member_evaluations': member_evaluations,
+        'general_comment': general_comment,
+        'class_comment': class_comment,
+        'has_content': bool(group_evaluations or member_evaluations or general_comment or class_comment),
+    }
+
+
 @login_required
 def peer_evaluation_list_view(request, session_id):
     """ピア評価一覧"""
@@ -81,6 +121,8 @@ def peer_evaluation_results_view(request, session_id):
             submission_map[submission.student_id] = submission
 
     enrolled_students = list(session.classroom.students.filter(role='student').order_by('full_name'))
+    group_name_map = {group.id: group.display_name for group in groups}
+    student_name_map = {student.id: student.full_name for student in enrolled_students}
     submission_rows = []
     submitted_count = 0
     for enrolled_student in enrolled_students:
@@ -93,6 +135,7 @@ def peer_evaluation_results_view(request, session_id):
             'email': enrolled_student.email,
             'submitted': submitted,
             'submitted_at': submission.created_at if submission else None,
+            'submission_detail': _build_submission_detail(submission, group_name_map, student_name_map) if submission else None,
         })
 
     total_students = len(enrolled_students)

@@ -94,7 +94,7 @@
                     <div id="member-settings" style="{% if not pe_settings or not pe_settings.enable_member_evaluation %}display:none{% endif %}">
                         <div class="settings-section">
                             <h6 class="fw-bold mb-3">配点設定</h6>
-                            <p class="text-muted small">順位ごとの加点を設定します。順位数は配点の行数で決まります。</p>
+                            <p class="text-muted small">順位ごとの加点を設定します。評価対象とする順位数は配点の行数で決まります。</p>
                             <div id="member-scores-container">
                                 <!-- JSで動的生成 -->
                             </div>
@@ -121,7 +121,7 @@
                             </select>
                             <div class="mt-2 small text-muted">
                                 <strong>直接付与:</strong> 各評価者の順位がそのまま点数に反映されます。<br>
-                                <strong>集計して付与:</strong> 締め切り時に全評価を集計し、内部ポイント(G-N)でソートして上位から加点します。
+                                <strong>集計して付与:</strong> 締め切り時に全評価を集計し、最も評価が高い順に加点を行います。
                             </div>
                         </div>
                     </div>
@@ -144,7 +144,7 @@
                     <div id="group-settings" style="{% if not pe_settings or not pe_settings.enable_group_evaluation %}display:none{% endif %}">
                         <div class="settings-section">
                             <h6 class="fw-bold mb-3">配点設定</h6>
-                            <p class="text-muted small">順位ごとの加点を設定します。順位数は配点の行数で決まります。</p>
+                            <p class="text-muted small">順位ごとの加点を設定します。評価対象とする順位数は配点の行数で決まります。</p>
                             <div id="group-scores-container">
                                 <!-- JSで動的生成 -->
                             </div>
@@ -171,7 +171,7 @@
                             </select>
                             <div class="mt-2 small text-muted">
                                 <strong>直接付与:</strong> 各評価回答の順位配点をそのまま加算します。<br>
-                                <strong>集計して付与:</strong> 締切時に内部ポイント(G-N)でランキング集計し、上位から配点を付与します（同点は同順位加点）。
+                                <strong>集計して付与:</strong> 締め切り時に全評価を集計し、最も評価が高い順に加点を行います。
                             </div>
                         </div>
                     </div>

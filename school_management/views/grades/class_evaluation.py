@@ -17,6 +17,62 @@ from ...models import (
 
 logger = logging.getLogger(__name__)
 
+
+def _safe_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_group_vote_point_map(session_groups, session_peer_evals, pe_settings, peer_status):
+    group_point_map = {group_obj.id: 0 for group_obj in session_groups}
+    if not pe_settings or not pe_settings.enable_group_evaluation:
+        return group_point_map
+
+    score_points = pe_settings.group_scores or []
+    if not score_points:
+        return group_point_map
+
+    if pe_settings.group_evaluation_method == PeerEvaluationSettings.EvaluationMethod.AGGREGATE:
+        if peer_status != LessonSession.PeerEvaluationStatus.CLOSED:
+            return group_point_map
+
+        group_internal_points = {group_obj.id: 0 for group_obj in session_groups}
+        group_count = len(session_groups)
+        for pe in session_peer_evals:
+            response = pe.response_json or {}
+            for entry in response.get('other_group_eval', []):
+                gid = _safe_int(entry.get('group_id'))
+                rank = _safe_int(entry.get('rank'))
+                if gid in group_internal_points and rank and 1 <= rank <= group_count:
+                    group_internal_points[gid] += (group_count - rank)
+
+        sorted_groups = sorted(
+            group_internal_points.items(),
+            key=lambda x: x[1],
+            reverse=True,
+        )
+        current_rank = 0
+        prev_points = None
+        for idx, (gid, internal_points) in enumerate(sorted_groups):
+            if internal_points != prev_points:
+                current_rank = idx
+                prev_points = internal_points
+            if current_rank < len(score_points):
+                group_point_map[gid] = score_points[current_rank]
+        return group_point_map
+
+    for pe in session_peer_evals:
+        response = pe.response_json or {}
+        for entry in response.get('other_group_eval', []):
+            gid = _safe_int(entry.get('group_id'))
+            rank = _safe_int(entry.get('rank'))
+            if gid in group_point_map and rank and 1 <= rank <= len(score_points):
+                group_point_map[gid] += score_points[rank - 1]
+    return group_point_map
+
+
 @login_required
 def class_evaluation_view(request, class_id):
     """
@@ -110,16 +166,14 @@ def class_evaluation_view(request, class_id):
                         ) if pe_settings and pe_settings.enable_group_evaluation else []
 
                         if score_points:
-                            session_groups = Group.objects.filter(lesson_session=session)
-                            group_point_map = {g.id: 0 for g in session_groups}
                             session_evals = PeerEvaluation.objects.filter(lesson_session=session)
-                            for pe in session_evals:
-                                response = pe.response_json or {}
-                                for entry in response.get('other_group_eval', []):
-                                    gid = entry.get('group_id')
-                                    rank = entry.get('rank')
-                                    if gid in group_point_map and rank and 1 <= rank <= len(score_points):
-                                        group_point_map[gid] += score_points[rank - 1]
+                            session_groups = list(Group.objects.filter(lesson_session=session))
+                            group_point_map = _build_group_vote_point_map(
+                                session_groups=session_groups,
+                                session_peer_evals=session_evals,
+                                pe_settings=pe_settings,
+                                peer_status=session.peer_evaluation_status,
+                            )
 
                             vote_score = group_point_map.get(group.id, 0)
 

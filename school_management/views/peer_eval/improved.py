@@ -771,10 +771,17 @@ def peer_evaluation_results(request, session_id):
             aggregate_group_scores[gid] = group_score_list[current_rank] if current_rank < len(group_score_list) else 0
     
     group_stats = {}
+    is_group_aggregate_mode = (
+        pe_settings
+        and pe_settings.enable_group_evaluation
+        and pe_settings.group_evaluation_method == PeerEvaluationSettings.EvaluationMethod.AGGREGATE
+    )
     for group in groups:
         votes = group_vote_counts.get(group.id, {})
         if aggregate_group_scores:
             total_score = aggregate_group_scores.get(group.id, 0)
+        elif is_group_aggregate_mode:
+            total_score = 0
         else:
             total_score = 0
             for rank, count in votes.items():

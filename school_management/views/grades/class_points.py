@@ -1,13 +1,12 @@
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST
-from django.contrib import messages
-from django.db.models import Sum
 
 from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPoints, SelfEvaluation, QuizScore, \
-    ContributionEvaluation, GroupMember, PeerEvaluation, LessonSession, Group, PeerEvaluationSettings
+    ContributionEvaluation, GroupMember, PeerEvaluation, PeerEvaluationSettings
 
 
 @login_required

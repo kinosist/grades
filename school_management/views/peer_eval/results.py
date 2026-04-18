@@ -1,7 +1,9 @@
 from collections import defaultdict
-from django.shortcuts import render, get_object_or_404
+
 from django.contrib.auth.decorators import login_required
-from ...models import LessonSession, PeerEvaluationSettings
+from django.shortcuts import render, get_object_or_404
+
+from ...models import LessonSession
 
 
 def _safe_int(value):

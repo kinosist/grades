@@ -1,18 +1,19 @@
-import uuid
 import json
 import secrets
+import uuid
 from datetime import timedelta
 from urllib import parse, request as urllib_request, error as urllib_error
-from django.shortcuts import render, redirect, get_object_or_404
+
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core import signing
 from django.core.signing import BadSignature, SignatureExpired
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
 from django.db import IntegrityError
-from django.db.models import Q
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
+
 from ...models import (
     LessonSession,
     Group,

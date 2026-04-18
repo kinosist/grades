@@ -73,10 +73,12 @@
         <div class="col-md-3">
             <div class="card text-center">
                 <div class="card-body">
-                    {% if lesson_session.peer_evaluation_closed %}
+                    {% if lesson_session.peer_evaluation_status == 'CLOSED' %}
                         <h3 class="text-danger">締切済み</h3>
-                    {% else %}
+                    {% elif lesson_session.peer_evaluation_status == 'OPEN' %}
                         <h3 class="text-success">受付中</h3>
+                    {% else %}
+                        <h3 class="text-secondary">受付前</h3>
                     {% endif %}
                     <p class="mb-0">評価状態</p>
                 </div>
@@ -137,10 +139,16 @@
     <!-- グループランキング -->
     <div class="row">
         <div class="col-lg-8">
-            <div class="card">
+                <div class="card">
                 <div class="card-header">
                     <h5><i class="fas fa-trophy me-2"></i>グループランキング</h5>
-                    <small class="text-muted">1位票×2点 + 2位票×1点で計算</small>
+                    {% if group_rank_headers %}
+                    <small class="text-muted">
+                        {% for item in group_rank_headers %}
+                            {{ item.rank }}位票×{{ item.points }}点{% if not forloop.last %} + {% endif %}
+                        {% endfor %}
+                    </small>
+                    {% endif %}
                 </div>
                 <div class="card-body p-0">
                     {% if group_stats %}
@@ -150,8 +158,9 @@
                                 <tr>
                                     <th>順位</th>
                                     <th>グループ</th>
-                                    <th class="text-center">1位票</th>
-                                    <th class="text-center">2位票</th>
+                                    {% for item in group_rank_headers %}
+                                    <th class="text-center">{{ item.rank }}位票</th>
+                                    {% endfor %}
                                     <th class="text-center">スコア</th>
                                     <th class="text-center">評価提出</th>
                                 </tr>
@@ -179,20 +188,15 @@
                                             {% endif %}
                                         </strong>
                                     </td>
+                                    {% for vote_count in stat.votes_by_rank_list %}
                                     <td class="text-center">
-                                        {% if stat.first_place_votes > 0 %}
-                                            <span class="badge bg-warning">{{ stat.first_place_votes }}</span>
+                                        {% if vote_count > 0 %}
+                                            <span class="badge bg-primary">{{ vote_count }}</span>
                                         {% else %}
                                             <span class="text-muted">0</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-center">
-                                        {% if stat.second_place_votes > 0 %}
-                                            <span class="badge bg-secondary">{{ stat.second_place_votes }}</span>
-                                        {% else %}
-                                            <span class="text-muted">0</span>
-                                        {% endif %}
-                                    </td>
+                                    {% endfor %}
                                     <td class="text-center">
                                         <strong class="text-primary">{{ stat.score }}</strong>
                                     </td>
@@ -224,8 +228,8 @@
                     <h6><i class="fas fa-comments me-2"></i>評価コメント</h6>
                 </div>
                 <div class="card-body" style="max-height: 600px; overflow-y: auto;">
-                    {% for evaluation in evaluations %}
-                        {% if evaluation.first_place_reason or evaluation.second_place_reason or evaluation.general_comment %}
+                    {% for row in comment_rows %}
+                        {% with evaluation=row.evaluation %}
                         <div class="mb-3 border-bottom pb-2">
                             <small class="text-muted">
                                 評価者: 
@@ -236,19 +240,19 @@
                                 {% endif %}
                             </small>
                             
-                            {% if evaluation.first_place_reason %}
+                            {% for item in row.group_reasons %}
                             <div class="mt-1">
-                                <strong class="text-warning">1位理由:</strong>
-                                <p class="small mb-1">{{ evaluation.first_place_reason }}</p>
+                                <strong class="text-warning">{{ item.rank }}位グループ理由:</strong>
+                                <p class="small mb-1">{{ item.reason }}</p>
                             </div>
-                            {% endif %}
-                            
-                            {% if evaluation.second_place_reason %}
+                            {% endfor %}
+
+                            {% for item in row.member_reasons %}
                             <div class="mt-1">
-                                <strong class="text-secondary">2位理由:</strong>
-                                <p class="small mb-1">{{ evaluation.second_place_reason }}</p>
+                                <strong class="text-success">{{ item.rank }}位メンバー理由:</strong>
+                                <p class="small mb-1">{{ item.reason }}</p>
                             </div>
-                            {% endif %}
+                            {% endfor %}
                             
                             {% if evaluation.general_comment %}
                             <div class="mt-1">
@@ -257,7 +261,7 @@
                             </div>
                             {% endif %}
                         </div>
-                        {% endif %}
+                        {% endwith %}
                     {% empty %}
                         <p class="text-muted">コメントがありません。</p>
                     {% endfor %}

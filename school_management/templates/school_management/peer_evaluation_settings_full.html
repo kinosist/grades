@@ -1,120 +1,128 @@
 {% extends 'school_management/base.html' %}
 
-{% block title %}ピア評価設定 - 学校管理システム{% endblock %}
-{% block page_title %}
-    ピア評価管理設定
-{% endblock %}
+{% block title %}ピア評価設定 - {{ lesson_session }}{% endblock %}
+{% block page_title %}ピア評価設定 - {{ lesson_session }}{% endblock %}
 
 {% block breadcrumbs %}
 <li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
-<li class="breadcrumb-item"><a href="{% url 'school_management:session_detail' lesson_session.id %}">{{ lesson_session.classroom.class_name }} 第{{ lesson_session.session_number }}回</a></li>
-<li class="breadcrumb-item active" aria-current="page">ピア評価設定</li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' lesson_session.classroom.id %}">{{ lesson_session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:session_detail' lesson_session.id %}">第{{ lesson_session.session_number }}回</a></li>
+<li class="breadcrumb-item active">ピア評価設定</li>
 {% endblock %}
 
 {% block extra_css %}
 <style>
-    .score-input-group {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        margin-bottom: 10px;
-    }
-    .score-input-group input {
-        width: 100px;
-    }
-    .rank-label {
-        min-width: 60px;
-        font-weight: bold;
-        color: #0d6efd;
-    }
+    .score-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .score-row .rank-label { min-width: 50px; font-weight: bold; }
+    .score-row input { max-width: 100px; }
+    .score-row .btn-remove { padding: 0.25rem 0.5rem; }
+    .settings-section { border-left: 4px solid #0d6efd; padding-left: 1rem; margin-bottom: 1.5rem; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-lg-10 mx-auto">
-        <form method="post">
-            {% csrf_token %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
 
+        {% if lesson_session.peer_evaluation_status != 'NOT_OPEN' %}
+        <div class="alert alert-warning">
+            <i class="fas fa-lock me-2"></i>受付開始済みのため、設定は変更できません。
+        </div>
+        {% else %}
+
+        <!-- テンプレートコピー -->
+        {% if template_sessions %}
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-copy me-2"></i>既存の授業回から設定をコピー</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="copy_template">
+                    <div class="input-group">
+                        <select name="source_session_id" class="form-select">
+                            {% for ts in template_sessions %}
+                            <option value="{{ ts.id }}">第{{ ts.session_number }}回 ({{ ts.date|date:"Y/m/d" }}) {{ ts.topic }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-info text-white">
+                            <i class="fas fa-copy me-1"></i>コピー
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- メイン設定フォーム -->
+        <form method="post" id="settingsForm">
+            {% csrf_token %}
+            
             <!-- 一般設定 -->
             <div class="card mb-4">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0"><i class="fas fa-cog me-2"></i>一般設定</h5>
-                </div>
+                <div class="card-header"><h5 class="mb-0"><i class="fas fa-sliders-h me-2"></i>一般設定</h5></div>
                 <div class="card-body">
                     <div class="form-check form-switch mb-3">
-                        <input 
-                            class="form-check-input"
-                            type="checkbox"
-                            id="enable_comments"
-                            name="enable_comments"
-                            value="on"
-                            {% if enable_comments %}checked{% endif %}
-                        >
-                        <label class="form-check-label" for="enable_comments">
-                            <strong>コメント機能を有効にする</strong>
-                        </label>
+                        <input class="form-check-input" type="checkbox" id="enable_comments" name="enable_comments" {% if lesson_session.enable_comments %}checked{% endif %}>
+                        <label class="form-check-label" for="enable_comments">コメント機能を有効にする</label>
                     </div>
-                    <small class="text-muted">生徒がグループワークについての感想を記入できます。</small>
-
-                    <hr class="my-4">
-
                     <div class="form-check form-switch mb-3">
-                        <input 
-                            class="form-check-input"
-                            type="checkbox"
-                            id="enable_feedback"
-                            name="enable_feedback"
-                            value="on"
-                            {% if enable_feedback %}checked{% endif %}
-                        >
-                        <label class="form-check-label" for="enable_feedback">
-                            <strong>感想欄を有効にする</strong>
-                        </label>
+                        <input class="form-check-input" type="checkbox" id="enable_feedback" name="enable_feedback" {% if lesson_session.enable_feedback %}checked{% endif %}>
+                        <label class="form-check-label" for="enable_feedback">授業の感想欄を有効にする</label>
                     </div>
-                    <small class="text-muted">生徒が授業全体の感想を記入できます。</small>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="show_points" name="show_points" {% if pe_settings.show_points or not pe_settings %}checked{% endif %}>
+                        <label class="form-check-label" for="show_points">回答ページで配点テーブルを表示する</label>
+                    </div>
                 </div>
             </div>
 
             <!-- メンバー評価設定 -->
             <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>チームメンバー評価設定</h5>
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-medal me-2"></i>グループ内メンバー評価</h5>
                 </div>
                 <div class="card-body">
                     <div class="form-check form-switch mb-3">
-                        <input 
-                            class="form-check-input"
-                            type="checkbox"
-                            id="enable_member_evaluation"
-                            name="enable_member_evaluation"
-                            value="on"
-                            onchange="toggleMemberEvaluation()"
-                            {% if enable_member_evaluation %}checked{% endif %}
-                        >
-                        <label class="form-check-label" for="enable_member_evaluation">
-                            <strong>メンバー評価を有効にする</strong>
-                        </label>
+                        <input class="form-check-input" type="checkbox" id="enable_member_evaluation" name="enable_member_evaluation" 
+                               {% if pe_settings and pe_settings.enable_member_evaluation %}checked{% endif %}
+                               onchange="toggleSection('member-settings', this.checked)">
+                        <label class="form-check-label fw-bold" for="enable_member_evaluation">メンバー評価を有効にする</label>
                     </div>
-
-                    <div id="member_eval_settings" style="{% if not enable_member_evaluation %}display: none;{% endif %}">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">順位の最大数</label>
-                            <input 
-                                type="number" 
-                                class="form-control" 
-                                name="member_ranking_count"
-                                min="1"
-                                max="10"
-                                value="{{ member_ranking_count }}"
-                                onchange="updateMemberScoreInputs()"
-                            >
-                            <small class="text-muted">例：2を設定すると、1位と2位を評価対象にします</small>
+                    
+                    <div id="member-settings" style="{% if not pe_settings or not pe_settings.enable_member_evaluation %}display:none{% endif %}">
+                        <div class="settings-section">
+                            <h6 class="fw-bold mb-3">配点設定</h6>
+                            <p class="text-muted small">順位ごとの加点を設定します。順位数は配点の行数で決まります。</p>
+                            <div id="member-scores-container">
+                                <!-- JSで動的生成 -->
+                            </div>
+                            <button type="button" class="btn btn-outline-success btn-sm mt-2" onclick="addScoreRow('member')">
+                                <i class="fas fa-plus me-1"></i>順位を追加
+                            </button>
                         </div>
-
-                        <label class="form-label fw-bold">配点設定</label>
-                        <div id="member_scores_container">
-                            <!-- JavaScriptで動的生成 -->
+                        
+                        <div class="settings-section">
+                            <h6 class="fw-bold mb-3">理由記入</h6>
+                            <select name="member_reason_control" class="form-select" style="max-width:300px;">
+                                {% for value, label in reason_mode_choices %}
+                                <option value="{{ value }}" {% if pe_settings and pe_settings.member_reason_control == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h6 class="fw-bold mb-3">付与方法</h6>
+                            <select name="evaluation_method" class="form-select" style="max-width:400px;">
+                                {% for value, label in evaluation_method_choices %}
+                                <option value="{{ value }}" {% if pe_settings and pe_settings.evaluation_method == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="mt-2 small text-muted">
+                                <strong>直接付与:</strong> 各評価者の順位がそのまま点数に反映されます。<br>
+                                <strong>集計して付与:</strong> 締め切り時に全評価を集計し、内部ポイント(G-N)でソートして上位から加点します。
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -122,147 +130,138 @@
 
             <!-- グループ評価設定 -->
             <div class="card mb-4">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>グループ評価設定</h5>
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>他グループ評価</h5>
                 </div>
                 <div class="card-body">
                     <div class="form-check form-switch mb-3">
-                        <input 
-                            class="form-check-input"
-                            type="checkbox"
-                            id="enable_group_evaluation"
-                            name="enable_group_evaluation"
-                            value="on"
-                            onchange="toggleGroupEvaluation()"
-                            {% if enable_group_evaluation %}checked{% endif %}
-                        >
-                        <label class="form-check-label" for="enable_group_evaluation">
-                            <strong>グループ評価を有効にする</strong>
-                        </label>
+                        <input class="form-check-input" type="checkbox" id="enable_group_evaluation" name="enable_group_evaluation"
+                               {% if pe_settings and pe_settings.enable_group_evaluation %}checked{% endif %}
+                               onchange="toggleSection('group-settings', this.checked)">
+                        <label class="form-check-label fw-bold" for="enable_group_evaluation">グループ評価を有効にする</label>
                     </div>
-
-                    <div id="group_eval_settings" style="{% if not enable_group_evaluation %}display: none;{% endif %}">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">順位の最大数</label>
-                            <input 
-                                type="number" 
-                                class="form-control" 
-                                name="group_ranking_count"
-                                min="1"
-                                max="10"
-                                value="{{ group_ranking_count }}"
-                                onchange="updateGroupScoreInputs()"
-                            >
-                            <small class="text-muted">例：2を設定すると、1位と2位を評価対象にします</small>
+                    
+                    <div id="group-settings" style="{% if not pe_settings or not pe_settings.enable_group_evaluation %}display:none{% endif %}">
+                        <div class="settings-section">
+                            <h6 class="fw-bold mb-3">配点設定</h6>
+                            <p class="text-muted small">順位ごとの加点を設定します。順位数は配点の行数で決まります。</p>
+                            <div id="group-scores-container">
+                                <!-- JSで動的生成 -->
+                            </div>
+                            <button type="button" class="btn btn-outline-warning btn-sm mt-2" onclick="addScoreRow('group')">
+                                <i class="fas fa-plus me-1"></i>順位を追加
+                            </button>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h6 class="fw-bold mb-3">理由記入</h6>
+                            <select name="group_reason_control" class="form-select" style="max-width:300px;">
+                                {% for value, label in reason_mode_choices %}
+                                <option value="{{ value }}" {% if pe_settings and pe_settings.group_reason_control == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
 
-                        <label class="form-label fw-bold">配点設定</label>
-                        <div id="group_scores_container">
-                            <!-- JavaScriptで動的生成 -->
+                        <div class="settings-section">
+                            <h6 class="fw-bold mb-3">付与方法</h6>
+                            <select name="group_evaluation_method" class="form-select" style="max-width:400px;">
+                                {% for value, label in evaluation_method_choices %}
+                                <option value="{{ value }}" {% if pe_settings and pe_settings.group_evaluation_method == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="mt-2 small text-muted">
+                                <strong>直接付与:</strong> 各評価回答の順位配点をそのまま加算します。<br>
+                                <strong>集計して付与:</strong> 締切時に内部ポイント(G-N)でランキング集計し、上位から配点を付与します（同点は同順位加点）。
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- ボタン -->
-            <div class="d-flex gap-2 mb-4">
-                <button type="submit" class="btn btn-primary btn-lg">
+            <!-- hidden fields for JSON -->
+            <input type="hidden" name="member_scores_json" id="member_scores_json">
+            <input type="hidden" name="group_scores_json" id="group_scores_json">
+
+            <div class="text-center mb-4">
+                <button type="submit" class="btn btn-primary btn-lg" onclick="prepareSubmit()">
                     <i class="fas fa-save me-2"></i>設定を保存
                 </button>
-                <a href="{% url 'school_management:session_detail' lesson_session.id %}" class="btn btn-outline-secondary btn-lg">
-                    <i class="fas fa-arrow-left me-2"></i>キャンセル
+                <a href="{% url 'school_management:session_detail' lesson_session.id %}" class="btn btn-outline-secondary btn-lg ms-2">
+                    キャンセル
                 </a>
             </div>
-
-            <!-- 注記 -->
-            <div class="alert alert-warning" role="alert">
-                <i class="fas fa-lightbulb me-2"></i>
-                <strong>設定後の流れ：</strong>
-                <ol class="mb-0 mt-2">
-                    <li>生徒が学生共有リンクからピア評価フォームにアクセス</li>
-                    <li>このページで設定した内容が動的に表示される</li>
-                    <li>生徒が評価と記入を完了して提出</li>
-                    <li>成績に自動的に反映される</li>
-                </ol>
-            </div>
         </form>
+        {% endif %}
     </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-    const memberScoresData = {{ member_scores_json|safe }};
-    const groupScoresData = {{ group_scores_json|safe }};
+const initialMemberScores = {{ pe_settings.member_scores|default:"[]"|safe }};
+const initialGroupScores = {{ pe_settings.group_scores|default:"[]"|safe }};
 
-    function toggleMemberEvaluation() {
-        const enabled = document.getElementById('enable_member_evaluation').checked;
-        document.getElementById('member_eval_settings').style.display = enabled ? 'block' : 'none';
-        if (enabled) {
-            updateMemberScoreInputs();
-        }
-    }
+function toggleSection(id, show) {
+    document.getElementById(id).style.display = show ? '' : 'none';
+}
 
-    function toggleGroupEvaluation() {
-        const enabled = document.getElementById('enable_group_evaluation').checked;
-        document.getElementById('group_eval_settings').style.display = enabled ? 'block' : 'none';
-        if (enabled) {
-            updateGroupScoreInputs();
-        }
-    }
-
-    function updateMemberScoreInputs() {
-        const count = parseInt(document.querySelector('input[name="member_ranking_count"]').value);
-        const container = document.getElementById('member_scores_container');
-        container.innerHTML = '';
-
-        for (let i = 1; i <= count; i++) {
-            const currentScore = memberScoresData[i] || (i === 1 ? 2 : i === 2 ? 1 : 0);
-            const html = `
-                <div class="score-input-group">
-                    <span class="rank-label">${i}位</span>
-                    <input 
-                        type="number" 
-                        class="form-control"
-                        name="member_score_${i}"
-                        value="${currentScore}"
-                        min="0"
-                        max="100"
-                    >
-                    <span>点</span>
-                </div>
-            `;
-            container.innerHTML += html;
-        }
-    }
-
-    function updateGroupScoreInputs() {
-        const count = parseInt(document.querySelector('input[name="group_ranking_count"]').value);
-        const container = document.getElementById('group_scores_container');
-        container.innerHTML = '';
-
-        for (let i = 1; i <= count; i++) {
-            const currentScore = groupScoresData[i] || (i === 1 ? 2 : i === 2 ? 1 : 0);
-            const html = `
-                <div class="score-input-group">
-                    <span class="rank-label">${i}位</span>
-                    <input 
-                        type="number" 
-                        class="form-control"
-                        name="group_score_${i}"
-                        value="${currentScore}"
-                        min="0"
-                        max="100"
-                    >
-                    <span>点</span>
-                </div>
-            `;
-            container.innerHTML += html;
-        }
-    }
-
-    // ページロード時に初期化
-    document.addEventListener('DOMContentLoaded', function() {
-        updateMemberScoreInputs();
-        updateGroupScoreInputs();
+function renderScoreRows(type, scores) {
+    const container = document.getElementById(type + '-scores-container');
+    container.innerHTML = '';
+    scores.forEach((score, idx) => {
+        addScoreRowWithValue(type, idx + 1, score);
     });
+}
+
+function addScoreRow(type) {
+    const container = document.getElementById(type + '-scores-container');
+    const rank = container.children.length + 1;
+    addScoreRowWithValue(type, rank, 0);
+}
+
+function addScoreRowWithValue(type, rank, value) {
+    const container = document.getElementById(type + '-scores-container');
+    const div = document.createElement('div');
+    div.className = 'score-row';
+    div.innerHTML = `
+        <span class="rank-label badge ${rank <= 3 ? (rank === 1 ? 'bg-warning text-dark' : rank === 2 ? 'bg-secondary' : 'bg-dark') : 'bg-light text-dark border'}">${rank}位</span>
+        <input type="number" class="form-control form-control-sm ${type}-score-input" value="${value}" min="0" max="100" placeholder="点数">
+        <span class="text-muted">点</span>
+        <button type="button" class="btn btn-outline-danger btn-sm score-row-remove" onclick="removeScoreRow(this, '${type}')">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    container.appendChild(div);
+}
+
+function removeScoreRow(btn, type) {
+    btn.closest('.score-row').remove();
+    // Re-number ranks
+    const container = document.getElementById(type + '-scores-container');
+    Array.from(container.children).forEach((row, idx) => {
+        const rank = idx + 1;
+        row.querySelector('.rank-label').textContent = rank + '位';
+    });
+}
+
+function collectScores(type) {
+    const inputs = document.querySelectorAll('.' + type + '-score-input');
+    return Array.from(inputs).map(input => parseInt(input.value) || 0);
+}
+
+function prepareSubmit() {
+    document.getElementById('member_scores_json').value = JSON.stringify(collectScores('member'));
+    document.getElementById('group_scores_json').value = JSON.stringify(collectScores('group'));
+}
+
+document.getElementById('settingsForm').addEventListener('submit', function(e) {
+    prepareSubmit();
+});
+
+// 初期化
+document.addEventListener('DOMContentLoaded', function() {
+    renderScoreRows('member', initialMemberScores.length ? initialMemberScores : []);
+    renderScoreRows('group', initialGroupScores.length ? initialGroupScores : []);
+});
 </script>
 {% endblock %}

@@ -4,10 +4,10 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.contrib import messages
-from django.db.models import Sum, Q
+from django.db.models import Sum
 
 from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPoints, SelfEvaluation, QuizScore, \
-    ContributionEvaluation, GroupMember, PeerEvaluation, LessonSession, Group
+    ContributionEvaluation, GroupMember, PeerEvaluation, LessonSession, Group, PeerEvaluationSettings
 
 
 @login_required
@@ -129,30 +129,26 @@ def class_points_view(request, class_id):
         # そのセッションの投票を抽出
         session_peer_evals = [pe for pe in all_peer_evals if pe.lesson_session_id == sess_id]
 
-        # グループごとの投票スコアを計算
-        group_scores = {}
-        for group_obj in session_groups:
-            first_votes = sum(
-                1 for pe in session_peer_evals
-                if (pe.first_place_group_id == group_obj.id or
-                    pe.first_place_group_number == group_obj.group_number)
-            )
-            second_votes = sum(
-                1 for pe in session_peer_evals
-                if (pe.second_place_group_id == group_obj.id or
-                    pe.second_place_group_number == group_obj.group_number)
-            )
-            score = (first_votes * 2) + (second_votes * 1)
-            group_scores[group_obj.id] = score
+        # グループごとの投票スコアを計算（response_json + 設定配点）
+        try:
+            pe_settings = sess.peer_evaluation_settings
+        except PeerEvaluationSettings.DoesNotExist:
+            pe_settings = None
 
-        # ユニークなスコアを取得し、上位2つを特定
-        unique_scores = sorted(list(set(group_scores.values())), reverse=True)
-        top_2_scores = set(unique_scores[:2]) if len(unique_scores) >= 2 else set(unique_scores)
+        group_scores = {group_obj.id: 0 for group_obj in session_groups}
+        score_points = (pe_settings.group_scores or []) if pe_settings and pe_settings.enable_group_evaluation else []
+        if score_points:
+            for pe in session_peer_evals:
+                response = pe.response_json or {}
+                for entry in response.get('other_group_eval', []):
+                    gid = entry.get('group_id')
+                    rank = entry.get('rank')
+                    if gid in group_scores and rank and 1 <= rank <= len(score_points):
+                        group_scores[gid] += score_points[rank - 1]
 
         # キャッシュに保存
         session_rankings_cache[sess_id] = {
             'group_scores': group_scores,
-            'top_2_scores': top_2_scores
         }
 
     # ===== 各学生のクラス内成績を取得 =====
@@ -217,10 +213,7 @@ def class_points_view(request, class_id):
             if sess_id in session_rankings_cache:
                 ranking_info = session_rankings_cache[sess_id]
                 my_score = ranking_info['group_scores'].get(group.id, 0)
-                top_2_scores = ranking_info['top_2_scores']
-
-                # 上位2位のみポイント付付与
-                vote_points = my_score if (my_score > 0 and my_score in top_2_scores) else 0
+                vote_points = my_score
 
                 # 表示用に記録
                 if vote_points > 0 or my_score > 0:

@@ -107,7 +107,7 @@ urlpatterns = [
     path('sessions/<int:session_id>/peer-evaluation/', peer_eval.peer_evaluation_list_view, name='peer_evaluation_list'),
     path('sessions/<int:session_id>/peer-evaluation/create/', peer_eval.peer_evaluation_create_view, name='peer_evaluation_create'),
     path('sessions/<int:session_id>/peer-evaluation/link/', peer_eval.peer_evaluation_link_view, name='peer_evaluation_link'),
-    path('sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results_view, name='peer_evaluation_results'),
+    path('sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results_view, name='peer_evaluation_results_legacy'),
 
     # 回答フォーム（公開・学生用）
     path('peer-evaluation/<str:token>/', peer_eval.peer_evaluation_form_view, name='peer_evaluation_form'),

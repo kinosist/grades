@@ -801,8 +801,9 @@ def peer_evaluation_results(request, session_id):
         else:
             total_score = 0
             for rank, count in votes.items():
-                if rank - 1 < len(group_score_list):
-                    total_score += group_score_list[rank - 1] * count
+                normalized_rank = _safe_int(rank)
+                if normalized_rank and 1 <= normalized_rank <= len(group_score_list):
+                    total_score += group_score_list[normalized_rank - 1] * count
         votes_by_rank_list = [votes.get(idx + 1, 0) for idx in range(len(group_score_list))]
         
         evaluations_given = evaluations.filter(evaluator_group=group).count()

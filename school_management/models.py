@@ -838,65 +838,92 @@ class StudentClassPoints(models.Model):
 
     def _calculate_group_vote_points(self):
         """response_jsonベースでグループ投票ポイントを計算"""
-        vote_total = 0
-        student_groups = GroupMember.objects.filter(
+        student_groups = list(GroupMember.objects.filter(
             student=self.student,
             group__lesson_session__classroom=self.classroom
-        )
+        ).select_related('group__lesson_session'))
+        if not student_groups:
+            return 0
+
+        session_settings = {}
+        target_session_ids = set()
         for membership in student_groups:
-            group = membership.group
-            session = group.lesson_session
-            
-            # 設定を取得
+            session = membership.group.lesson_session
+            if session.id in session_settings:
+                continue
             try:
                 pe_settings = session.peer_evaluation_settings
             except PeerEvaluationSettings.DoesNotExist:
+                session_settings[session.id] = None
                 continue
-            
-            if not pe_settings.enable_group_evaluation:
-                continue
-            
+
             score_points = pe_settings.group_scores or []
-            if not score_points:
+            if not pe_settings.enable_group_evaluation or not score_points:
+                session_settings[session.id] = None
                 continue
 
-            session_groups = list(Group.objects.filter(lesson_session=session))
-            evals = PeerEvaluation.objects.filter(lesson_session=session)
+            session_settings[session.id] = {
+                'method': pe_settings.group_evaluation_method,
+                'score_points': score_points,
+                'peer_status': session.peer_evaluation_status,
+            }
+            target_session_ids.add(session.id)
 
-            if pe_settings.group_evaluation_method == PeerEvaluationSettings.EvaluationMethod.AGGREGATE:
-                if session.peer_evaluation_status != LessonSession.PeerEvaluationStatus.CLOSED:
-                    continue
+        if not target_session_ids:
+            return 0
 
-                # 締切時に内部ポイント(G-N)で集計し、順位配点を付与
-                group_internal_points = {g.id: 0 for g in session_groups}
-                group_count = len(session_groups)
-                for ev in evals:
-                    response = ev.response_json or {}
-                    for entry in response.get('other_group_eval', []):
-                        gid = entry.get('group_id')
-                        rank = entry.get('rank')
-                        if gid in group_internal_points and rank and 1 <= rank <= group_count:
-                            group_internal_points[gid] += (group_count - rank)
+        session_groups = {}
+        for group in Group.objects.filter(lesson_session_id__in=target_session_ids).values('id', 'lesson_session_id'):
+            session_groups.setdefault(group['lesson_session_id'], []).append(group['id'])
 
-                sorted_groups = sorted(
-                    group_internal_points.items(),
-                    key=lambda x: x[1],
-                    reverse=True,
-                )
-                group_point_map = {g.id: 0 for g in session_groups}
-                current_rank = 0
-                prev_points = None
-                for idx, (gid, internal_points) in enumerate(sorted_groups):
-                    if internal_points != prev_points:
-                        current_rank = idx
-                        prev_points = internal_points
-                    if current_rank < len(score_points):
-                        group_point_map[gid] = score_points[current_rank]
+        session_eval_responses = {}
+        eval_rows = PeerEvaluation.objects.filter(
+            lesson_session_id__in=target_session_ids
+        ).values_list('lesson_session_id', 'response_json')
+        for session_id, response_json in eval_rows:
+            session_eval_responses.setdefault(session_id, []).append(response_json or {})
+
+        session_group_point_maps = {}
+        for session_id in target_session_ids:
+            settings = session_settings.get(session_id)
+            group_ids = session_groups.get(session_id, [])
+            group_point_map = {group_id: 0 for group_id in group_ids}
+
+            if not settings or not group_ids:
+                session_group_point_maps[session_id] = group_point_map
+                continue
+
+            score_points = settings['score_points']
+            eval_responses = session_eval_responses.get(session_id, [])
+
+            if settings['method'] == PeerEvaluationSettings.EvaluationMethod.AGGREGATE:
+                if settings['peer_status'] == LessonSession.PeerEvaluationStatus.CLOSED:
+                    # 締切時に内部ポイント(G-N)で集計し、順位配点を付与
+                    group_internal_points = {group_id: 0 for group_id in group_ids}
+                    group_count = len(group_ids)
+                    for response in eval_responses:
+                        for entry in response.get('other_group_eval', []):
+                            gid = entry.get('group_id')
+                            rank = entry.get('rank')
+                            if gid in group_internal_points and rank and 1 <= rank <= group_count:
+                                group_internal_points[gid] += (group_count - rank)
+
+                    sorted_groups = sorted(
+                        group_internal_points.items(),
+                        key=lambda x: x[1],
+                        reverse=True,
+                    )
+                    current_rank = 0
+                    prev_points = None
+                    for idx, (gid, internal_points) in enumerate(sorted_groups):
+                        if internal_points != prev_points:
+                            current_rank = idx
+                            prev_points = internal_points
+                        if current_rank < len(score_points):
+                            group_point_map[gid] = score_points[current_rank]
             else:
                 # 直接付与: 各回答の順位配点をそのまま加算
-                group_point_map = {g.id: 0 for g in session_groups}
-                for ev in evals:
-                    response = ev.response_json or {}
+                for response in eval_responses:
                     for entry in response.get('other_group_eval', []):
                         gid = entry.get('group_id')
                         rank = entry.get('rank')
@@ -904,6 +931,12 @@ class StudentClassPoints(models.Model):
                             if gid in group_point_map:
                                 group_point_map[gid] += score_points[rank - 1]
 
+            session_group_point_maps[session_id] = group_point_map
+
+        vote_total = 0
+        for membership in student_groups:
+            group = membership.group
+            group_point_map = session_group_point_maps.get(group.lesson_session_id, {})
             my_points = group_point_map.get(group.id, 0)
             if my_points > 0:
                 vote_total += my_points

@@ -219,12 +219,19 @@ function addScoreRow(type) {
     addScoreRowWithValue(type, rank, 0);
 }
 
+function getRankBadgeClass(rank) {
+    if (rank === 1) return 'bg-warning text-dark';
+    if (rank === 2) return 'bg-secondary';
+    if (rank === 3) return 'bg-dark';
+    return 'bg-light text-dark border';
+}
+
 function addScoreRowWithValue(type, rank, value) {
     const container = document.getElementById(type + '-scores-container');
     const div = document.createElement('div');
     div.className = 'score-row';
     div.innerHTML = `
-        <span class="rank-label badge ${rank <= 3 ? (rank === 1 ? 'bg-warning text-dark' : rank === 2 ? 'bg-secondary' : 'bg-dark') : 'bg-light text-dark border'}">${rank}位</span>
+        <span class="rank-label badge ${getRankBadgeClass(rank)}">${rank}位</span>
         <input type="number" class="form-control form-control-sm ${type}-score-input" value="${value}" min="0" max="100" placeholder="点数">
         <span class="text-muted">点</span>
         <button type="button" class="btn btn-outline-danger btn-sm score-row-remove" onclick="removeScoreRow(this, '${type}')">
@@ -240,7 +247,9 @@ function removeScoreRow(btn, type) {
     const container = document.getElementById(type + '-scores-container');
     Array.from(container.children).forEach((row, idx) => {
         const rank = idx + 1;
-        row.querySelector('.rank-label').textContent = rank + '位';
+        const rankLabel = row.querySelector('.rank-label');
+        rankLabel.className = 'rank-label badge ' + getRankBadgeClass(rank);
+        rankLabel.textContent = rank + '位';
     });
 }
 

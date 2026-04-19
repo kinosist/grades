@@ -1,4 +1,5 @@
 import hashlib
+import uuid
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from ...models import LessonSession, PeerEvaluation, Student, ContributionEvaluation
@@ -78,6 +79,7 @@ def peer_evaluation_form_view(request, token):
 
             evaluation = PeerEvaluation.objects.create(
                 lesson_session=target_session,
+                evaluator_token=uuid.uuid4(),
                 evaluator_group=evaluator_group_obj,
                 response_json=response_json,
                 general_comment=general_comment

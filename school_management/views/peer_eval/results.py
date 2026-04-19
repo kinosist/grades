@@ -77,9 +77,9 @@ def peer_evaluation_results_view(request, session_id):
     for evaluation in evaluations:
         response = evaluation.response_json or {}
         for entry in response.get('other_group_eval', []):
-            gid = entry.get('group_id')
-            rank = entry.get('rank')
-            if gid and rank:
+            gid = _safe_int(entry.get('group_id'))
+            rank = _safe_int(entry.get('rank'))
+            if gid is not None and rank is not None:
                 group_vote_counts[gid][rank] += 1
         
         # 貢献度評価集計
@@ -102,7 +102,8 @@ def peer_evaluation_results_view(request, session_id):
         votes = group_vote_counts.get(group.id, {})
         total_score = 0
         for rank, count in votes.items():
-            if rank - 1 < len(group_score_list):
+            rank = _safe_int(rank)
+            if rank is not None and 1 <= rank <= len(group_score_list):
                 total_score += group_score_list[rank - 1] * count
         
         evaluations_given = evaluations.filter(evaluator_group=group).count()

@@ -768,9 +768,9 @@ def peer_evaluation_results(request, session_id):
         for ev in evaluations:
             response = ev.response_json or {}
             for entry in response.get('other_group_eval', []):
-                gid = entry.get('group_id')
-                rank = entry.get('rank')
-                if gid in aggregate_internal_points and rank and 1 <= rank <= group_count:
+                gid = _safe_int(entry.get('group_id'))
+                rank = _safe_int(entry.get('rank'))
+                if gid in aggregate_internal_points and rank is not None and 1 <= rank <= group_count:
                     aggregate_internal_points[gid] += (group_count - rank)
 
         sorted_groups_internal = sorted(

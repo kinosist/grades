@@ -683,10 +683,11 @@ def _aggregate_member_scores(lesson_session, pe_settings):
         for ev in group_evals:
             response = ev.response_json or {}
             for entry in response.get('group_members_eval', []):
-                member_id = entry.get('member_id')
-                rank = entry.get('rank')
-                if member_id and rank:
-                    internal_points[member_id] += (G - rank)
+                member_id = _safe_int(entry.get('member_id'))
+                rank = _safe_int(entry.get('rank'))
+                if member_id is None or rank is None:
+                    continue
+                internal_points[member_id] += (G - rank)
         
         # ポイント降順でソート
         sorted_members = sorted(internal_points.items(), key=lambda x: x[1], reverse=True)
@@ -768,9 +769,9 @@ def peer_evaluation_results(request, session_id):
         for ev in evaluations:
             response = ev.response_json or {}
             for entry in response.get('other_group_eval', []):
-                gid = entry.get('group_id')
-                rank = entry.get('rank')
-                if gid in aggregate_internal_points and rank and 1 <= rank <= group_count:
+                gid = _safe_int(entry.get('group_id'))
+                rank = _safe_int(entry.get('rank'))
+                if gid in aggregate_internal_points and rank is not None and 1 <= rank <= group_count:
                     aggregate_internal_points[gid] += (group_count - rank)
 
         sorted_groups_internal = sorted(
@@ -801,8 +802,9 @@ def peer_evaluation_results(request, session_id):
         else:
             total_score = 0
             for rank, count in votes.items():
-                if rank - 1 < len(group_score_list):
-                    total_score += group_score_list[rank - 1] * count
+                normalized_rank = _safe_int(rank)
+                if normalized_rank and 1 <= normalized_rank <= len(group_score_list):
+                    total_score += group_score_list[normalized_rank - 1] * count
         votes_by_rank_list = [votes.get(idx + 1, 0) for idx in range(len(group_score_list))]
         
         evaluations_given = evaluations.filter(evaluator_group=group).count()

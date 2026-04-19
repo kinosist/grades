@@ -325,12 +325,12 @@ class PeerEvaluationSettings(models.Model):
             self.group_reason_control = self.ReasonMode.DISABLED
             self.group_evaluation_method = self.EvaluationMethod.DIRECT
 
-        if not self.pk:
-            return
-
-        old = PeerEvaluationSettings.objects.get(pk=self.pk)
         session_status = self.lesson_session.peer_evaluation_status
         if session_status != LessonSession.PeerEvaluationStatus.NOT_OPEN:
+            if not self.pk:
+                raise ValidationError('受付開始後のピア評価設定は作成できません。')
+
+            old = PeerEvaluationSettings.objects.get(pk=self.pk)
             immutable_fields = (
                 'enable_member_evaluation',
                 'member_scores',

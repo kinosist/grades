@@ -102,7 +102,8 @@ def peer_evaluation_results_view(request, session_id):
         votes = group_vote_counts.get(group.id, {})
         total_score = 0
         for rank, count in votes.items():
-            if rank - 1 < len(group_score_list):
+            rank = _safe_int(rank)
+            if rank is not None and 1 <= rank <= len(group_score_list):
                 total_score += group_score_list[rank - 1] * count
         
         evaluations_given = evaluations.filter(evaluator_group=group).count()

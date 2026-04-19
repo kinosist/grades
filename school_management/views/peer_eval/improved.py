@@ -683,10 +683,11 @@ def _aggregate_member_scores(lesson_session, pe_settings):
         for ev in group_evals:
             response = ev.response_json or {}
             for entry in response.get('group_members_eval', []):
-                member_id = entry.get('member_id')
-                rank = entry.get('rank')
-                if member_id and rank:
-                    internal_points[member_id] += (G - rank)
+                member_id = _safe_int(entry.get('member_id'))
+                rank = _safe_int(entry.get('rank'))
+                if member_id is None or rank is None:
+                    continue
+                internal_points[member_id] += (G - rank)
         
         # ポイント降順でソート
         sorted_members = sorted(internal_points.items(), key=lambda x: x[1], reverse=True)

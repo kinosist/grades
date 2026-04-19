@@ -362,17 +362,27 @@ def peer_evaluation_common_form(request, session_id):
         
         validation_errors = []
         response_json = {'group_members_eval': [], 'other_group_eval': []}
+        allowed_group_ids = {group.id for group in ordered_other_groups}
+        allowed_member_ids = {member['student__id'] for member in evaluator_group_member_objects}
         
         # グループ評価バリデーション
         if pe_settings.enable_group_evaluation:
             selected_group_ids = set()
             for rank_item in group_ranking_list:
                 rank = rank_item['rank']
-                group_id = request.POST.get(f'group_rank_{rank}')
+                raw_group_id = request.POST.get(f'group_rank_{rank}')
                 reason = request.POST.get(f'group_reason_{rank}', '')
                 
-                if not group_id:
+                if not raw_group_id:
                     validation_errors.append(f'❌ グループ評価の{rank}位：グループを選択してください。')
+                    continue
+
+                group_id = _safe_int(raw_group_id)
+                if group_id is None:
+                    validation_errors.append(f'❌ グループ評価の{rank}位：不正なグループIDです。')
+                    continue
+                if group_id not in allowed_group_ids:
+                    validation_errors.append(f'❌ グループ評価の{rank}位：選択できないグループです。')
                     continue
                 
                 if group_id in selected_group_ids:
@@ -383,7 +393,7 @@ def peer_evaluation_common_form(request, session_id):
                 if pe_settings.group_reason_control == 'REQUIRED' and not reason.strip():
                     validation_errors.append(f'❌ グループ評価の{rank}位：理由を入力してください。')
                 
-                entry = {'rank': rank, 'group_id': int(group_id)}
+                entry = {'rank': rank, 'group_id': group_id}
                 if pe_settings.group_reason_control != 'DISABLED':
                     entry['reason'] = reason
                 response_json['other_group_eval'].append(entry)
@@ -393,11 +403,19 @@ def peer_evaluation_common_form(request, session_id):
             selected_member_ids = set()
             for rank_item in member_ranking_list:
                 rank = rank_item['rank']
-                member_id = request.POST.get(f'member_rank_{rank}')
+                raw_member_id = request.POST.get(f'member_rank_{rank}')
                 reason = request.POST.get(f'member_reason_{rank}', '')
                 
-                if not member_id:
+                if not raw_member_id:
                     validation_errors.append(f'❌ チームメンバー評価の{rank}位：メンバーを選択してください。')
+                    continue
+
+                member_id = _safe_int(raw_member_id)
+                if member_id is None:
+                    validation_errors.append(f'❌ チームメンバー評価の{rank}位：不正なメンバーIDです。')
+                    continue
+                if member_id not in allowed_member_ids:
+                    validation_errors.append(f'❌ チームメンバー評価の{rank}位：選択できないメンバーです。')
                     continue
                 
                 if member_id in selected_member_ids:
@@ -408,7 +426,7 @@ def peer_evaluation_common_form(request, session_id):
                 if pe_settings.member_reason_control == 'REQUIRED' and not reason.strip():
                     validation_errors.append(f'❌ チームメンバー評価の{rank}位：理由を入力してください。')
                 
-                entry = {'rank': rank, 'member_id': int(member_id)}
+                entry = {'rank': rank, 'member_id': member_id}
                 if pe_settings.member_reason_control != 'DISABLED':
                     entry['reason'] = reason
                 response_json['group_members_eval'].append(entry)

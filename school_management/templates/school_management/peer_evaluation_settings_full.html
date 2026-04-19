@@ -263,12 +263,19 @@ function prepareSubmit() {
     document.getElementById('group_scores_json').value = JSON.stringify(collectScores('group'));
 }
 
-document.getElementById('settingsForm').addEventListener('submit', function(e) {
-    prepareSubmit();
-});
+const settingsForm = document.getElementById('settingsForm');
+
+if (settingsForm) {
+    settingsForm.addEventListener('submit', function(e) {
+        prepareSubmit();
+    });
+}
 
 // 初期化
 document.addEventListener('DOMContentLoaded', function() {
+    if (!settingsForm) {
+        return;
+    }
     renderScoreRows('member', initialMemberScores.length ? initialMemberScores : []);
     renderScoreRows('group', initialGroupScores.length ? initialGroupScores : []);
 });

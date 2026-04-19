@@ -96,6 +96,32 @@ def class_evaluation_view(request, class_id):
     # 評価システム（default: 通常, original: カスタマイズ, goal: 目標管理）
     grading_system = classroom.grading_system
 
+    # セッション単位で不変な「グループ投票ポイント」を先に計算して使い回す
+    session_group_point_maps = {}
+    session_peer_settings = {}
+    for session in sessions:
+        if not session.has_peer_evaluation:
+            session_peer_settings[session.id] = None
+            continue
+        try:
+            pe_settings = session.peer_evaluation_settings
+        except PeerEvaluationSettings.DoesNotExist:
+            pe_settings = None
+        session_peer_settings[session.id] = pe_settings
+
+        score_points = (
+            pe_settings.group_scores or []
+        ) if pe_settings and pe_settings.enable_group_evaluation else []
+        if not score_points:
+            continue
+
+        session_group_point_maps[session.id] = _build_group_vote_point_map(
+            session_groups=list(Group.objects.filter(lesson_session=session)),
+            session_peer_evals=PeerEvaluation.objects.filter(lesson_session=session),
+            pe_settings=pe_settings,
+            peer_status=session.peer_evaluation_status,
+        )
+
     # 各学生の評価データを格納するリスト
     student_evaluations = []
     
@@ -156,25 +182,12 @@ def class_evaluation_view(request, class_id):
                     
                     if membership:
                         group = membership.group
-                        try:
-                            pe_settings = session.peer_evaluation_settings
-                        except PeerEvaluationSettings.DoesNotExist:
-                            pe_settings = None
-
+                        pe_settings = session_peer_settings.get(session.id)
                         score_points = (
                             pe_settings.group_scores or []
                         ) if pe_settings and pe_settings.enable_group_evaluation else []
-
                         if score_points:
-                            session_evals = PeerEvaluation.objects.filter(lesson_session=session)
-                            session_groups = list(Group.objects.filter(lesson_session=session))
-                            group_point_map = _build_group_vote_point_map(
-                                session_groups=session_groups,
-                                session_peer_evals=session_evals,
-                                pe_settings=pe_settings,
-                                peer_status=session.peer_evaluation_status,
-                            )
-
+                            group_point_map = session_group_point_maps.get(session.id, {})
                             vote_score = group_point_map.get(group.id, 0)
 
                     peer_evaluation_score = contrib_score + vote_score

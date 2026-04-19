@@ -197,6 +197,8 @@ def improved_peer_evaluation_create(request, session_id):
                 lesson_session.peer_evaluation_status = LessonSession.PeerEvaluationStatus.OPEN
                 lesson_session.save()
                 messages.success(request, 'ピア評価の受付を開始しました。')
+            elif lesson_session.peer_evaluation_status == LessonSession.PeerEvaluationStatus.CLOSED:
+                messages.error(request, '一度締め切ったピア評価は再開できません。')
         return redirect('school_management:improved_peer_evaluation_create', session_id=session_id)
     
     # フォームURL生成
@@ -626,17 +628,13 @@ def close_peer_evaluation(request, session_id):
 
 @login_required
 def reopen_peer_evaluation(request, session_id):
-    """ピア評価を再開する"""
+    """ピア評価の再開は不可（締切後はロック）"""
     if request.user.role not in ['teacher', 'admin']:
         return redirect('school_management:dashboard')
-    lesson_session = _get_session_for_teacher_or_admin(request, session_id)
+    _get_session_for_teacher_or_admin(request, session_id)
     
     if request.method == 'POST':
-        lesson_session.peer_evaluation_status = LessonSession.PeerEvaluationStatus.OPEN
-        lesson_session.save()
-        for scp in StudentClassPoints.objects.filter(classroom=lesson_session.classroom).select_related('student'):
-            scp.recalculate_total()
-        messages.success(request, 'ピア評価を再開しました。')
+        messages.error(request, '一度締め切ったピア評価は再開できません。')
     
     return redirect('school_management:improved_peer_evaluation_create', session_id=session_id)
 

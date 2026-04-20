@@ -62,7 +62,7 @@ class PeerEvaluationAggregateFlowTest(TestCase):
             session_number=1,
             date=date(2026, 4, 1),
             has_peer_evaluation=True,
-            peer_evaluation_status=LessonSession.PeerEvaluationStatus.OPEN,
+            peer_evaluation_status=LessonSession.PeerEvaluationStatus.NOT_OPEN,
         )
 
         self.g1 = Group.objects.create(lesson_session=self.session, group_number=1, group_name='G1')
@@ -81,6 +81,9 @@ class PeerEvaluationAggregateFlowTest(TestCase):
             group_scores=[5, 3],
             group_evaluation_method=PeerEvaluationSettings.EvaluationMethod.AGGREGATE,
         )
+
+        self.session.peer_evaluation_status = LessonSession.PeerEvaluationStatus.OPEN
+        self.session.save(update_fields=['peer_evaluation_status'])
 
         self._create_submission(self.s1, self.g1, other_group=self.g2, member_id=self.s2.id)
         self._create_submission(self.s2, self.g1, other_group=self.g2, member_id=self.s1.id)
@@ -135,3 +138,65 @@ class PeerEvaluationAggregateFlowTest(TestCase):
         )
         self.assertEqual(contribution_evals.count(), 4)
         self.assertTrue(all(item.contribution_score == 4 for item in contribution_evals))
+
+    def test_delete_all_is_blocked_after_close(self):
+        self.session.peer_evaluation_status = LessonSession.PeerEvaluationStatus.CLOSED
+        self.session.save(update_fields=['peer_evaluation_status'])
+
+        before_count = PeerEvaluation.objects.filter(lesson_session=self.session).count()
+        response = self.client.post(
+            reverse('school_management:delete_all_peer_evaluations', kwargs={'session_id': self.session.id})
+        )
+
+        self.assertEqual(response.status_code, 302)
+        after_count = PeerEvaluation.objects.filter(lesson_session=self.session).count()
+        self.assertEqual(before_count, after_count)
+
+    def test_delete_all_works_before_close(self):
+        response = self.client.post(
+            reverse('school_management:delete_all_peer_evaluations', kwargs={'session_id': self.session.id})
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(PeerEvaluation.objects.filter(lesson_session=self.session).count(), 0)
+
+
+class PeerEvaluationSettingsViewTest(TestCase):
+    def setUp(self):
+        self.teacher = CustomUser.objects.create_user(
+            email='teacher-settings@example.com',
+            full_name='Teacher Settings',
+            password='pass123',
+            role='teacher',
+        )
+        self.classroom = ClassRoom.objects.create(class_name='Settings Test', year=2026, semester='first')
+        self.classroom.teachers.add(self.teacher)
+        self.session = LessonSession.objects.create(
+            classroom=self.classroom,
+            session_number=1,
+            date=date(2026, 4, 2),
+            has_peer_evaluation=True,
+            peer_evaluation_status=LessonSession.PeerEvaluationStatus.NOT_OPEN,
+        )
+        self.client.force_login(self.teacher)
+
+    def test_settings_save_allows_disabled_member_and_group_evaluation(self):
+        response = self.client.post(
+            reverse('school_management:peer_evaluation_settings', kwargs={'session_id': self.session.id}),
+            {
+                'member_reason_control': PeerEvaluationSettings.ReasonMode.DISABLED,
+                'evaluation_method': PeerEvaluationSettings.EvaluationMethod.DIRECT,
+                'group_reason_control': PeerEvaluationSettings.ReasonMode.DISABLED,
+                'group_evaluation_method': PeerEvaluationSettings.EvaluationMethod.DIRECT,
+                'member_scores_json': '[]',
+                'group_scores_json': '[]',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        settings_obj = PeerEvaluationSettings.objects.get(lesson_session=self.session)
+        self.assertFalse(settings_obj.enable_member_evaluation)
+        self.assertFalse(settings_obj.enable_group_evaluation)
+        self.assertEqual(settings_obj.member_scores, [])
+        self.assertEqual(settings_obj.group_scores, [])
+

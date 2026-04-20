@@ -894,6 +894,10 @@ def delete_all_peer_evaluations(request, session_id):
     lesson_session = _get_session_for_teacher_or_admin(request, session_id)
     
     if request.method == 'POST':
+        if lesson_session.peer_evaluation_status == LessonSession.PeerEvaluationStatus.CLOSED:
+            messages.error(request, 'ピア評価の締切後は回答を全削除できません。')
+            return redirect('school_management:peer_evaluation_results', session_id=session_id)
+
         # ピア評価データを削除（紐づく貢献度評価も自動削除され、ポイントも再計算されます）
         count = PeerEvaluation.objects.filter(lesson_session=lesson_session).count()
         PeerEvaluation.objects.filter(lesson_session=lesson_session).delete()
@@ -1012,6 +1016,14 @@ def peer_evaluation_settings_view(request, session_id):
         if settings_data['evaluation_method'] not in valid_eval_methods:
             settings_data['evaluation_method'] = PeerEvaluationSettings.EvaluationMethod.DIRECT
         if settings_data['group_evaluation_method'] not in valid_eval_methods:
+            settings_data['group_evaluation_method'] = PeerEvaluationSettings.EvaluationMethod.DIRECT
+
+        if not settings_data['enable_member_evaluation']:
+            settings_data['member_scores'] = []
+            settings_data['member_reason_control'] = PeerEvaluationSettings.ReasonMode.DISABLED
+        if not settings_data['enable_group_evaluation']:
+            settings_data['group_scores'] = []
+            settings_data['group_reason_control'] = PeerEvaluationSettings.ReasonMode.DISABLED
             settings_data['group_evaluation_method'] = PeerEvaluationSettings.EvaluationMethod.DIRECT
 
         if settings_data['enable_member_evaluation'] and not settings_data['member_scores']:

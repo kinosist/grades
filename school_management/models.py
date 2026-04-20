@@ -255,7 +255,7 @@ class PeerEvaluationSettings(models.Model):
     # メンバー評価設定
     enable_member_evaluation = models.BooleanField(default=False, verbose_name='メンバー評価有効')
     member_scores = models.JSONField(
-        default=list, verbose_name='メンバー評価配点',
+        default=list, blank=True, verbose_name='メンバー評価配点',
         help_text='例: [5, 3, 1] → 1位5点, 2位3点, 3位1点'
     )
     member_reason_control = models.CharField(
@@ -274,7 +274,7 @@ class PeerEvaluationSettings(models.Model):
     # グループ評価設定
     enable_group_evaluation = models.BooleanField(default=False, verbose_name='グループ評価有効')
     group_scores = models.JSONField(
-        default=list, verbose_name='グループ評価配点',
+        default=list, blank=True, verbose_name='グループ評価配点',
         help_text='例: [3, 2] → 1位3点, 2位2点'
     )
     group_reason_control = models.CharField(
@@ -320,8 +320,10 @@ class PeerEvaluationSettings(models.Model):
         self.group_scores = self._normalize_scores(self.group_scores)
 
         if not self.enable_member_evaluation:
+            self.member_scores = []
             self.member_reason_control = self.ReasonMode.DISABLED
         if not self.enable_group_evaluation:
+            self.group_scores = []
             self.group_reason_control = self.ReasonMode.DISABLED
             self.group_evaluation_method = self.EvaluationMethod.DIRECT
 

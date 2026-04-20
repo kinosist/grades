@@ -259,8 +259,10 @@ function collectScores(type) {
 }
 
 function prepareSubmit() {
-    document.getElementById('member_scores_json').value = JSON.stringify(collectScores('member'));
-    document.getElementById('group_scores_json').value = JSON.stringify(collectScores('group'));
+    const enableMember = document.getElementById('enable_member_evaluation').checked;
+    const enableGroup = document.getElementById('enable_group_evaluation').checked;
+    document.getElementById('member_scores_json').value = JSON.stringify(enableMember ? collectScores('member') : []);
+    document.getElementById('group_scores_json').value = JSON.stringify(enableGroup ? collectScores('group') : []);
 }
 
 const settingsForm = document.getElementById('settingsForm');

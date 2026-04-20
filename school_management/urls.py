@@ -56,7 +56,6 @@ urlpatterns = [
     path('classes/<int:class_id>/lesson-sessions/create/', sessions.lesson_session_create, name='lesson_session_create'),
     path('lesson-sessions/<int:session_id>/', sessions.lesson_session_detail, name='lesson_session_detail'),
     path('sessions/<int:session_id>/delete/', sessions.lesson_session_delete, name='session_delete'),
-    path('sessions/<int:session_id>/initialize-qr/', sessions.session_initialize_qr, name='session_initialize_qr'),
     path('sessions/<int:session_id>/merge-quizzes/', sessions.merge_duplicate_quizzes, name='merge_duplicate_quizzes'),
     path('sessions/<int:session_id>/reset-qr/', sessions.session_reset_qr, name='session_reset_qr'),
 
@@ -74,7 +73,6 @@ urlpatterns = [
     path('students/create/', students.student_create_view, name='student_create'),
     path('students/<str:student_number>/', students.student_detail_view, name='student_detail'),
     path('students/<str:student_number>/edit/', students.student_edit_view, name='student_edit'),
-    path('student/<int:student_id>/update-points/', students.update_student_points, name='update_student_points'),
     path('student/<int:student_id>/remove-from-class/', students.remove_student_from_class, name='remove_student_from_class'),
 
     # --- グループ管理（Groups） ---
@@ -104,9 +102,6 @@ urlpatterns = [
     path('lesson-sessions/<int:session_id>/peer-evaluation/delete-all/', peer_eval.delete_all_peer_evaluations, name='delete_all_peer_evaluations'),
     
     # 従来版（Original）
-    path('sessions/<int:session_id>/peer-evaluation/', peer_eval.peer_evaluation_list_view, name='peer_evaluation_list'),
-    path('sessions/<int:session_id>/peer-evaluation/create/', peer_eval.peer_evaluation_create_view, name='peer_evaluation_create'),
-    path('sessions/<int:session_id>/peer-evaluation/link/', peer_eval.peer_evaluation_link_view, name='peer_evaluation_link'),
     path('sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results_view, name='peer_evaluation_results_legacy'),
 
     # 回答フォーム（公開・学生用）

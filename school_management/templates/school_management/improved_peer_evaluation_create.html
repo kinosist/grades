@@ -88,14 +88,8 @@
                             <div class="mb-3">
                                 {% if lesson_session.peer_evaluation_closed %}
                                     <div class="alert alert-danger">
-                                        <i class="fas fa-lock me-2"></i>ピア評価は締め切られています
+                                        <i class="fas fa-lock me-2"></i>ピア評価は締め切られています（締切後は再開できません）
                                     </div>
-                                    <form method="post" action="{% url 'school_management:reopen_peer_evaluation' lesson_session.id %}" style="display: inline;">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-success me-2" onclick="return confirm('ピア評価を再開しますか？')">
-                                            <i class="fas fa-unlock me-2"></i>評価を再開する
-                                        </button>
-                                    </form>
                                 {% else %}
                                     <div class="alert alert-success">
                                         <i class="fas fa-unlock me-2"></i>ピア評価は受付中です

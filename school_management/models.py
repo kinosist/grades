@@ -1,6 +1,7 @@
 import uuid
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import Sum, Q
@@ -190,21 +191,25 @@ class StudentColumnScore(models.Model):
 
 class LessonSession(models.Model):
     """授業回マスタ"""
+    
+    class PeerEvaluationStatus(models.TextChoices):
+        NOT_OPEN = 'NOT_OPEN', '受付前'
+        OPEN = 'OPEN', '受付中'
+        CLOSED = 'CLOSED', '締切'
+    
     classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス')
     session_number = models.IntegerField(verbose_name='回数')
     date = models.DateField(verbose_name='実施日')
     topic = models.CharField(max_length=200, blank=True, verbose_name='テーマ・内容')
     has_quiz = models.BooleanField(default=False, verbose_name='小テストあり')
     has_peer_evaluation = models.BooleanField(default=False, verbose_name='ピア評価あり')
-    peer_evaluation_configured = models.BooleanField(default=False, verbose_name='ピア評価設定済み')
-    peer_evaluation_closed = models.BooleanField(default=False, verbose_name='ピア評価締切済み')
+    peer_evaluation_status = models.CharField(
+        max_length=10,
+        choices=PeerEvaluationStatus.choices,
+        default=PeerEvaluationStatus.NOT_OPEN,
+        verbose_name='ピア評価ステータス'
+    )
     enable_comments = models.BooleanField(default=False, verbose_name='コメント機能有効')
-    enable_member_evaluation = models.BooleanField(default=False, verbose_name='メンバー評価有効')
-    member_ranking_count = models.IntegerField(default=2, verbose_name='メンバー順位数')
-    member_scores = models.JSONField(default=dict, verbose_name='メンバー評価配点', help_text='例: {"1": 2, "2": 1}')
-    enable_group_evaluation = models.BooleanField(default=False, verbose_name='グループ評価有効')
-    group_ranking_count = models.IntegerField(default=2, verbose_name='グループ順位数')
-    group_scores = models.JSONField(default=dict, verbose_name='グループ評価配点', help_text='例: {"1": 2, "2": 1}')
     enable_feedback = models.BooleanField(default=False, verbose_name='感想欄有効')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -216,6 +221,146 @@ class LessonSession(models.Model):
 
     def __str__(self):
         return f"{self.classroom.class_name} 第{self.session_number}回"
+    
+    @property
+    def peer_evaluation_configured(self):
+        """ピア評価設定が存在するかどうか"""
+        return hasattr(self, 'peer_evaluation_settings') and self.peer_evaluation_settings is not None
+    
+    @property
+    def peer_evaluation_closed(self):
+        """後方互換性: 締切済みかどうか"""
+        return self.peer_evaluation_status == self.PeerEvaluationStatus.CLOSED
+
+
+class PeerEvaluationSettings(models.Model):
+    """ピア評価設定（授業回ごと）"""
+    
+    class ReasonMode(models.TextChoices):
+        REQUIRED = 'REQUIRED', '必須'
+        OPTIONAL = 'OPTIONAL', '任意'
+        DISABLED = 'DISABLED', '無効'
+    
+    class EvaluationMethod(models.TextChoices):
+        DIRECT = 'DIRECT', '直接付与'
+        AGGREGATE = 'AGGREGATE', '集計して付与'
+    
+    lesson_session = models.OneToOneField(
+        LessonSession,
+        on_delete=models.CASCADE,
+        verbose_name='授業回',
+        related_name='peer_evaluation_settings'
+    )
+    
+    # メンバー評価設定
+    enable_member_evaluation = models.BooleanField(default=False, verbose_name='メンバー評価有効')
+    member_scores = models.JSONField(
+        default=list, blank=True, verbose_name='メンバー評価配点',
+        help_text='例: [5, 3, 1] → 1位5点, 2位3点, 3位1点'
+    )
+    member_reason_control = models.CharField(
+        max_length=20,
+        choices=ReasonMode.choices,
+        default=ReasonMode.DISABLED,
+        verbose_name='メンバー評価理由記入'
+    )
+    evaluation_method = models.CharField(
+        max_length=20,
+        choices=EvaluationMethod.choices,
+        default=EvaluationMethod.DIRECT,
+        verbose_name='メンバー評価の付与方法'
+    )
+    
+    # グループ評価設定
+    enable_group_evaluation = models.BooleanField(default=False, verbose_name='グループ評価有効')
+    group_scores = models.JSONField(
+        default=list, blank=True, verbose_name='グループ評価配点',
+        help_text='例: [3, 2] → 1位3点, 2位2点'
+    )
+    group_reason_control = models.CharField(
+        max_length=20,
+        choices=ReasonMode.choices,
+        default=ReasonMode.DISABLED,
+        verbose_name='グループ評価理由記入'
+    )
+    group_evaluation_method = models.CharField(
+        max_length=20,
+        choices=EvaluationMethod.choices,
+        default=EvaluationMethod.DIRECT,
+        verbose_name='グループ評価の付与方法'
+    )
+    
+    # 表示設定
+    show_points = models.BooleanField(default=True, verbose_name='配点テーブルを表示')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'ピア評価設定'
+        verbose_name_plural = 'ピア評価設定'
+    
+    def __str__(self):
+        return f"{self.lesson_session} ピア評価設定"
+
+    @staticmethod
+    def _normalize_scores(values):
+        if not isinstance(values, list):
+            return []
+        normalized = []
+        for value in values:
+            try:
+                normalized.append(max(0, int(value)))
+            except (TypeError, ValueError):
+                continue
+        return normalized
+
+    def clean(self):
+        self.member_scores = self._normalize_scores(self.member_scores)
+        self.group_scores = self._normalize_scores(self.group_scores)
+
+        if not self.enable_member_evaluation:
+            self.member_scores = []
+            self.member_reason_control = self.ReasonMode.DISABLED
+        if not self.enable_group_evaluation:
+            self.group_scores = []
+            self.group_reason_control = self.ReasonMode.DISABLED
+            self.group_evaluation_method = self.EvaluationMethod.DIRECT
+
+        session_status = self.lesson_session.peer_evaluation_status
+        if session_status != LessonSession.PeerEvaluationStatus.NOT_OPEN:
+            if not self.pk:
+                raise ValidationError('受付開始後のピア評価設定は作成できません。')
+
+            old = PeerEvaluationSettings.objects.get(pk=self.pk)
+            immutable_fields = (
+                'enable_member_evaluation',
+                'member_scores',
+                'member_reason_control',
+                'evaluation_method',
+                'enable_group_evaluation',
+                'group_scores',
+                'group_reason_control',
+                'group_evaluation_method',
+                'show_points',
+            )
+            for field in immutable_fields:
+                if getattr(self, field) != getattr(old, field):
+                    raise ValidationError('受付開始後のピア評価設定は変更できません。')
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+    
+    @property
+    def member_ranking_count(self):
+        """メンバー評価の順位数"""
+        return len(self.member_scores) if self.member_scores else 0
+    
+    @property
+    def group_ranking_count(self):
+        """グループ評価の順位数"""
+        return len(self.group_scores) if self.group_scores else 0
 
 
 class Group(models.Model):
@@ -436,35 +581,14 @@ class PeerEvaluation(models.Model):
     )
     evaluator_group_number = models.IntegerField(verbose_name='評価者グループ番号', null=True, blank=True)
     
-    first_place_group = models.ForeignKey(
-        Group,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name='first_place_votes',
-        verbose_name='1位グループ'
+    # 評価データ（JSON形式）
+    response_json = models.JSONField(
+        default=dict, blank=True, verbose_name='評価データ',
+        help_text='{"group_members_eval": [...], "other_group_eval": [...]}'
     )
-    first_place_group_number = models.IntegerField(verbose_name='1位グループ番号', null=True, blank=True)
     
-    second_place_group = models.ForeignKey(
-        Group,
-        on_delete=models.CASCADE,
-        null=True, 
-        blank=True,
-        related_name='second_place_votes',
-        verbose_name='2位グループ'
-    )
-    second_place_group_number = models.IntegerField(verbose_name='2位グループ番号', null=True, blank=True)
-    
-    first_place_reason = models.TextField(blank=True, verbose_name='1位選択理由')
-    second_place_reason = models.TextField(blank=True, verbose_name='2位選択理由')
     class_comment = models.TextField(blank=True, verbose_name='授業コメント')
     general_comment = models.TextField(blank=True, verbose_name='全般コメント')
-    
-    # ✅ グループ評価ランク拡張: 複数ランクをJSON保存 (例: {1: group_id, 2: group_id, ...})
-    group_selections = models.JSONField(default=dict, blank=True, verbose_name='グループ選択（全ランク）')
-    # ✅ メンバー評価ランク拡張: 複数ランクをJSON保存 (例: {1: student_id, 2: student_id, ...})
-    member_selections = models.JSONField(default=dict, blank=True, verbose_name='メンバー選択（全ランク）')
     
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='評価日時')
 
@@ -483,13 +607,8 @@ class PeerEvaluation(models.Model):
         return f"{self.lesson_session} - 匿名評価 ({self.created_at.strftime('%m/%d %H:%M')})"
 
     def save(self, *args, **kwargs):
-        # グループ番号を自動保存（グループ再編時のリンク切れ防止）
         if self.evaluator_group:
             self.evaluator_group_number = self.evaluator_group.group_number
-        if self.first_place_group:
-            self.first_place_group_number = self.first_place_group.group_number
-        if self.second_place_group:
-            self.second_place_group_number = self.second_place_group.group_number
         super().save(*args, **kwargs)
 
 
@@ -671,7 +790,7 @@ class StudentClassPoints(models.Model):
             lesson_session__classroom=self.classroom
         ).aggregate(total=Sum('points'))['total'] or 0
         
-        # ピア評価ポイント (貢献度 + 投票)
+        # ピア評価ポイント (貢献度 + グループ投票)
         peer_total = 0
         
         # 1. 貢献度評価 (5段階評価の合計)
@@ -681,48 +800,8 @@ class StudentClassPoints(models.Model):
         )
         peer_total += contrib_evals.aggregate(total=Sum('contribution_score'))['total'] or 0
         
-        # 2. 投票ポイント (1位=2点, 2位=1点)
-        student_groups = GroupMember.objects.filter(
-            student=self.student,
-            group__lesson_session__classroom=self.classroom
-        )
-        for membership in student_groups:
-            group = membership.group
-            session = group.lesson_session
-            
-            # --- ランキング判定ロジック ---
-            # この授業回の全グループのスコアを計算して順位を決定する
-            session_groups = Group.objects.filter(lesson_session=session)
-            group_scores = []
-            
-            for g in session_groups:
-                f_votes = PeerEvaluation.objects.filter(
-                    Q(first_place_group=g) | 
-                    Q(lesson_session=session, first_place_group_number=g.group_number)
-                ).distinct().count()
-                s_votes = PeerEvaluation.objects.filter(
-                    Q(second_place_group=g) | 
-                    Q(lesson_session=session, second_place_group_number=g.group_number)
-                ).distinct().count()
-                score = (f_votes * 2) + (s_votes * 1)
-                group_scores.append(score)
-            
-            # スコアの降順でソートし、上位2つのユニークなスコアを取得（同点対応）
-            unique_scores = sorted(list(set(group_scores)), reverse=True)
-            top_2_scores = unique_scores[:2] # 1位と2位のスコア
-            
-            # 自分のグループのスコアを計算
-            my_first_votes = PeerEvaluation.objects.filter(
-                Q(first_place_group=group) | Q(lesson_session=session, first_place_group_number=group.group_number)
-            ).distinct().count()
-            my_second_votes = PeerEvaluation.objects.filter(
-                Q(second_place_group=group) | Q(lesson_session=session, second_place_group_number=group.group_number)
-            ).distinct().count()
-            my_score = (my_first_votes * 2) + (my_second_votes * 1)
-            
-            # 上位2位以内（スコアがtop_2_scoresに含まれる）かつ0点より大きい場合のみ加算
-            if my_score > 0 and my_score in top_2_scores:
-                peer_total += my_score
+        # 2. グループ投票ポイント（response_jsonベース）
+        peer_total += self._calculate_group_vote_points()
                 
         #  新規追加: 独自評価項目（列）の合計得点を計算
         custom_columns_total = StudentColumnScore.objects.filter(
@@ -759,6 +838,113 @@ class StudentClassPoints(models.Model):
         self.calculate_points_internal()
         return self.points
 
+    def _calculate_group_vote_points(self):
+        """response_jsonベースでグループ投票ポイントを計算"""
+        student_groups = list(GroupMember.objects.filter(
+            student=self.student,
+            group__lesson_session__classroom=self.classroom
+        ).select_related('group__lesson_session'))
+        if not student_groups:
+            return 0
+
+        session_settings = {}
+        target_session_ids = set()
+        for membership in student_groups:
+            session = membership.group.lesson_session
+            if session.id in session_settings:
+                continue
+            try:
+                pe_settings = session.peer_evaluation_settings
+            except PeerEvaluationSettings.DoesNotExist:
+                session_settings[session.id] = None
+                continue
+
+            score_points = pe_settings.group_scores or []
+            if not pe_settings.enable_group_evaluation or not score_points:
+                session_settings[session.id] = None
+                continue
+
+            session_settings[session.id] = {
+                'method': pe_settings.group_evaluation_method,
+                'score_points': score_points,
+                'peer_status': session.peer_evaluation_status,
+            }
+            target_session_ids.add(session.id)
+
+        if not target_session_ids:
+            return 0
+
+        session_groups = {}
+        for group in Group.objects.filter(lesson_session_id__in=target_session_ids).values('id', 'lesson_session_id'):
+            session_groups.setdefault(group['lesson_session_id'], []).append(group['id'])
+
+        session_eval_responses = {}
+        eval_rows = PeerEvaluation.objects.filter(
+            lesson_session_id__in=target_session_ids
+        ).values_list('lesson_session_id', 'response_json')
+        for session_id, response_json in eval_rows:
+            session_eval_responses.setdefault(session_id, []).append(response_json or {})
+
+        session_group_point_maps = {}
+        for session_id in target_session_ids:
+            settings = session_settings.get(session_id)
+            group_ids = session_groups.get(session_id, [])
+            group_point_map = {group_id: 0 for group_id in group_ids}
+
+            if not settings or not group_ids:
+                session_group_point_maps[session_id] = group_point_map
+                continue
+
+            score_points = settings['score_points']
+            eval_responses = session_eval_responses.get(session_id, [])
+
+            if settings['method'] == PeerEvaluationSettings.EvaluationMethod.AGGREGATE:
+                if settings['peer_status'] == LessonSession.PeerEvaluationStatus.CLOSED:
+                    # 締切時に内部ポイント(G-N)で集計し、順位配点を付与
+                    group_internal_points = {group_id: 0 for group_id in group_ids}
+                    group_count = len(group_ids)
+                    for response in eval_responses:
+                        for entry in response.get('other_group_eval', []):
+                            gid = entry.get('group_id')
+                            rank = entry.get('rank')
+                            if gid in group_internal_points and rank and 1 <= rank <= group_count:
+                                group_internal_points[gid] += (group_count - rank)
+
+                    sorted_groups = sorted(
+                        group_internal_points.items(),
+                        key=lambda x: x[1],
+                        reverse=True,
+                    )
+                    current_rank = 0
+                    prev_points = None
+                    for idx, (gid, internal_points) in enumerate(sorted_groups):
+                        if internal_points != prev_points:
+                            current_rank = idx
+                            prev_points = internal_points
+                        if current_rank < len(score_points):
+                            group_point_map[gid] = score_points[current_rank]
+            else:
+                # 直接付与: 各回答の順位配点をそのまま加算
+                for response in eval_responses:
+                    for entry in response.get('other_group_eval', []):
+                        gid = entry.get('group_id')
+                        rank = entry.get('rank')
+                        if gid and rank and 1 <= rank <= len(score_points):
+                            if gid in group_point_map:
+                                group_point_map[gid] += score_points[rank - 1]
+
+            session_group_point_maps[session_id] = group_point_map
+
+        vote_total = 0
+        for membership in student_groups:
+            group = membership.group
+            group_point_map = session_group_point_maps.get(group.lesson_session_id, {})
+            my_points = group_point_map.get(group.id, 0)
+            if my_points > 0:
+                vote_total += my_points
+        
+        return vote_total
+
     def get_activity_points(self):
         """モードに関係なく、純粋な積み上げポイント（授業点相当）を計算して返す"""
         # 小テスト (重複対策)
@@ -781,39 +967,9 @@ class StudentClassPoints(models.Model):
             peer_evaluation__lesson_session__classroom=self.classroom
         )
         peer_total += contrib_evals.aggregate(total=Sum('contribution_score'))['total'] or 0
-        
-        student_groups = GroupMember.objects.filter(student=self.student, group__lesson_session__classroom=self.classroom)
-        for membership in student_groups:
-            group = membership.group
-            session = group.lesson_session
-            
-            # ランキング判定（calculate_points_internalと同様）
-            session_groups = Group.objects.filter(lesson_session=session)
-            group_scores = []
-            for g in session_groups:
-                f_votes = PeerEvaluation.objects.filter(
-                    Q(first_place_group=g) | Q(lesson_session=session, first_place_group_number=g.group_number)
-                ).distinct().count()
-                s_votes = PeerEvaluation.objects.filter(
-                    Q(second_place_group=g) | Q(lesson_session=session, second_place_group_number=g.group_number)
-                ).distinct().count()
-                group_scores.append((f_votes * 2) + (s_votes * 1))
-            
-            unique_scores = sorted(list(set(group_scores)), reverse=True)
-            top_2_scores = unique_scores[:2]
-            
-            my_first_votes = PeerEvaluation.objects.filter(
-                Q(first_place_group=group) | Q(lesson_session=session, first_place_group_number=group.group_number)
-            ).distinct().count()
-            my_second_votes = PeerEvaluation.objects.filter(
-                Q(second_place_group=group) | Q(lesson_session=session, second_place_group_number=group.group_number)
-            ).distinct().count()
-            my_score = (my_first_votes * 2) + (my_second_votes * 1)
-            
-            if my_score > 0 and my_score in top_2_scores:
-                peer_total += my_score
+        peer_total += self._calculate_group_vote_points()
                 
-        #  新規追加: 独自評価項目（列）の合計得点を計算
+        # 独自評価項目（列）の合計得点を計算
         custom_columns_total = StudentColumnScore.objects.filter(
             student=self.student,
             column__classroom=self.classroom
@@ -855,23 +1011,18 @@ class StudentClassPoints(models.Model):
 
     def get_peer_history(self):
         """ピア評価の獲得ポイント履歴（貢献度、投票点、合計）を返す"""
-        # 循環参照回避のためメソッド内でインポート
-        from .models import ContributionEvaluation, GroupMember, PeerEvaluation, Group
-        from django.db.models import Q, Sum
+        from .models import ContributionEvaluation, GroupMember, PeerEvaluation, Group, PeerEvaluationSettings
+        from django.db.models import Sum
 
         history = []
-        
-        # このクラスのピア評価ありの授業回を取得（新しい順）
         sessions = self.classroom.lessonsession_set.filter(has_peer_evaluation=True).order_by('-session_number')
         
         for session in sessions:
-            # 1. 貢献度評価 (5段階評価の合計)
             contrib_score = ContributionEvaluation.objects.filter(
                 evaluatee=self.student,
                 peer_evaluation__lesson_session=session
             ).aggregate(total=Sum('contribution_score'))['total'] or 0
             
-            # 2. 投票ポイント (1位=2点, 2位=1点)
             vote_score = 0
             membership = GroupMember.objects.filter(
                 student=self.student,
@@ -880,26 +1031,54 @@ class StudentClassPoints(models.Model):
             
             if membership:
                 group = membership.group
+                try:
+                    pe_settings = session.peer_evaluation_settings
+                except PeerEvaluationSettings.DoesNotExist:
+                    pe_settings = None
                 
-                # ランキング判定（calculate_points_internalと同様のロジック）
-                session_groups = Group.objects.filter(lesson_session=session)
-                group_scores = []
-                for g in session_groups:
-                    f = PeerEvaluation.objects.filter(Q(first_place_group=g) | Q(lesson_session=session, first_place_group_number=g.group_number)).distinct().count()
-                    s = PeerEvaluation.objects.filter(Q(second_place_group=g) | Q(lesson_session=session, second_place_group_number=g.group_number)).distinct().count()
-                    group_scores.append((f * 2) + (s * 1))
-                
-                unique_scores = sorted(list(set(group_scores)), reverse=True)
-                top_2_scores = unique_scores[:2]
-                
-                my_f = PeerEvaluation.objects.filter(Q(first_place_group=group) | Q(lesson_session=session, first_place_group_number=group.group_number)).distinct().count()
-                my_s = PeerEvaluation.objects.filter(Q(second_place_group=group) | Q(lesson_session=session, second_place_group_number=group.group_number)).distinct().count()
-                my_score = (my_f * 2) + (my_s * 1)
-                
-                if my_score > 0 and my_score in top_2_scores:
-                    vote_score = my_score
+                if pe_settings and pe_settings.enable_group_evaluation:
+                    score_points = pe_settings.group_scores or []
+                    if score_points:
+                        session_groups = list(Group.objects.filter(lesson_session=session))
+                        group_point_map = {g.id: 0 for g in session_groups}
+                        
+                        evals = PeerEvaluation.objects.filter(lesson_session=session)
+                        if pe_settings.group_evaluation_method == PeerEvaluationSettings.EvaluationMethod.AGGREGATE:
+                            if session.peer_evaluation_status == LessonSession.PeerEvaluationStatus.CLOSED:
+                                group_internal_points = {g.id: 0 for g in session_groups}
+                                group_count = len(session_groups)
+                                for ev in evals:
+                                    response = ev.response_json or {}
+                                    for entry in response.get('other_group_eval', []):
+                                        gid = entry.get('group_id')
+                                        rank = entry.get('rank')
+                                        if gid in group_internal_points and rank and 1 <= rank <= group_count:
+                                            group_internal_points[gid] += (group_count - rank)
+                                sorted_groups = sorted(
+                                    group_internal_points.items(),
+                                    key=lambda x: x[1],
+                                    reverse=True,
+                                )
+                                current_rank = 0
+                                prev_points = None
+                                for idx, (gid, internal_points) in enumerate(sorted_groups):
+                                    if internal_points != prev_points:
+                                        current_rank = idx
+                                        prev_points = internal_points
+                                    if current_rank < len(score_points):
+                                        group_point_map[gid] = score_points[current_rank]
+                        else:
+                            for ev in evals:
+                                response = ev.response_json or {}
+                                for entry in response.get('other_group_eval', []):
+                                    gid = entry.get('group_id')
+                                    rank = entry.get('rank')
+                                    if gid and rank and 1 <= rank <= len(score_points):
+                                        if gid in group_point_map:
+                                            group_point_map[gid] += score_points[rank - 1]
+                        
+                        vote_score = group_point_map.get(group.id, 0)
             
-            # 履歴に追加
             total_score = contrib_score + vote_score
             if total_score > 0:
                 history.append({
@@ -909,7 +1088,7 @@ class StudentClassPoints(models.Model):
                     'total': total_score
                 })
                 
-        return history[:10] # 最新10件
+        return history[:10]
 
 
 class StudentGoal(models.Model):
@@ -1122,10 +1301,6 @@ def set_peer_evaluation_group_numbers(sender, instance, **kwargs):
     """ピア評価保存時にグループ番号を自動設定（リンク切れ防止）"""
     if instance.evaluator_group:
         instance.evaluator_group_number = instance.evaluator_group.group_number
-    if instance.first_place_group:
-        instance.first_place_group_number = instance.first_place_group.group_number
-    if instance.second_place_group:
-        instance.second_place_group_number = instance.second_place_group.group_number
 
 @receiver([post_save, post_delete], sender=ContributionEvaluation)
 def update_class_points_from_contribution(sender, instance, **kwargs):
@@ -1150,21 +1325,18 @@ def update_class_points_from_peer_vote(sender, instance, **kwargs):
     """ピア評価（投票）更新時に成績を再計算"""
     try:
         if instance.lesson_session.classroom:
-            # 1位・2位のグループメンバーのポイントを再計算
+            # response_jsonからグループ評価を取得して再計算
             groups = []
-            # 削除時などリレーションが切れている可能性を考慮してIDチェックとtry-except
-            if instance.first_place_group_id or instance.first_place_group_number:
-                try:
-                    # グループ番号から現在のグループを取得するロジックが必要だが、
-                    # 簡易的に全グループを再計算対象にするか、ここでは既存ロジックを維持しつつエラー回避
-                    if instance.first_place_group: groups.append(instance.first_place_group)
-                except:
-                    pass
-            if instance.second_place_group_id or instance.second_place_group_number:
-                try:
-                    if instance.second_place_group: groups.append(instance.second_place_group)
-                except:
-                    pass
+            response = instance.response_json or {}
+            other_group_eval = response.get('other_group_eval', [])
+            for entry in other_group_eval:
+                group_id = entry.get('group_id')
+                if group_id:
+                    try:
+                        g = Group.objects.get(id=group_id, lesson_session=instance.lesson_session)
+                        groups.append(g)
+                    except Group.DoesNotExist:
+                        pass
             
             for group in groups:
                 members = GroupMember.objects.filter(group=group)

@@ -22,6 +22,9 @@
         .rank-1 { background-color: #ffd700; color: #000; }
         .rank-2 { background-color: #c0c0c0; color: #000; }
         .rank-3 { background-color: #cd7f32; color: #fff; }
+        .eval-section { border-left: 4px solid; padding-left: 1rem; }
+        .eval-section.member { border-color: #198754; }
+        .eval-section.group { border-color: #ffc107; }
     </style>
 </head>
 <body class="bg-light">
@@ -100,7 +103,7 @@
                     <p class="mb-0">{{ auth_error }}</p>
                 </div>
 
-                <!-- ✅ 締切エラー -->
+                <!-- 締切エラー -->
                 {% elif is_closed %}
                 <div class="alert alert-warning text-center">
                     <h4><i class="fas fa-clock me-2"></i>締切が過ぎています</h4>
@@ -172,10 +175,12 @@
                             <div class="mb-4 p-3 border rounded" style="background-color: #f9f9f9;">
                                 <label class="form-label fw-bold mb-3">
                                     <span class="rank-badge rank-{{ rank_item.rank }}">{{ rank_item.rank }}位</span>
+                                    {% if show_scores %}
                                     <span class="ms-2">({{ rank_item.points }}点)</span>
+                                    {% endif %}
                                 </label>
                                 <select 
-                                    class="form-select"
+                                    class="form-select mb-2 member-select"
                                     name="member_rank_{{ rank_item.rank }}"
                                     required
                                 >
@@ -184,6 +189,16 @@
                                     <option value="{{ member_obj.student__id }}">{{ member_obj.student__full_name }}</option>
                                     {% endfor %}
                                 </select>
+                                {% if pe_settings.member_reason_control != 'DISABLED' %}
+                                <textarea 
+                                    class="form-control mt-2" 
+                                    name="member_reason_{{ rank_item.rank }}" 
+                                    rows="2"
+                                    placeholder="理由を入力{% if pe_settings.member_reason_control == 'REQUIRED' %}（必須）{% else %}（任意）{% endif %}"
+                                    {% if pe_settings.member_reason_control == 'REQUIRED' %}required{% endif %}
+                                    style="max-height: 100px; resize: vertical;"
+                                ></textarea>
+                                {% endif %}
                             </div>
                             {% endfor %}
                         </div>
@@ -205,10 +220,12 @@
                             <div class="mb-4 p-3 border rounded" style="background-color: #f9f9f9;">
                                 <label class="form-label fw-bold mb-3">
                                     <span class="rank-badge rank-{{ rank_item.rank }}">{{ rank_item.rank }}位</span>
+                                    {% if show_scores %}
                                     <span class="ms-2">({{ rank_item.points }}点)</span>
+                                    {% endif %}
                                 </label>
                                 <select 
-                                    class="form-select"
+                                    class="form-select mb-2 group-select"
                                     name="group_rank_{{ rank_item.rank }}"
                                     required
                                 >
@@ -217,6 +234,16 @@
                                     <option value="{{ group.id }}">{{ group.display_name }}</option>
                                     {% endfor %}
                                 </select>
+                                {% if pe_settings.group_reason_control != 'DISABLED' %}
+                                <textarea 
+                                    class="form-control mt-2" 
+                                    name="group_reason_{{ rank_item.rank }}" 
+                                    rows="2"
+                                    placeholder="理由を入力{% if pe_settings.group_reason_control == 'REQUIRED' %}（必須）{% else %}（任意）{% endif %}"
+                                    {% if pe_settings.group_reason_control == 'REQUIRED' %}required{% endif %}
+                                    style="max-height: 100px; resize: vertical;"
+                                ></textarea>
+                                {% endif %}
                             </div>
                             {% endfor %}
                         </div>
@@ -287,15 +314,29 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // テンプレート フィルタ dict_lookup の代わりにJavaScriptで実装
-        function getMemberScore(rank) {
-            const scores = {{ member_scores_json|safe }};
-            return scores[rank] || 0;
+    // 重複選択防止
+    document.addEventListener('DOMContentLoaded', function() {
+        function setupDuplicatePrevention(selectClass) {
+            const selects = document.querySelectorAll('.' + selectClass);
+            selects.forEach(select => {
+                select.addEventListener('change', function() {
+                    const selectedValues = new Set();
+                    selects.forEach(s => {
+                        if (s.value) selectedValues.add(s.value);
+                    });
+                    selects.forEach(s => {
+                        Array.from(s.options).forEach(opt => {
+                            if (opt.value && opt.value !== s.value) {
+                                opt.disabled = selectedValues.has(opt.value);
+                            }
+                        });
+                    });
+                });
+            });
         }
-        function getGroupScore(rank) {
-            const scores = {{ group_scores_json|safe }};
-            return scores[rank] || 0;
-        }
+        setupDuplicatePrevention('member-select');
+        setupDuplicatePrevention('group-select');
+    });
     </script>
 </body>
 </html>

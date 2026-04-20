@@ -28,12 +28,18 @@
                             </p>
                         </div>
                         <div class="col-md-4 text-md-end">
+                            {% if lesson_session.peer_evaluation_status == 'CLOSED' %}
+                            <span class="btn btn-outline-danger me-2 disabled" aria-disabled="true" title="締切後は全削除できません">
+                                <i class="fas fa-lock me-1"></i>全削除
+                            </span>
+                            {% else %}
                             <form action="{% url 'school_management:delete_all_peer_evaluations' lesson_session.id %}" method="post" class="d-inline" onsubmit="return confirm('本当に全ての評価データを削除しますか？\nこの操作は取り消せません。\n\n※ポイントも自動的に減算されます。');">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-outline-danger me-2">
                                     <i class="fas fa-trash-alt me-1"></i>全削除
                                 </button>
                             </form>
+                            {% endif %}
                             <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}?active_tab=peer" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left me-1"></i>戻る
                             </a>
@@ -43,6 +49,12 @@
             </div>
         </div>
     </div>
+
+    {% if lesson_session.peer_evaluation_status == 'CLOSED' %}
+    <div class="alert alert-warning" role="alert">
+        <i class="fas fa-info-circle me-1"></i>ピア評価の締切後は回答データの全削除はできません。
+    </div>
+    {% endif %}
 
     <!-- 統計情報 -->
     <div class="row mb-4">
@@ -73,10 +85,12 @@
         <div class="col-md-3">
             <div class="card text-center">
                 <div class="card-body">
-                    {% if lesson_session.peer_evaluation_closed %}
+                    {% if lesson_session.peer_evaluation_status == 'CLOSED' %}
                         <h3 class="text-danger">締切済み</h3>
-                    {% else %}
+                    {% elif lesson_session.peer_evaluation_status == 'OPEN' %}
                         <h3 class="text-success">受付中</h3>
+                    {% else %}
+                        <h3 class="text-secondary">受付前</h3>
                     {% endif %}
                     <p class="mb-0">評価状態</p>
                 </div>
@@ -92,6 +106,7 @@
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
+                        <p class="m-1">提出した学生名をクリックして、提出内容を確認することができます。</p>
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
@@ -103,8 +118,16 @@
                             </thead>
                             <tbody>
                                 {% for row in submission_rows %}
-                                <tr>
-                                    <td>{{ row.student.full_name }}</td>
+                                <tr {% if row.submitted %}role="button" data-bs-toggle="modal" data-bs-target="#submissionDetailModal{{ row.student.id }}" style="cursor: pointer;"{% endif %}>
+                                    <td>
+                                        {% if row.submitted %}
+                                            <span class="text-primary fw-semibold">
+                                                {{ row.student.full_name }}
+                                            </span>
+                                        {% else %}
+                                            {{ row.student.full_name }}
+                                        {% endif %}
+                                    </td>
                                     <td>{{ row.email|default:'-' }}</td>
                                     <td>
                                         {% if row.submitted_at %}
@@ -134,13 +157,83 @@
         </div>
     </div>
 
+    {% for row in submission_rows %}
+        {% if row.submitted %}
+        <div class="modal fade" id="submissionDetailModal{{ row.student.id }}" tabindex="-1" aria-labelledby="submissionDetailModalLabel{{ row.student.id }}" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="submissionDetailModalLabel{{ row.student.id }}">
+                            {{ row.student.full_name }} さんの提出内容
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% if row.submission_detail.has_content %}
+                            {% if row.submission_detail.group_evaluations %}
+                            <div class="mb-4">
+                                <h6 class="fw-bold text-warning"><i class="fas fa-layer-group me-2"></i>他グループ評価</h6>
+                                {% for item in row.submission_detail.group_evaluations %}
+                                <div class="border rounded p-2 mb-2">
+                                    <div><strong>{{ item.rank }}位:</strong> {{ item.target_name }}</div>
+                                    {% if item.reason %}
+                                    <div class="small text-muted mt-1">{{ item.reason }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% if row.submission_detail.member_evaluations %}
+                            <div class="mb-4">
+                                <h6 class="fw-bold text-success"><i class="fas fa-user-friends me-2"></i>チームメンバー評価</h6>
+                                {% for item in row.submission_detail.member_evaluations %}
+                                <div class="border rounded p-2 mb-2">
+                                    <div><strong>{{ item.rank }}位:</strong> {{ item.target_name }}</div>
+                                    {% if item.reason %}
+                                    <div class="small text-muted mt-1">{{ item.reason }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% if row.submission_detail.general_comment %}
+                            <div class="mb-3">
+                                <h6 class="fw-bold text-info"><i class="fas fa-comment me-2"></i>コメント</h6>
+                                <p class="mb-0">{{ row.submission_detail.general_comment }}</p>
+                            </div>
+                            {% endif %}
+
+                            {% if row.submission_detail.class_comment %}
+                            <div class="mb-0">
+                                <h6 class="fw-bold text-secondary"><i class="fas fa-lightbulb me-2"></i>授業の感想</h6>
+                                <p class="mb-0">{{ row.submission_detail.class_comment }}</p>
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            <p class="text-muted mb-0">提出内容の詳細データはありません。</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    {% endfor %}
+
     <!-- グループランキング -->
     <div class="row">
         <div class="col-lg-8">
-            <div class="card">
+                <div class="card">
                 <div class="card-header">
                     <h5><i class="fas fa-trophy me-2"></i>グループランキング</h5>
-                    <small class="text-muted">1位票×2点 + 2位票×1点で計算</small>
+                    {% if group_rank_headers %}
+                    <small class="text-muted">
+                        {% for item in group_rank_headers %}
+                            {{ item.rank }}位票×{{ item.points }}点{% if not forloop.last %} + {% endif %}
+                        {% endfor %}
+                    </small>
+                    {% endif %}
                 </div>
                 <div class="card-body p-0">
                     {% if group_stats %}
@@ -150,8 +243,9 @@
                                 <tr>
                                     <th>順位</th>
                                     <th>グループ</th>
-                                    <th class="text-center">1位票</th>
-                                    <th class="text-center">2位票</th>
+                                    {% for item in group_rank_headers %}
+                                    <th class="text-center">{{ item.rank }}位票</th>
+                                    {% endfor %}
                                     <th class="text-center">スコア</th>
                                     <th class="text-center">評価提出</th>
                                 </tr>
@@ -179,20 +273,15 @@
                                             {% endif %}
                                         </strong>
                                     </td>
+                                    {% for vote_count in stat.votes_by_rank_list %}
                                     <td class="text-center">
-                                        {% if stat.first_place_votes > 0 %}
-                                            <span class="badge bg-warning">{{ stat.first_place_votes }}</span>
+                                        {% if vote_count > 0 %}
+                                            <span class="badge bg-primary">{{ vote_count }}</span>
                                         {% else %}
                                             <span class="text-muted">0</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-center">
-                                        {% if stat.second_place_votes > 0 %}
-                                            <span class="badge bg-secondary">{{ stat.second_place_votes }}</span>
-                                        {% else %}
-                                            <span class="text-muted">0</span>
-                                        {% endif %}
-                                    </td>
+                                    {% endfor %}
                                     <td class="text-center">
                                         <strong class="text-primary">{{ stat.score }}</strong>
                                     </td>
@@ -224,8 +313,8 @@
                     <h6><i class="fas fa-comments me-2"></i>評価コメント</h6>
                 </div>
                 <div class="card-body" style="max-height: 600px; overflow-y: auto;">
-                    {% for evaluation in evaluations %}
-                        {% if evaluation.first_place_reason or evaluation.second_place_reason or evaluation.general_comment %}
+                    {% for row in comment_rows %}
+                        {% with evaluation=row.evaluation %}
                         <div class="mb-3 border-bottom pb-2">
                             <small class="text-muted">
                                 評価者: 
@@ -236,19 +325,19 @@
                                 {% endif %}
                             </small>
                             
-                            {% if evaluation.first_place_reason %}
+                            {% for item in row.group_reasons %}
                             <div class="mt-1">
-                                <strong class="text-warning">1位理由:</strong>
-                                <p class="small mb-1">{{ evaluation.first_place_reason }}</p>
+                                <strong class="text-warning">{{ item.rank }}位グループ理由:</strong>
+                                <p class="small mb-1">{{ item.reason }}</p>
                             </div>
-                            {% endif %}
-                            
-                            {% if evaluation.second_place_reason %}
+                            {% endfor %}
+
+                            {% for item in row.member_reasons %}
                             <div class="mt-1">
-                                <strong class="text-secondary">2位理由:</strong>
-                                <p class="small mb-1">{{ evaluation.second_place_reason }}</p>
+                                <strong class="text-success">{{ item.rank }}位メンバー理由:</strong>
+                                <p class="small mb-1">{{ item.reason }}</p>
                             </div>
-                            {% endif %}
+                            {% endfor %}
                             
                             {% if evaluation.general_comment %}
                             <div class="mt-1">
@@ -257,7 +346,7 @@
                             </div>
                             {% endif %}
                         </div>
-                        {% endif %}
+                        {% endwith %}
                     {% empty %}
                         <p class="text-muted">コメントがありません。</p>
                     {% endfor %}

@@ -108,10 +108,12 @@ class PeerEvaluationAuthTest(TestCase):
             email='student1@example.com',
             evaluator_token=uuid.uuid4(),
             evaluator_group=self.group1,
-            first_place_group=self.group2,
-            second_place_group=self.group1,
-            first_place_reason='good',
-            second_place_reason='ok',
+            response_json={
+                'other_group_eval': [
+                    {'group_id': self.group2.id, 'rank': 1, 'reason': 'good'},
+                    {'group_id': self.group1.id, 'rank': 2, 'reason': 'ok'},
+                ],
+            },
         )
 
         response = self.client.get(
@@ -128,10 +130,12 @@ class PeerEvaluationAuthTest(TestCase):
             email='student1@example.com',
             evaluator_token=uuid.uuid4(),
             evaluator_group=self.group1,
-            first_place_group=self.group2,
-            second_place_group=self.group1,
-            first_place_reason='good',
-            second_place_reason='ok',
+            response_json={
+                'other_group_eval': [
+                    {'group_id': self.group2.id, 'rank': 1, 'reason': 'good'},
+                    {'group_id': self.group1.id, 'rank': 2, 'reason': 'ok'},
+                ],
+            },
         )
 
         self.client.force_login(self.teacher)
@@ -162,5 +166,4 @@ class PeerEvaluationAuthTest(TestCase):
         self.assertEqual(response.status_code, 200)
         created = PeerEvaluation.objects.get(lesson_session=self.lesson_session, student=self.student1)
         self.assertEqual(created.evaluator_group_id, self.group1.id)
-
 

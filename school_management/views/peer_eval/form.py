@@ -1,4 +1,5 @@
 import hashlib
+import uuid
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from ...models import LessonSession, PeerEvaluation, Student, ContributionEvaluation
@@ -61,13 +62,26 @@ def peer_evaluation_form_view(request, token):
                 second_group_obj = None
             
             # ピア評価を保存
+            response_json = {
+                'group_members_eval': [],
+                'other_group_eval': [],
+            }
+            if first_group_obj:
+                first_entry = {'rank': 1, 'group_id': first_group_obj.id}
+                if first_place_reason:
+                    first_entry['reason'] = first_place_reason
+                response_json['other_group_eval'].append(first_entry)
+            if second_group_obj:
+                second_entry = {'rank': 2, 'group_id': second_group_obj.id}
+                if second_place_reason:
+                    second_entry['reason'] = second_place_reason
+                response_json['other_group_eval'].append(second_entry)
+
             evaluation = PeerEvaluation.objects.create(
                 lesson_session=target_session,
+                evaluator_token=uuid.uuid4(),
                 evaluator_group=evaluator_group_obj,
-                first_place_group=first_group_obj,
-                second_place_group=second_group_obj,
-                first_place_reason=first_place_reason,
-                second_place_reason=second_place_reason,
+                response_json=response_json,
                 general_comment=general_comment
             )
             

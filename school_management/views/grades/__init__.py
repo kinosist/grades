@@ -1,4 +1,4 @@
-from .class_points import class_points_view, update_attendance_rate, update_goal_score, update_class_settings
+from .class_points import class_points_view, update_attendance_rate, update_class_settings
 from .class_evaluation import class_evaluation_view
 
 from .class_evaluation import class_evaluation_view, update_custom_score

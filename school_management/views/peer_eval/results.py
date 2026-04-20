@@ -1,17 +1,14 @@
 from collections import defaultdict
-
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404
-
+from django.http import HttpRequest, HttpResponse
 from ...models import LessonSession
-
 
 def _safe_int(value):
     try:
         return int(value)
     except (TypeError, ValueError):
         return None
-
 
 def _build_submission_detail(evaluation, group_name_map, student_name_map):
     response = evaluation.response_json or {}
@@ -44,21 +41,8 @@ def _build_submission_detail(evaluation, group_name_map, student_name_map):
         'has_content': bool(group_evaluations or member_evaluations or general_comment or class_comment),
     }
 
-
 @login_required
-def peer_evaluation_list_view(request, session_id):
-    """ピア評価一覧"""
-    session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
-    evaluations = session.peerevaluation_set.all()
-    
-    context = {
-        'session': session,
-        'evaluations': evaluations,
-    }
-    return render(request, 'school_management/peer_evaluation_list.html', context)
-
-@login_required
-def peer_evaluation_results_view(request, session_id):
+def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpResponse:
     """ピア評価結果表示"""
     session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
     evaluations = session.peerevaluation_set.all()

@@ -73,6 +73,8 @@ urlpatterns = [
     path('students/create/', students.student_create_view, name='student_create'),
     path('students/<str:student_number>/', students.student_detail_view, name='student_detail'),
     path('students/<str:student_number>/edit/', students.student_edit_view, name='student_edit'),
+    # 👇 ここに復元しました！
+    path('student/<int:student_id>/update-points/', students.update_student_points, name='update_student_points'),
     path('student/<int:student_id>/remove-from-class/', students.remove_student_from_class, name='remove_student_from_class'),
 
     # --- グループ管理（Groups） ---

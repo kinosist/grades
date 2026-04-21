@@ -45,33 +45,6 @@ def session_create_view(request, class_id):
     return render(request, 'school_management/session_create.html', context)
 
 @login_required
-def session_initialize_qr(request, session_id):
-    """授業回にQRアクション点枠を作成（旧データ互換用）"""
-    session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
-    
-    if not session.quiz_set.filter(is_qr_linked=True).exists():
-        # 既存の小テストがあるか確認
-        existing_quiz = Quiz.objects.filter(lesson_session=session).first()
-        
-        if existing_quiz:
-            existing_quiz.is_qr_linked = True
-            existing_quiz.save()
-            messages.success(request, f'既存の小テスト「{existing_quiz.quiz_name}」をQRアクション点枠として設定しました。')
-        else:
-            Quiz.objects.create(
-                lesson_session=session,
-                quiz_name="QRアクション点",
-                max_score=100,
-                grading_method='qr_mobile',
-                is_qr_linked=True
-            )
-            messages.success(request, 'QRアクション点枠を作成しました。')
-    else:
-        messages.info(request, '既にQRアクション点枠が存在します。')
-        
-    return redirect('school_management:session_detail', session_id=session.id)
-
-@login_required
 def merge_duplicate_quizzes(request, session_id):
     """重複した小テストを統合する"""
     session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)

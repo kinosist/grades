@@ -1,6 +1,3 @@
-# ミスしてる可能性
-
-from .management import session_create_view, session_create_view as lesson_session_create, session_initialize_qr, merge_duplicate_quizzes, session_reset_qr, lesson_session_delete
+from .management import session_create_view, session_create_view as lesson_session_create, merge_duplicate_quizzes, session_reset_qr, lesson_session_delete
 from .detail import lesson_session_detail, lesson_session_detail as session_detail_view
-
 from .list import session_list_view

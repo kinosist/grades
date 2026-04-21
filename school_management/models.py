@@ -85,6 +85,16 @@ class CustomUser(AbstractUser):
     class Meta:
         verbose_name = 'ユーザー'
         verbose_name_plural = 'ユーザー'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student_number'],
+                condition=Q(role='student') & ~Q(student_number=''),
+                name='unique_student_number_for_students',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['student_number'], name='idx_customuser_student_number'),
+        ]
 
     def __str__(self):
         return self.full_name

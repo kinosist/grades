@@ -5,8 +5,9 @@ from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.contrib.auth.hashers import make_password
 from django.middleware.csrf import get_token
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from ...models import CustomUser, Student, ClassRoom, StudentClassPoints
 
 @login_required
@@ -74,80 +75,109 @@ def student_create_view(request):
                 return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
             
             lines = bulk_student_data.split('\n')
-            added_count = 0
-            error_count = 0
             errors = []
-            
+            pending_students = []
+            seen_student_numbers = {}
+            seen_emails = {}
+
             for line_num, line in enumerate(lines, 1):
                 line = line.strip()
                 if not line:
                     continue
-                
-                # カンマで分割
+
                 parts = [part.strip() for part in line.split(',')]
                 if len(parts) < 3:
                     errors.append(f'行{line_num}: 必要な項目が不足しています（学籍番号,氏名,ふりがな） - {line}')
-                    error_count += 1
                     continue
-                
+
                 student_number = parts[0]
                 full_name = parts[1]
                 furigana = parts[2]
                 email = parts[3] if len(parts) > 3 and parts[3].strip() else None
-                
-                try:
-                    # 重複チェック
-                    if Student.objects.filter(student_number=student_number).exists():
-                        errors.append(f'行{line_num}: 学籍番号 "{student_number}" は既に登録されています')
-                        error_count += 1
-                        continue
-                    
-                    # メールアドレスの重複チェック（null値は除外）
-                    if email and Student.objects.filter(email=email).exists():
-                        errors.append(f'行{line_num}: メールアドレス "{email}" は既に登録されています')
-                        error_count += 1
-                        continue
-                    
-                    # 学生作成
-                    # デフォルトパスワードを生成（学籍番号をベースに）
-                    default_password = f"student_{student_number}"
-                    
-                    Student.objects.create_user(
-                        email=email,
-                        full_name=full_name,
-                        password=default_password,
-                        student_number=student_number,
-                        furigana=furigana,
-                        role='student'
+
+                if not student_number or not full_name or not furigana:
+                    errors.append(f'行{line_num}: 学籍番号・氏名・ふりがなは必須です')
+                    continue
+
+                duplicate_student_line = seen_student_numbers.get(student_number)
+                if duplicate_student_line is not None:
+                    errors.append(
+                        f'行{line_num}: 学籍番号 "{student_number}" が入力内で重複しています（行{duplicate_student_line}）'
                     )
-                    added_count += 1
-                    
-                except IntegrityError as e:
-                    # データベース制約違反の場合
-                    error_message = str(e).lower()
-                    if 'student_number' in error_message or 'unique constraint' in error_message:
-                        errors.append(f'行{line_num}: 学籍番号 "{student_number}" は既に登録されています')
-                    elif 'email' in error_message:
-                        errors.append(f'行{line_num}: メールアドレス "{email}" は既に登録されています')
-                    else:
-                        errors.append(f'行{line_num}: データの重複により登録できませんでした')
-                    error_count += 1
-                    
-                except Exception as e:
-                    errors.append(f'行{line_num}: 作成エラー - {str(e)}')
-                    error_count += 1
-            
-            # 結果メッセージ
-            if added_count > 0:
-                messages.success(request, f'{added_count}名の学生を一括登録しました。')
-            if error_count > 0:
-                for error in errors[:10]:  # 最初の10個のエラーのみ表示
+                    continue
+                seen_student_numbers[student_number] = line_num
+
+                if email:
+                    duplicate_email_line = seen_emails.get(email)
+                    if duplicate_email_line is not None:
+                        errors.append(
+                            f'行{line_num}: メールアドレス "{email}" が入力内で重複しています（行{duplicate_email_line}）'
+                        )
+                        continue
+                    seen_emails[email] = line_num
+
+                pending_students.append({
+                    'line_num': line_num,
+                    'student_number': student_number,
+                    'full_name': full_name,
+                    'furigana': furigana,
+                    'email': email,
+                })
+
+            if pending_students:
+                student_numbers = [row['student_number'] for row in pending_students]
+                emails = [row['email'] for row in pending_students if row['email']]
+
+                existing_student_numbers = set(
+                    Student.objects.filter(
+                        role='student',
+                        student_number__in=student_numbers,
+                    ).values_list('student_number', flat=True)
+                )
+                existing_emails = set(
+                    Student.objects.filter(email__in=emails).values_list('email', flat=True)
+                ) if emails else set()
+
+                for row in pending_students:
+                    if row['student_number'] in existing_student_numbers:
+                        errors.append(
+                            f'行{row["line_num"]}: 学籍番号 "{row["student_number"]}" は既に登録されています'
+                        )
+                    if row['email'] and row['email'] in existing_emails:
+                        errors.append(
+                            f'行{row["line_num"]}: メールアドレス "{row["email"]}" は既に登録されています'
+                        )
+
+            if errors:
+                for error in errors[:10]:
                     messages.error(request, error)
                 if len(errors) > 10:
                     messages.error(request, f'他に{len(errors) - 10}個のエラーがあります。')
-            
-            if added_count > 0:
-                return redirect('school_management:student_list')
+                messages.error(request, '整合性を優先するため、一括登録は全件中止しました。内容を修正して再実行してください。')
+                return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
+
+            try:
+                with transaction.atomic():
+                    students_to_create = []
+                    for row in pending_students:
+                        students_to_create.append(Student(
+                            email=Student.objects.normalize_email(row['email']) if row['email'] else None,
+                            full_name=row['full_name'],
+                            password=make_password(None),
+                            student_number=row['student_number'],
+                            furigana=row['furigana'],
+                            role='student',
+                        ))
+                    Student.objects.bulk_create(students_to_create, batch_size=500)
+            except IntegrityError:
+                messages.error(
+                    request,
+                    '同時更新により重複が発生したため、一括登録をロールバックしました。再度実行してください。'
+                )
+                return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
+
+            messages.success(request, f'{len(pending_students)}名の学生を一括登録しました。')
+            return redirect('school_management:student_list')
         
         else:
             # 単体登録処理（既存の処理）

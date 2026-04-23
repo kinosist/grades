@@ -283,129 +283,125 @@
                 </div>
             </div>
             
-            <!-- 左カラム：設定フォーム -->
-            <div class="col-md-6 mb-3">
+            <!-- 左上：基本設定 -->
+            <div class="col-md-6 mb-4">
                 <div class="card h-100 shadow-sm">
                     <div class="card-header">
-                        <h6><i class="fas fa-sliders-h me-2"></i>クラス設定</h6>
+                        <h6><i class="fas fa-sliders-h me-2"></i>基本設定</h6>
                     </div>
-                    <div class="list-group list-group-flush">
-                        
-                        <!-- 評価システムの変更フォーム -->
-                        <div class="list-group-item p-3">
-                            <form action="{% url 'school_management:update_class_settings' classroom.id %}" method="post">
-                                {% csrf_token %}
-                                <label for="grading_system" class="form-label fw-bold"><i class="fas fa-balance-scale me-2 text-primary"></i>評価システム</label>
-                                <div class="input-group">
-                                    <select class="form-select" id="grading_system" name="grading_system">
-                                        <!--  修正箇所：value を DBの選択肢（default）に合わせました -->
-                                        <option value="default" {% if classroom.grading_system == 'default' %}selected{% endif %}>通常評価（積み上げ方式）</option>
-                                        <option value="original" {% if classroom.grading_system == 'original' %}selected{% endif %}>オリジナル（カスタマイズ方式）</option>
-                                        <option value="goal" {% if classroom.grading_system == 'goal' %}selected{% endif %}>目標管理（講師評価方式）</option>
-                                    </select>
-                                    <button class="btn btn-outline-primary" type="submit">更新</button>
-                                </div>
-                                <div class="form-text text-muted small mt-2">「目標管理」にすると、QRやピア評価の点数は成績に加算されず、講師が入力した評価点が最終成績になります。</div>
-                            </form>
-                        </div>
+                    <div class="card-body">
+                        <!-- 評価システム -->
+                        <form action="{% url 'school_management:update_class_settings' classroom.id %}" method="post" class="mb-4">
+                            {% csrf_token %}
+                            <label for="grading_system" class="form-label fw-bold"><i class="fas fa-balance-scale me-2 text-primary"></i>評価システム</label>
+                            <div class="input-group">
+                                <select class="form-select" id="grading_system" name="grading_system">
+                                    <option value="default" {% if classroom.grading_system == 'default' %}selected{% endif %}>通常評価（積み上げ方式）</option>
+                                    <option value="original" {% if classroom.grading_system == 'original' %}selected{% endif %}>オリジナル（カスタマイズ方式）</option>
+                                    <option value="goal" {% if classroom.grading_system == 'goal' %}selected{% endif %}>目標管理（講師評価方式）</option>
+                                </select>
+                                <button class="btn btn-outline-primary" type="submit">更新</button>
+                            </div>
+                            <div class="form-text text-muted small mt-2">「目標管理」にすると、QRやピア評価の点数は成績に加算されず、講師が入力した評価点が最終成績になります。</div>
+                        </form>
 
-                        <!-- QRアクションポイントの変更フォーム -->
-                        <div class="list-group-item p-3">
-                            <form action="{% url 'school_management:update_class_settings' classroom.id %}" method="post">
-                                {% csrf_token %}
-                                <label for="qr_point_value" class="form-label fw-bold"><i class="fas fa-qrcode me-2 text-warning"></i>QRアクションポイント (pt/回)</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" id="qr_point_value" name="qr_point_value" value="{{ classroom.qr_point_value }}" min="1" max="100">
-                                    <button class="btn btn-outline-primary" type="submit">更新</button>
-                                </div>
-                                <div class="form-text text-muted small mt-2">QRコードスキャン1回あたりに付与されるポイント数です。</div>
-                            </form>
-                        </div>
-
-                        <!-- 出席点満点の変更フォーム -->
-                        <div class="list-group-item p-3">
-                            <form action="{% url 'school_management:update_class_settings' classroom.id %}" method="post">
-                                {% csrf_token %}
-                                <label for="attendance_max_points" class="form-label fw-bold"><i class="fas fa-user-check me-2 text-success"></i>出席点満点</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" id="attendance_max_points" name="attendance_max_points" value="{{ classroom.attendance_max_points }}" min="0" max="1000">
-                                    <button class="btn btn-outline-primary" type="submit">更新</button>
-                                </div>
-                                <div class="form-text text-muted small mt-2">出席率100%のときに付与される最大ポイント数です。</div>
-                            </form>
-                        </div>
-
-                        <!-- 独自の評価項目（列）の管理 -->
-                        <div class="list-group-item p-3 bg-light">
-                            <label class="form-label fw-bold mb-3"><i class="fas fa-columns me-2 text-info"></i>独自の評価項目（列）</label>
-                            
-                            {% if point_columns %}
-                                <ul class="list-group mb-3">
-                                    {% for column in point_columns %}
-                                        <li class="list-group-item d-flex justify-content-between align-items-center py-2 border-0 shadow-sm mb-2 rounded">
-                                            <span class="fw-bold text-dark">{{ column.column_title }}</span>
-                                            <form action="{% url 'school_management:delete_point_column' column.id %}" method="post" class="d-inline m-0">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="削除" onclick="return confirm('項目「{{ column.column_title }}」を削除しますか？\n※すでに入力されたこの項目の点数もすべて消去されます。');">
-                                                    <i class="fas fa-trash-alt"></i>
-                                                </button>
-                                            </form>
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            {% else %}
-                                <div class="alert alert-secondary py-2 small border-0 shadow-sm">
-                                    <i class="fas fa-info-circle me-1"></i>追加された項目はありません。
-                                </div>
-                            {% endif %}
-
-                            <!-- 項目の追加フォーム -->
-                            <form action="{% url 'school_management:add_point_column' classroom.id %}" method="post" class="mt-2">
-                                {% csrf_token %}
-                                <div class="input-group shadow-sm">
-                                    <input type="text" class="form-control border-info" name="column_title" placeholder="例: プレゼン加点、良い質問..." required>
-                                    <button class="btn btn-info text-white" type="submit"><i class="fas fa-plus me-1"></i>追加</button>
-                                </div>
-                                <div class="form-text text-muted small mt-2">※追加した項目は成績・評価一覧の「列」として表示されます。</div>
-                            </form>
+                        <!-- QRポイントと出席点満点 -->
+                        <div class="row">
+                            <div class="col-lg-6 mb-3 mb-lg-0">
+                                <form action="{% url 'school_management:update_class_settings' classroom.id %}" method="post">
+                                    {% csrf_token %}
+                                    <label for="qr_point_value" class="form-label fw-bold"><i class="fas fa-qrcode me-2 text-warning"></i>QRポイント</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="qr_point_value" name="qr_point_value" value="{{ classroom.qr_point_value }}" min="1" max="100">
+                                        <button class="btn btn-outline-primary" type="submit">更新</button>
+                                    </div>
+                                    <div class="form-text text-muted small mt-2">QRコードスキャン1回あたりに付与されるポイント数です。</div>
+                                </form>
+                            </div>
+                            <div class="col-lg-6">
+                                <form action="{% url 'school_management:update_class_settings' classroom.id %}" method="post">
+                                    {% csrf_token %}
+                                    <label for="attendance_max_points" class="form-label fw-bold"><i class="fas fa-user-check me-2 text-success"></i>出席点満点</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="attendance_max_points" name="attendance_max_points" value="{{ classroom.attendance_max_points }}" min="0" max="1000">
+                                        <button class="btn btn-outline-primary" type="submit">更新</button>
+                                    </div>
+                                    <div class="form-text text-muted small mt-2">出席率100%のときに付与される最大ポイント数です。</div>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- 右カラム：グループ設定・危険な操作 -->
-            <div class="col-md-6">
-                <div class="row">
-                    <!-- グループマスタ管理 -->
-                    <div class="col-12 mb-3">
-                        <div class="card h-100 shadow-sm">
-                            <div class="card-header">
-                                <h6><i class="fas fa-layer-group me-2"></i>グループ設定</h6>
-                            </div>
-                            <div class="card-body">
-                                <p>クラスの固定グループ（グループマスタ）を管理します。授業回ごとにここからグループ編成をコピーできます。</p>
-                                <a href="{% url 'school_management:group_master_management' classroom.id %}" class="btn btn-info text-white">
-                                    <i class="fas fa-edit me-2"></i>グループマスタ管理
-                                </a>
-                            </div>
-                        </div>
+
+            <!-- 右上：独自の評価項目 -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header">
+                        <h6><i class="fas fa-columns me-2 text-info"></i>独自の評価項目（列）</h6>
                     </div>
-                    <!-- クラス削除（危険な操作） -->
-                    <div class="col-12 mb-3">
-                        <div class="card h-100 border-danger shadow-sm">
-                            <div class="card-header bg-danger text-white">
-                                <h6><i class="fas fa-exclamation-triangle me-2"></i>危険な操作</h6>
+                    <div class="card-body">
+                        {% if point_columns %}
+                            <ul class="list-group mb-3">
+                                {% for column in point_columns %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center py-2 border-0 shadow-sm mb-2 rounded">
+                                        <span class="fw-bold text-dark">{{ column.column_title }}</span>
+                                        <form action="{% url 'school_management:delete_point_column' column.id %}" method="post" class="d-inline m-0">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="削除" onclick="return confirm('項目「{{ column.column_title }}」を削除しますか？\n※すでに入力されたこの項目の点数もすべて消去されます。');">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </form>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div class="alert alert-secondary py-2 small border-0 shadow-sm">
+                                <i class="fas fa-info-circle me-1"></i>追加された項目はありません。
                             </div>
-                            <div class="card-body">
-                                <p>このクラスを削除します。クラスに関連する授業回、成績データなども全て削除されます。</p>
-                                <form action="{% url 'school_management:class_delete' classroom.id %}" method="post">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-outline-danger" onclick="return confirm('本当にこのクラスを削除しますか？この操作は取り消せません。')">
-                                        <i class="fas fa-trash-alt me-2"></i>クラスを削除
-                                    </button>
-                                </form>
+                        {% endif %}
+
+                        <!-- 項目の追加フォーム -->
+                        <form action="{% url 'school_management:add_point_column' classroom.id %}" method="post" class="mt-2">
+                            {% csrf_token %}
+                            <div class="input-group shadow-sm">
+                                <input type="text" class="form-control border-info" name="column_title" placeholder="例: プレゼン加点、良い質問..." required>
+                                <button class="btn btn-info text-white" type="submit"><i class="fas fa-plus me-1"></i>追加</button>
                             </div>
-                        </div>
+                            <div class="form-text text-muted small mt-2">※追加した項目は成績・評価一覧の「列」として表示されます。</div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 左下：グループ設定 -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header">
+                        <h6><i class="fas fa-layer-group me-2"></i>グループ設定</h6>
+                    </div>
+                    <div class="card-body">
+                        <p>クラスの固定グループ（グループマスタ）を管理します。授業回ごとにここからグループ編成をコピーできます。</p>
+                        <a href="{% url 'school_management:group_master_management' classroom.id %}" class="btn btn-info text-white">
+                            <i class="fas fa-edit me-2"></i>グループマスタ管理
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <!-- 右下：危険な操作 -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 border-danger shadow-sm">
+                    <div class="card-header bg-danger text-white">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>危険な操作</h6>
+                    </div>
+                    <div class="card-body">
+                        <p>このクラスを削除します。クラスに関連する授業回、成績データなども全て削除されます。</p>
+                        <form action="{% url 'school_management:class_delete' classroom.id %}" method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger" onclick="return confirm('本当にこのクラスを削除しますか？この操作は取り消せません。')">
+                                <i class="fas fa-trash-alt me-2"></i>クラスを削除
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>

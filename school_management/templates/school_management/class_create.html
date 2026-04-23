@@ -91,34 +91,34 @@
             <div class="card-body">
                 <form method="post">
                     {% csrf_token %}
-                    
-                    <!-- クラス名・年度の入力 -->
+
+                    <!-- 年度・学期の入力 -->
                     <div class="row">
-                        <div class="col-md-8">
-                            <div class="mb-3">
-                                <label for="class_name" class="form-label">クラス名 <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="class_name" name="class_name" 
-                                       placeholder="例: 2025年度1年A組" required>
-                                <div class="form-text">分かりやすいクラス名を入力してください</div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="year" class="form-label">年度 <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="year" name="year" 
+                                <input type="number" class="form-control" id="year" name="year"
                                        value="2025" min="2020" max="2030" required>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="semester" class="form-label">学期 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="semester" name="semester" required>
+                                    <option value="">学期を選択してください</option>
+                                    <option value="first">前期</option>
+                                    <option value="second">後期</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <!-- 学期の選択 -->
+
+                    <!-- クラス名の入力 -->
                     <div class="mb-4">
-                        <label for="semester" class="form-label">学期 <span class="text-danger">*</span></label>
-                        <select class="form-select" id="semester" name="semester" required>
-                            <option value="">学期を選択してください</option>
-                            <option value="first">前期</option>
-                            <option value="second">後期</option>
-                        </select>
+                        <label for="class_name" class="form-label">クラス名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="class_name" name="class_name"
+                               placeholder="例: 情報技術基礎A" required>
+                        <div class="form-text">分かりやすいクラス名を入力してください</div>
                     </div>
 
                     <!-- 【新規追加】評価システム（採点方式）の選択UI -->

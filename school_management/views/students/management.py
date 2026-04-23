@@ -266,8 +266,7 @@ def update_student_points(request, student_id):
                 classroom=classroom,
                 defaults={'points': 0}
             )
-            scp.points = int(points)
-            scp.save()
+            StudentClassPoints.objects.filter(id=scp.id).update(points=int(points))
 
             return JsonResponse({'success': True, 'message': 'ポイントが更新されました'})
         except Exception as e:

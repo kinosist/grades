@@ -3,11 +3,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse  
 from django.shortcuts import render, redirect, get_object_or_404
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.contrib.auth.hashers import make_password
 from django.middleware.csrf import get_token
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 from ...models import CustomUser, Student, ClassRoom, StudentClassPoints
 
 @login_required
@@ -163,16 +164,25 @@ def student_create_view(request):
                         students_to_create.append(Student(
                             email=Student.objects.normalize_email(row['email']) if row['email'] else None,
                             full_name=row['full_name'],
-                            password=make_password(None),
+                            password='',
                             student_number=row['student_number'],
                             furigana=row['furigana'],
                             role='student',
                         ))
+                    # bulk_createではset_passwordが使えないため、事前にハッシュ済みパスワードを設定する
+                    for student in students_to_create:
+                        student.set_password(settings.DEFAULT_STUDENT_PASSWORD)
                     Student.objects.bulk_create(students_to_create, batch_size=500)
             except IntegrityError:
                 messages.error(
                     request,
                     '同時更新により重複が発生したため、一括登録をロールバックしました。再度実行してください。'
+                )
+                return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
+            except Exception:
+                messages.error(
+                    request,
+                    '一括登録中にエラーが発生したため、処理を中止してロールバックしました。入力内容を確認して再実行してください。'
                 )
                 return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
 
@@ -266,7 +276,10 @@ def update_student_points(request, student_id):
                 classroom=classroom,
                 defaults={'points': 0}
             )
-            StudentClassPoints.objects.filter(id=scp.id).update(points=int(points))
+            StudentClassPoints.objects.filter(id=scp.id).update(
+                points=int(points),
+                updated_at=timezone.now(),
+            )
 
             return JsonResponse({'success': True, 'message': 'ポイントが更新されました'})
         except Exception as e:

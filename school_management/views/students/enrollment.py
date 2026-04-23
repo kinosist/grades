@@ -1,10 +1,10 @@
 import json
 from django.shortcuts import render, redirect, get_object_or_404
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.contrib import messages
-from django.contrib.auth.hashers import make_password
 from django.views.decorators.http import require_POST
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -165,11 +165,22 @@ def bulk_student_add_csv(request, class_id):
                     students_to_create.append(Student(
                         email=Student.objects.normalize_email(row['email']) if row['email'] else None,
                         full_name=row['full_name'],
-                        password=make_password(None),
+                        password='',
                         role='student',
                         student_number=row['student_number'],
                     ))
-                created_students = Student.objects.bulk_create(students_to_create, batch_size=500)
+                for student in students_to_create:
+                    student.set_password(settings.DEFAULT_STUDENT_PASSWORD)
+
+                Student.objects.bulk_create(students_to_create, batch_size=500)
+
+                created_students = list(Student.objects.filter(
+                    role='student',
+                    student_number__in=[row['student_number'] for row in pending_students],
+                ))
+
+                if len(created_students) != len(pending_students):
+                    raise IntegrityError('Created student count mismatch after bulk insert')
 
                 through_model = ClassRoom.students.through
                 through_model.objects.bulk_create([
@@ -187,8 +198,8 @@ def bulk_student_add_csv(request, class_id):
                 '同時更新により重複が発生したため、一括追加をロールバックしました。再度実行してください。'
             )
             return render(request, 'school_management/bulk_student_add.html', {'classroom': classroom})
-        except Exception as e:
-            messages.error(request, f'一括追加中にエラーが発生したためロールバックしました: {str(e)}')
+        except Exception:
+            messages.error(request, '一括追加中にエラーが発生したため、処理を中止してロールバックしました。')
             return render(request, 'school_management/bulk_student_add.html', {'classroom': classroom})
         
         messages.success(request, f'{len(pending_students)}人の学生を追加しました。')

@@ -43,7 +43,7 @@ body {
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="group_count" class="form-label">グループ数</label>
-                            <select class="form-control" id="group_count" name="group_count" onchange="updateGroups()">
+                            <select class="form-select" id="group_count" name="group_count" onchange="updateGroups()">
                                 {% if groups %}
                                     {% for i in "12345678" %}
                                         <option value="{{ forloop.counter }}" {% if forloop.counter == max_group_number %}selected{% endif %}>
@@ -220,9 +220,6 @@ function updateGroups() {
                            placeholder="グループ名（任意）"
                            style="background-color: rgba(255,255,255,0.1) !important;">
                 </div>
-                <button type="button" class="btn btn-sm btn-outline-light ms-2" onclick="removeGroup(${i})" title="グループを削除">
-                    <i class="fas fa-times"></i>
-                </button>
             </div>
             <div class="card-body group-drop-zone" 
                  ondrop="drop(event)" 
@@ -506,9 +503,6 @@ function addNewGroup() {
                        placeholder="グループ名（任意）"
                        style="background-color: rgba(255,255,255,0.1) !important;">
             </div>
-            <button type="button" class="btn btn-sm btn-outline-light ms-2" onclick="removeGroup(${newGroupNumber})" title="グループを削除">
-                <i class="fas fa-times"></i>
-            </button>
         </div>
         <div class="card-body group-drop-zone" 
              ondrop="drop(event)" 
@@ -526,86 +520,6 @@ function addNewGroup() {
     
     container.appendChild(groupDiv);
     updateGroupCountSelect();
-}
-
-function removeGroup(groupNumber) {
-    if (confirm('このグループを削除しますか？グループ内のメンバーは学生プールに戻されます。')) {
-        const container = document.getElementById('groupsContainer');
-        const groupCard = container.querySelector(`[data-group="${groupNumber}"]`)?.closest('.card');
-        
-        if (!groupCard) return;
-        
-        // グループ内のメンバーを学生プールに戻す
-        const membersDiv = document.getElementById(`group_${groupNumber}_members`);
-        if (membersDiv) {
-            membersDiv.querySelectorAll('.member-item').forEach(memberItem => {
-                const hiddenInput = memberItem.querySelector(`input[name^="group_${groupNumber}_member"]`);
-                const nameElement = memberItem.querySelector('strong');
-                if (hiddenInput && nameElement) {
-                    const studentId = hiddenInput.value;
-                    const studentName = nameElement.textContent.trim();
-                    restoreStudentToPool(studentId, studentName);
-                }
-            });
-        }
-        
-        // グループを削除
-        groupCard.remove();
-        
-        // グループ番号を再計算して更新
-        renumberGroups();
-        updateGroupCountSelect();
-    }
-}
-
-function renumberGroups() {
-    const container = document.getElementById('groupsContainer');
-    const groups = container.querySelectorAll('.card');
-    
-    groups.forEach((groupCard, index) => {
-        const newGroupNumber = index + 1;
-        const dropZone = groupCard.querySelector('.group-drop-zone');
-        const membersDiv = dropZone.querySelector('.group-members');
-        const placeholder = dropZone.querySelector(`[id^="group_"]`);
-        const headerTitle = groupCard.querySelector('h6');
-        const nameInput = groupCard.querySelector('input[name^="group_"]');
-        const removeButton = groupCard.querySelector('button[onclick^="removeGroup"]');
-        
-        // データ属性を更新
-        dropZone.dataset.group = newGroupNumber;
-        
-        // ヘッダータイトルを更新
-        if (headerTitle) {
-            headerTitle.innerHTML = `<i class="fas fa-users me-2"></i>グループ ${newGroupNumber}`;
-        }
-        
-        // グループ名入力のname属性を更新
-        if (nameInput) {
-            nameInput.name = `group_${newGroupNumber}_name`;
-        }
-        
-        // 削除ボタンのonclick属性を更新
-        if (removeButton) {
-            removeButton.onclick = () => removeGroup(newGroupNumber);
-        }
-        
-        // メンバーのhidden inputのname属性を更新
-        if (membersDiv) {
-            membersDiv.id = `group_${newGroupNumber}_members`;
-            membersDiv.querySelectorAll('input[name^="group_"]').forEach((input, memberIndex) => {
-                if (input.name.includes('_member_')) {
-                    input.name = `group_${newGroupNumber}_member_${memberIndex}`;
-                } else if (input.name.includes('_role_')) {
-                    input.name = `group_${newGroupNumber}_role_${memberIndex}`;
-                }
-            });
-        }
-        
-        // プレースホルダーのIDを更新
-        if (placeholder) {
-            placeholder.id = `group_${newGroupNumber}_placeholder`;
-        }
-    });
 }
 
 function updateGroupCountSelect() {
@@ -696,9 +610,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                    style="background-color: rgba(255,255,255,0.1) !important;"
                                    value="{{ group.group_name|escapejs|default:'' }}">
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-light ms-2" onclick="removeGroup(${groupNum})" title="グループを削除">
-                            <i class="fas fa-times"></i>
-                        </button>
                     </div>
                     <div class="card-body group-drop-zone" 
                          ondrop="drop(event)" 

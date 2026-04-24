@@ -239,9 +239,6 @@ GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '').st
 PEER_EVAL_SESSION_COOKIE_NAME = 'peer_eval_session_id'
 PEER_EVAL_SESSION_TTL_HOURS = int(os.environ.get('PEER_EVAL_SESSION_TTL_HOURS', '24'))
 
-# Student account defaults
-DEFAULT_STUDENT_PASSWORD = os.environ.get('DEFAULT_STUDENT_PASSWORD', '').strip()
-
 # Test discovery (only for test command)
 if len(sys.argv) > 1 and sys.argv[1] == 'test':
     TEST_RUNNER = 'school_management.test_runner.AppDiscoverRunner'

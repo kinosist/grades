@@ -3,7 +3,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse  
 from django.shortcuts import render, redirect, get_object_or_404
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.middleware.csrf import get_token
@@ -70,16 +69,11 @@ def student_create_view(request):
         if registration_type == 'bulk':
             # 一括登録処理
             bulk_student_data = request.POST.get('bulk_student_data', '').strip()
-            default_student_password = (getattr(settings, 'DEFAULT_STUDENT_PASSWORD', '') or '').strip()
             
             if not bulk_student_data:
                 messages.error(request, '学生データを入力してください。')
                 return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
 
-            if not default_student_password:
-                messages.error(request, 'DEFAULT_STUDENT_PASSWORD が未設定のため、一括登録を実行できません。')
-                return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
-            
             lines = bulk_student_data.split('\n')
             errors = []
             pending_students = []
@@ -179,7 +173,8 @@ def student_create_view(request):
                         ))
                     # bulk_createではset_passwordが使えないため、事前にハッシュ済みパスワードを設定する
                     for student in students_to_create:
-                        student.set_password(default_student_password)
+                        default_password = f"student_{student.student_number}"
+                        student.set_password(default_password)
                     Student.objects.bulk_create(students_to_create, batch_size=500)
             except IntegrityError:
                 messages.error(

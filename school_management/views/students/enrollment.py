@@ -1,6 +1,5 @@
 import json
 from django.shortcuts import render, redirect, get_object_or_404
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
@@ -72,7 +71,6 @@ def bulk_student_add(request, class_id):
 def bulk_student_add_csv(request, class_id):
     """学生一括追加（CSV形式）"""
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
-    default_student_password = (getattr(settings, 'DEFAULT_STUDENT_PASSWORD', '') or '').strip()
     
     if request.method == 'POST':
         student_data = request.POST.get('student_data', '').strip()
@@ -81,10 +79,6 @@ def bulk_student_add_csv(request, class_id):
             messages.error(request, '学生データを入力してください。')
             return render(request, 'school_management/bulk_student_add.html', {'classroom': classroom})
 
-        if not default_student_password:
-            messages.error(request, 'DEFAULT_STUDENT_PASSWORD が未設定のため、一括追加を実行できません。')
-            return render(request, 'school_management/bulk_student_add.html', {'classroom': classroom})
-        
         lines = student_data.split('\n')
         errors = []
         pending_students = []
@@ -106,6 +100,10 @@ def bulk_student_add_csv(request, class_id):
             full_name = parts[1].strip() if len(parts) > 1 else ""
             email = parts[2].strip() if len(parts) > 2 and parts[2].strip() else None
             normalized_email = Student.objects.normalize_email(email) if email else None
+
+            if not student_number:
+                errors.append(f'行{line_num}: 学生番号が入力されていません')
+                continue
             
             #  【修正箇所】名前が空っぽ（必須エラー）の場合、スキップしてエラーにする
             if not full_name:
@@ -178,7 +176,8 @@ def bulk_student_add_csv(request, class_id):
                         student_number=row['student_number'],
                     ))
                 for student in students_to_create:
-                    student.set_password(default_student_password)
+                    default_password = f"student_{student.student_number}"
+                    student.set_password(default_password)
 
                 Student.objects.bulk_create(students_to_create, batch_size=500)
 

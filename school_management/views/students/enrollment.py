@@ -72,12 +72,17 @@ def bulk_student_add(request, class_id):
 def bulk_student_add_csv(request, class_id):
     """学生一括追加（CSV形式）"""
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+    default_student_password = (getattr(settings, 'DEFAULT_STUDENT_PASSWORD', '') or '').strip()
     
     if request.method == 'POST':
         student_data = request.POST.get('student_data', '').strip()
         
         if not student_data:
             messages.error(request, '学生データを入力してください。')
+            return render(request, 'school_management/bulk_student_add.html', {'classroom': classroom})
+
+        if not default_student_password:
+            messages.error(request, 'DEFAULT_STUDENT_PASSWORD が未設定のため、一括追加を実行できません。')
             return render(request, 'school_management/bulk_student_add.html', {'classroom': classroom})
         
         lines = student_data.split('\n')
@@ -100,6 +105,7 @@ def bulk_student_add_csv(request, class_id):
             student_number = parts[0].strip()
             full_name = parts[1].strip() if len(parts) > 1 else ""
             email = parts[2].strip() if len(parts) > 2 and parts[2].strip() else None
+            normalized_email = Student.objects.normalize_email(email) if email else None
             
             #  【修正箇所】名前が空っぽ（必須エラー）の場合、スキップしてエラーにする
             if not full_name:
@@ -114,20 +120,20 @@ def bulk_student_add_csv(request, class_id):
                 continue
             seen_student_numbers[student_number] = line_num
 
-            if email:
-                duplicate_email_line = seen_emails.get(email)
+            if normalized_email:
+                duplicate_email_line = seen_emails.get(normalized_email)
                 if duplicate_email_line is not None:
                     errors.append(
                         f'行{line_num}: メールアドレス "{email}" が入力内で重複しています（行{duplicate_email_line}）'
                     )
                     continue
-                seen_emails[email] = line_num
+                seen_emails[normalized_email] = line_num
 
             pending_students.append({
                 'line_num': line_num,
                 'student_number': student_number,
                 'full_name': full_name,
-                'email': email,
+                'email': normalized_email,
             })
 
         if pending_students:
@@ -140,9 +146,11 @@ def bulk_student_add_csv(request, class_id):
                     student_number__in=student_numbers,
                 ).values_list('student_number', flat=True)
             )
-            existing_emails = set(
-                Student.objects.filter(email__in=emails).values_list('email', flat=True)
-            ) if emails else set()
+            existing_emails = {
+                Student.objects.normalize_email(item)
+                for item in Student.objects.filter(email__in=emails).values_list('email', flat=True)
+                if item
+            } if emails else set()
 
             for row in pending_students:
                 if row['student_number'] in existing_student_numbers:
@@ -163,14 +171,14 @@ def bulk_student_add_csv(request, class_id):
                 students_to_create = []
                 for row in pending_students:
                     students_to_create.append(Student(
-                        email=Student.objects.normalize_email(row['email']) if row['email'] else None,
+                        email=row['email'],
                         full_name=row['full_name'],
                         password='',
                         role='student',
                         student_number=row['student_number'],
                     ))
                 for student in students_to_create:
-                    student.set_password(settings.DEFAULT_STUDENT_PASSWORD)
+                    student.set_password(default_student_password)
 
                 Student.objects.bulk_create(students_to_create, batch_size=500)
 

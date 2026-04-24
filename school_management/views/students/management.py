@@ -70,9 +70,14 @@ def student_create_view(request):
         if registration_type == 'bulk':
             # 一括登録処理
             bulk_student_data = request.POST.get('bulk_student_data', '').strip()
+            default_student_password = (getattr(settings, 'DEFAULT_STUDENT_PASSWORD', '') or '').strip()
             
             if not bulk_student_data:
                 messages.error(request, '学生データを入力してください。')
+                return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
+
+            if not default_student_password:
+                messages.error(request, 'DEFAULT_STUDENT_PASSWORD が未設定のため、一括登録を実行できません。')
                 return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
             
             lines = bulk_student_data.split('\n')
@@ -95,6 +100,7 @@ def student_create_view(request):
                 full_name = parts[1]
                 furigana = parts[2]
                 email = parts[3] if len(parts) > 3 and parts[3].strip() else None
+                normalized_email = Student.objects.normalize_email(email) if email else None
 
                 if not student_number or not full_name or not furigana:
                     errors.append(f'行{line_num}: 学籍番号・氏名・ふりがなは必須です')
@@ -108,21 +114,21 @@ def student_create_view(request):
                     continue
                 seen_student_numbers[student_number] = line_num
 
-                if email:
-                    duplicate_email_line = seen_emails.get(email)
+                if normalized_email:
+                    duplicate_email_line = seen_emails.get(normalized_email)
                     if duplicate_email_line is not None:
                         errors.append(
                             f'行{line_num}: メールアドレス "{email}" が入力内で重複しています（行{duplicate_email_line}）'
                         )
                         continue
-                    seen_emails[email] = line_num
+                    seen_emails[normalized_email] = line_num
 
                 pending_students.append({
                     'line_num': line_num,
                     'student_number': student_number,
                     'full_name': full_name,
                     'furigana': furigana,
-                    'email': email,
+                    'email': normalized_email,
                 })
 
             if pending_students:
@@ -135,9 +141,11 @@ def student_create_view(request):
                         student_number__in=student_numbers,
                     ).values_list('student_number', flat=True)
                 )
-                existing_emails = set(
-                    Student.objects.filter(email__in=emails).values_list('email', flat=True)
-                ) if emails else set()
+                existing_emails = {
+                    Student.objects.normalize_email(item)
+                    for item in Student.objects.filter(email__in=emails).values_list('email', flat=True)
+                    if item
+                } if emails else set()
 
                 for row in pending_students:
                     if row['student_number'] in existing_student_numbers:
@@ -162,7 +170,7 @@ def student_create_view(request):
                     students_to_create = []
                     for row in pending_students:
                         students_to_create.append(Student(
-                            email=Student.objects.normalize_email(row['email']) if row['email'] else None,
+                            email=row['email'],
                             full_name=row['full_name'],
                             password='',
                             student_number=row['student_number'],
@@ -171,7 +179,7 @@ def student_create_view(request):
                         ))
                     # bulk_createではset_passwordが使えないため、事前にハッシュ済みパスワードを設定する
                     for student in students_to_create:
-                        student.set_password(settings.DEFAULT_STUDENT_PASSWORD)
+                        student.set_password(default_student_password)
                     Student.objects.bulk_create(students_to_create, batch_size=500)
             except IntegrityError:
                 messages.error(

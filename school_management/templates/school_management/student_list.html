@@ -89,6 +89,24 @@
         transform: scale(0.97);
         background-color: #f8fafc;
     }
+
+    .pagination .page-link {
+        border-radius: 10px;
+        margin: 0 4px;
+        border: 1px solid #dbe5f0;
+        color: #1d4ed8;
+        font-weight: 600;
+    }
+
+    .pagination .page-item.active .page-link {
+        background-color: #1d4ed8;
+        border-color: #1d4ed8;
+        color: #fff;
+    }
+
+    .pagination .page-item.disabled .page-link {
+        color: #94a3b8;
+    }
 </style>
 {% endblock %}
 
@@ -176,6 +194,37 @@
                             {% endfor %}
                         </div>
                     </div>
+
+                    {% if students_page.paginator.num_pages > 1 %}
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mt-4">
+                        <small class="text-muted">
+                            {{ students_page.start_index }} - {{ students_page.end_index }} / {{ students_page.paginator.count }} 件
+                        </small>
+                        <nav aria-label="学生一覧のページネーション">
+                            <ul class="pagination mb-0">
+                                <li class="page-item {% if not students_page.has_previous %}disabled{% endif %}">
+                                    <a class="page-link" href="?page={% if students_page.has_previous %}{{ students_page.previous_page_number }}{% else %}1{% endif %}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}">前へ</a>
+                                </li>
+
+                                {% for page_num in students_page.paginator.page_range %}
+                                    {% if page_num == students_page.number %}
+                                        <li class="page-item active" aria-current="page">
+                                            <span class="page-link">{{ page_num }}</span>
+                                        </li>
+                                    {% elif page_num >= students_page.number|add:'-2' and page_num <= students_page.number|add:'2' %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_num }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}">{{ page_num }}</a>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+
+                                <li class="page-item {% if not students_page.has_next %}disabled{% endif %}">
+                                    <a class="page-link" href="?page={% if students_page.has_next %}{{ students_page.next_page_number }}{% else %}{{ students_page.paginator.num_pages }}{% endif %}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}">次へ</a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                    {% endif %}
 
                 {% else %}
                     <div class="text-center py-5 opacity-50">

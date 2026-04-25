@@ -79,7 +79,6 @@ urlpatterns = [
     # --- グループ管理（Groups） ---
     path('lesson-sessions/<int:session_id>/groups/', groups.group_list_view, name='group_list'),
     path('lesson-sessions/<int:session_id>/groups/create/', groups.group_management, name='group_management'),
-    path('lesson-sessions/<int:session_id>/groups/add/', groups.group_add_view, name='group_add'),
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/', groups.group_detail_view, name='group_detail'),
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/edit/', groups.group_edit_view, name='group_edit'),
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/delete/', groups.group_delete_view, name='group_delete'),

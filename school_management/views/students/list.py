@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db.models import Q
 from ...models import Student
 
@@ -43,9 +44,14 @@ def student_list_view(request):
             Q(student_number__icontains=search_query) |
             Q(full_name__icontains=search_query)
         )
+
+    paginator = Paginator(students, 30)
+    page_number = request.GET.get('page')
+    students_page = paginator.get_page(page_number)
     
     context = {
-        'students': students,
+        'students': students_page,
+        'students_page': students_page,
         'search_query': search_query,
     }
     return render(request, 'school_management/student_list.html', context)

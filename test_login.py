@@ -12,6 +12,25 @@ django.setup()
 from django.test import Client
 from django.contrib.auth import get_user_model
 
+def ensure_test_user():
+    """テスト用ログインユーザーを用意する"""
+    User = get_user_model()
+    user = User.objects.filter(email='admin@test.com').first()
+    if user:
+        if not user.is_teacher:
+            user.role = 'teacher'
+            user.save(update_fields=['role'])
+        return user
+
+    return User.objects.create_user(
+        email='admin@test.com',
+        full_name='Test Admin',
+        password='admin123',
+        role='teacher',
+        is_staff=True,
+    )
+
+
 def test_student_create_access():
     """学生作成ページへのアクセステスト"""
     client = Client()
@@ -24,14 +43,9 @@ def test_student_create_access():
     
     # ログイン
     print("\n=== ログイン ===")
-    User = get_user_model()
-    try:
-        user = User.objects.get(email='admin@test.com')
-        client.force_login(user)
-        print("ログイン成功")
-    except User.DoesNotExist:
-        print("ユーザーが見つかりません")
-        return
+    user = ensure_test_user()
+    client.force_login(user)
+    print("ログイン成功（テストユーザー準備済み）")
     
     # ログイン後のアクセス
     print("\n=== ログイン後のアクセス ===")

@@ -172,38 +172,6 @@ def group_edit_view(request, session_id, group_id):
     return render(request, 'school_management/group_edit.html', context)
 
 @login_required
-def group_add_view(request, session_id):
-    """グループを追加（既存のグループを保持したまま）"""
-    lesson_session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
-    
-    if request.method == 'POST':
-        # 既存のグループ番号の最大値を取得
-        existing_groups = Group.objects.filter(lesson_session=lesson_session)
-        if existing_groups.exists():
-            max_group_number = existing_groups.aggregate(Max('group_number'))['group_number__max']
-            new_group_number = max_group_number + 1
-        else:
-            new_group_number = 1
-        
-        # グループ名を取得
-        group_name = request.POST.get('group_name', '').strip()
-        
-        # 新しいグループを作成
-        new_group = Group.objects.create(
-            lesson_session=lesson_session,
-            group_number=new_group_number,
-            group_name=group_name if group_name else f'グループ{new_group_number}'
-        )
-        
-        messages.success(request, f'グループ「{new_group.display_name}」を追加しました。')
-        return redirect('school_management:group_list', session_id=session_id)
-    
-    context = {
-        'lesson_session': lesson_session,
-    }
-    return render(request, 'school_management/group_add.html', context)
-
-@login_required
 def group_delete_view(request, session_id, group_id):
     """グループ削除"""
     lesson_session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)

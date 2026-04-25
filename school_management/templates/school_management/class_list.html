@@ -47,8 +47,8 @@
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>クラス名</th>
                                     <th>年度・学期</th>
+                                    <th>クラス名</th>
                                     <th>学生数</th>
                                     <th>作成日</th>
                                 </tr>
@@ -57,13 +57,13 @@
                                 {% for classroom in classes %}
                                 <tr class="clickable-row" onclick="window.location=`{% url 'school_management:class_detail' classroom.id %}`">
                                     <td>
-                                        <i class="fas fa-chalkboard me-2 text-primary"></i><strong>{{ classroom.class_name }}</strong>
-                                    </td>
-                                    <td>
                                         {{ classroom.year }}年度
                                         <span class="badge bg-{% if classroom.semester == 'first' %}primary{% else %}secondary{% endif %} ms-1">
                                             {{ classroom.get_semester_display }}
                                         </span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ classroom.class_name }}</strong>
                                     </td>
                                     <td><i class="fas fa-users me-2 text-muted"></i>{{ classroom.students.count }}名</td>
                                     <td><small class="text-muted">{{ classroom.created_at|date:"Y/m/d" }}</small></td>

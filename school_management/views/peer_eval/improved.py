@@ -1,6 +1,7 @@
 import json
 import secrets
 import uuid
+from types import SimpleNamespace
 from datetime import timedelta
 from urllib import parse, request as urllib_request, error as urllib_error
 
@@ -240,24 +241,21 @@ def peer_evaluation_links(request, session_id):
 def peer_evaluation_common_form(request, session_id):
     """ピア評価フォーム（PeerEvaluationSettings に基づいて動的に生成）"""
     lesson_session = get_object_or_404(LessonSession, id=session_id)
-    
-    # ピア評価設定が完了しているか確認
-    if not lesson_session.peer_evaluation_configured:
-        return render(request, 'school_management/improved_peer_evaluation_form_full.html', {
-            'lesson_session': lesson_session,
-            'error_message': '教員がピア評価を設定していません。',
-            'is_configuration_error': True,
-        })
-    
-    pe_settings = lesson_session.peer_evaluation_settings
-    
-    # ステータスチェック
-    if lesson_session.peer_evaluation_status == LessonSession.PeerEvaluationStatus.NOT_OPEN:
-        return render(request, 'school_management/improved_peer_evaluation_form_full.html', {
-            'lesson_session': lesson_session,
-            'error_message': 'ピア評価はまだ受付を開始していません。',
-            'is_configuration_error': True,
-        })
+
+    # 後方互換: 設定が未作成の場合も最低限の共通フォームを動かす
+    try:
+        pe_settings = lesson_session.peer_evaluation_settings
+    except PeerEvaluationSettings.DoesNotExist:
+        pe_settings = SimpleNamespace(
+            enable_member_evaluation=False,
+            enable_group_evaluation=True,
+            member_scores=[],
+            group_scores=[1, 1],
+            member_reason_control='DISABLED',
+            group_reason_control='OPTIONAL',
+            evaluation_method='DIRECT',
+            show_points=False,
+        )
     
     if lesson_session.peer_evaluation_status == LessonSession.PeerEvaluationStatus.CLOSED:
         return render(request, 'school_management/improved_peer_evaluation_form_full.html', {
@@ -372,6 +370,18 @@ def peer_evaluation_common_form(request, session_id):
                 rank = rank_item['rank']
                 raw_group_id = request.POST.get(f'group_rank_{rank}')
                 reason = request.POST.get(f'group_reason_{rank}', '')
+
+                # 後方互換: 旧フォーム項目を受け付ける
+                if not raw_group_id:
+                    if rank == 1:
+                        raw_group_id = request.POST.get('first_place_group')
+                    elif rank == 2:
+                        raw_group_id = request.POST.get('second_place_group')
+                if not reason:
+                    if rank == 1:
+                        reason = request.POST.get('first_place_reason', '')
+                    elif rank == 2:
+                        reason = request.POST.get('second_place_reason', '')
                 
                 if not raw_group_id:
                     validation_errors.append(f'❌ グループ評価の{rank}位：グループを選択してください。')

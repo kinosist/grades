@@ -34,13 +34,16 @@ def session_create_view(request, class_id):
         else:
             messages.error(request, '授業回と日付は必須です。')
     
-    # 次の授業回番号を提案
-    last_session = LessonSession.objects.filter(classroom=classroom).order_by('-session_number').first()
-    next_session_number = (last_session.session_number + 1) if last_session else 1
+    # 利用可能な授業回番号を計算
+    existing_session_numbers = set(
+        LessonSession.objects.filter(classroom=classroom).values_list('session_number', flat=True)
+    )
+    # 15回までを標準とする
+    available_numbers = [num for num in range(1, 16) if num not in existing_session_numbers]
     
     context = {
         'classroom': classroom,
-        'next_session_number': next_session_number,
+        'available_numbers': available_numbers,
     }
     return render(request, 'school_management/session_create.html', context)
 

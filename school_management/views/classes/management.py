@@ -4,6 +4,7 @@ from django.views.decorators.http import require_POST
 from django.middleware.csrf import get_token
 from django.contrib import messages
 from ...models import ClassRoom
+import datetime
 
 @login_required
 def class_create_view(request):
@@ -14,8 +15,6 @@ def class_create_view(request):
     新規クラス(ClassRoom)レコードを作成する。
     また、作成者を担当教員として自動的に紐付ける。
     """
-    csrf_token = get_token(request)
-    
     if request.method == 'POST':
         # フォームから送信された基本情報を取得
         class_name = request.POST.get('class_name')
@@ -51,8 +50,36 @@ def class_create_view(request):
                 messages.error(request, '年度は数値で入力してください。')
         else:
             messages.error(request, '必須項目を入力してください。')
-    
-    return render(request, 'school_management/class_create.html', {'csrf_token': csrf_token})
+
+    # GETリクエスト、またはPOSTでエラーがあった場合に表示するコンテキストを準備
+    now = datetime.datetime.now()
+    current_year = now.year
+    current_month = now.month
+
+    # 年度範囲の設定（現在の年から-5年、+5年）
+    year_range_min = current_year - 5
+    year_range_max = current_year + 5
+
+    # 学期のデフォルト設定
+    # 4月～8月: 「前期」
+    # 9月～3月: 「後期」
+    if 4 <= current_month <= 8:
+        default_semester = 'first'
+    else:
+        default_semester = 'second'
+
+    context = {
+        'csrf_token': get_token(request),
+        'default_year': current_year,
+        'year_range_min': year_range_min,
+        'year_range_max': year_range_max,
+        'default_semester': default_semester,
+    }
+    # POSTでエラーがあった場合、入力値を復元するためにcontextに追加
+    if request.method == 'POST':
+        context['form_data'] = request.POST
+
+    return render(request, 'school_management/class_create.html', context)
 
 @login_required
 @require_POST

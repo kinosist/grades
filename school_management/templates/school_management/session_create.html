@@ -23,10 +23,11 @@
                         <div class="col-md-4">
                             <div class="mb-3">
                                 <label for="session_number" class="form-label">回番号 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="session_number" name="session_number" required>
-                                    <option value="">選択してください</option>
-                                    {% for i in "123456789012345"|make_list %}
-                                        <option value="{{ forloop.counter }}">第{{ forloop.counter }}回</option>
+                                <select class="form-select" id="session_number" name="session_number" required {% if not available_numbers %}disabled{% endif %}>
+                                    {% for num in available_numbers %}
+                                        <option value="{{ num }}" {% if forloop.first %}selected{% endif %}>第{{ num }}回</option>
+                                    {% empty %}
+                                        <option value="" disabled>作成可能な授業回がありません</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -61,7 +62,7 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" {% if not available_numbers %}disabled{% endif %}>
                             <i class="fas fa-save me-2"></i>授業回を作成
                         </button>
                         <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-secondary">

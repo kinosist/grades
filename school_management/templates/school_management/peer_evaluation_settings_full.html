@@ -1,12 +1,12 @@
 {% extends 'school_management/base.html' %}
 
-{% block title %}ピア評価設定 - {{ lesson_session }}{% endblock %}
-{% block page_title %}ピア評価設定 - {{ lesson_session }}{% endblock %}
+{% block title %}ピア評価設定 - {{ lesson_session_model_instance }}{% endblock %}
+{% block page_title %}ピア評価設定 - {{ lesson_session_model_instance }}{% endblock %}
 
 {% block breadcrumbs %}
 <li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
-<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' lesson_session.classroom.id %}">{{ lesson_session.classroom.class_name }}</a></li>
-<li class="breadcrumb-item"><a href="{% url 'school_management:session_detail' lesson_session.id %}">第{{ lesson_session.session_number }}回</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' lesson_session_model_instance.classroom.id %}">{{ lesson_session_model_instance.classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:session_detail' lesson_session_model_instance.id %}">第{{ lesson_session_model_instance.session_number }}回</a></li>
 <li class="breadcrumb-item active">ピア評価設定</li>
 {% endblock %}
 
@@ -186,7 +186,7 @@
                 <button type="submit" class="btn btn-primary btn-lg" onclick="prepareSubmit()">
                     <i class="fas fa-save me-2"></i>設定を保存
                 </button>
-                <a href="{% url 'school_management:session_detail' lesson_session.id %}" class="btn btn-outline-secondary btn-lg ms-2">
+                <a href="{% url 'school_management:session_detail' lesson_session_model_instance.id %}" class="btn btn-outline-secondary btn-lg ms-2">
                     キャンセル
                 </a>
             </div>

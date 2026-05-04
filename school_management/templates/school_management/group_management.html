@@ -24,7 +24,17 @@ body {
                 <h5><i class="fas fa-users me-2"></i>グループ編成</h5>
                 <div>
                     <button type="submit" form="groupForm" id="saveButton" class="btn btn-primary btn-sm me-2" disabled>
-                        <i class="fas fa-save me-1"></i>グループ編成を保存
+                        <i class="fas fa-save me-1"></i>{% if groups %}グループ編成を更新{% else %}グループ編成を保存{% endif %}
+                    </button>
+                    <!-- 新しく追加するボタン群 -->
+                    <button type="button" class="btn btn-success btn-sm me-2" onclick="addNewGroup()">
+                        <i class="fas fa-plus me-1"></i>グループ追加
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm me-2" onclick="shuffleMembers()">
+                        <i class="fas fa-random me-1"></i>ランダム配置
+                    </button>
+                    <button type="button" class="btn btn-outline-warning btn-sm me-2" onclick="clearAll()">
+                        <i class="fas fa-eraser me-1"></i>全クリア
                     </button>
                     <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-info btn-sm me-2">
                         <i class="fas fa-list me-1"></i>グループ一覧
@@ -81,17 +91,6 @@ body {
                         <!-- グループが動的に生成されます -->
                     </div>
 
-                    <div class="mt-4">
-                        <button type="button" class="btn btn-success btn-sm" onclick="addNewGroup()">
-                            <i class="fas fa-plus me-1"></i>グループ追加
-                        </button>
-                        <button type="button" class="btn btn-outline-info btn-sm" onclick="shuffleMembers()">
-                            <i class="fas fa-random me-1"></i>ランダム配置
-                        </button>
-                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearAll()">
-                            <i class="fas fa-eraser me-1"></i>全クリア
-                        </button>
-                    </div>
                 </form>
             </div>
         </div>

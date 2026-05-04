@@ -512,6 +512,70 @@ def peer_evaluation_common_form(request, session_id):
     })
     return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
 
+@login_required
+def peer_evaluation_form_preview(request, session_id):
+    """教員向けのピア評価フォームプレビュー"""
+    if not request.user.is_teacher:
+        messages.error(request, "権限がありません。")
+        return redirect('school_management:dashboard')
+
+    lesson_session = _get_session_for_teacher_or_admin(request, session_id)
+
+    try:
+        pe_settings = lesson_session.peer_evaluation_settings
+    except PeerEvaluationSettings.DoesNotExist:
+        messages.error(request, 'ピア評価設定が完了していません。先に設定を行ってください。')
+        return redirect('school_management:peer_evaluation_settings', session_id=session_id)
+
+    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student')
+    if not groups.exists():
+        messages.error(request, 'グループが編成されていません。プレビューを表示できません。')
+        return redirect('school_management:group_management', session_id=session_id)
+
+    # プレビュー用のダミーデータを生成
+    teacher_as_student = request.user
+    evaluator_group = groups.first()
+    evaluator_group_member_objects = list(
+        GroupMember.objects.filter(group=evaluator_group)
+        .select_related('student')
+        .values('student__id', 'student__full_name')
+    )
+    other_groups = groups.exclude(id=evaluator_group.id)
+    ordered_other_groups = list(other_groups.order_by('group_number', 'id'))
+
+    member_score_list = pe_settings.member_scores or []
+    group_score_list = pe_settings.group_scores or []
+    
+    max_member_rank = min(len(member_score_list), len(evaluator_group_member_objects))
+    max_group_rank = min(len(group_score_list), len(ordered_other_groups))
+    
+    member_ranking_list = [
+        {'rank': i + 1, 'points': member_score_list[i] if i < len(member_score_list) else 0}
+        for i in range(max_member_rank)
+    ]
+    group_ranking_list = [
+        {'rank': i + 1, 'points': group_score_list[i] if i < len(group_score_list) else 0}
+        for i in range(max_group_rank)
+    ]
+
+    context = {
+        'lesson_session': lesson_session,
+        'pe_settings': pe_settings,
+        'is_teacher_preview': True,
+        'authenticated_student': teacher_as_student,
+        'evaluator_group': evaluator_group,
+        'evaluator_group_member_objects': evaluator_group_member_objects,
+        'other_groups': ordered_other_groups,
+        'member_ranking_list': member_ranking_list,
+        'group_ranking_list': group_ranking_list,
+        'show_scores': pe_settings.show_points,
+        'enable_comments': lesson_session.enable_comments,
+        'enable_feedback': lesson_session.enable_feedback,
+        'enable_member_evaluation': pe_settings.enable_member_evaluation,
+        'enable_group_evaluation': pe_settings.enable_group_evaluation,
+        'groups': groups,
+    }
+    return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
 
 def peer_evaluation_google_start(request, session_id):
     """Google OAuth認証開始"""

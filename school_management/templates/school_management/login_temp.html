@@ -42,6 +42,14 @@
                 </label>
             </div>
             <button class="w-100 btn btn-lg btn-primary" type="submit">ログイン</button>
+
+            <div class="d-flex align-items-center my-3">
+                <hr class="flex-grow-1">
+                <span class="px-3 text-muted">または</span>
+                <hr class="flex-grow-1">
+            </div>
+
+            <a href="{% url 'school_management:google_login' %}" class="w-100 btn btn-lg btn-outline-dark"><i class="fab fa-google me-2"></i>Googleでログイン</a>
             <p class="mt-5 mb-3 text-muted">&copy; 2025 School Management System</p>
         </form>
         

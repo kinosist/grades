@@ -212,7 +212,7 @@ class LessonSession(models.Model):
     date = models.DateField(verbose_name='実施日')
     topic = models.CharField(max_length=200, blank=True, verbose_name='テーマ・内容')
     has_quiz = models.BooleanField(default=False, verbose_name='小テストあり')
-    has_peer_evaluation = models.BooleanField(default=False, verbose_name='ピア評価あり')
+    has_peer_evaluation = models.BooleanField(default=True, verbose_name='ピア評価あり')
     peer_evaluation_status = models.CharField(
         max_length=10,
         choices=PeerEvaluationStatus.choices,

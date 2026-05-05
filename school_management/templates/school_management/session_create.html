@@ -47,20 +47,6 @@
                         <div class="form-text">授業の内容やテーマを簡潔に記入してください（任意）</div>
                     </div>
 
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="has_peer_evaluation" name="has_peer_evaluation">
-                                    <label class="form-check-label" for="has_peer_evaluation">
-                                        <i class="fas fa-users me-1"></i>ピア評価を実施する
-                                    </label>
-                                </div>
-                                <div class="form-text">グループワークのピア評価を実施する場合にチェック</div>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary" {% if not available_numbers %}disabled{% endif %}>
                             <i class="fas fa-save me-2"></i>授業回を作成
@@ -83,15 +69,14 @@
                 <ul class="list-unstyled">
                     <li><i class="fas fa-check text-success me-2"></i>回番号は1〜15回から選択</li>
                     <li><i class="fas fa-check text-success me-2"></i>実施日は必須項目です</li>
-                    <li><i class="fas fa-check text-success me-2"></i>ピア評価は後から変更可能</li>
+                    <li><i class="fas fa-check text-success me-2"></i>ピア評価は自動で有効になります</li>
                     <li><i class="fas fa-check text-success me-2"></i>作成後にグループ編成ができます</li>
                 </ul>
                 
                 <hr>
                 
                 <div class="alert alert-info">
-                    <small><i class="fas fa-lightbulb me-1"></i><strong>ヒント:</strong><br>
-                    ピア評価にチェックを入れると、後でピア評価の管理機能が利用できるようになります。</small>
+                    <small><i class="fas fa-lightbulb me-1"></i><strong>ヒント:</strong><br>ピア評価は自動で有効になり、後でピア評価の管理機能が利用できるようになります。</small>
                 </div>
             </div>
         </div>

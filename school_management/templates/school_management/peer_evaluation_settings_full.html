@@ -24,7 +24,7 @@
 <div class="row justify-content-center">
     <div class="col-lg-10">
 
-        {% if lesson_session.peer_evaluation_status != 'NOT_OPEN' %}
+        {% if lesson_session.peer_evaluation_status == 'CLOSED' %}
         <div class="alert alert-warning">
             <i class="fas fa-lock me-2"></i>受付開始済みのため、設定は変更できません。
         </div>

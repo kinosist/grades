@@ -1043,7 +1043,7 @@ def peer_evaluation_settings_view(request, session_id):
     )
     
     # 受付開始済みの設定は変更不可
-    if lesson_session_db.peer_evaluation_status != LessonSession.PeerEvaluationStatus.NOT_OPEN:
+    if lesson_session_db.peer_evaluation_status == LessonSession.PeerEvaluationStatus.CLOSED:
         messages.warning(request, '受付開始済みのピア評価設定は変更できません。')
         return redirect('school_management:session_detail', session_id=session_id)
     

@@ -338,7 +338,7 @@ class PeerEvaluationSettings(models.Model):
             self.group_evaluation_method = self.EvaluationMethod.DIRECT
 
         session_status = self.lesson_session.peer_evaluation_status
-        if session_status != LessonSession.PeerEvaluationStatus.NOT_OPEN:
+        if session_status == LessonSession.PeerEvaluationStatus.CLOSED: # 締切済みの場合のみ変更不可
             if not self.pk:
                 raise ValidationError('受付開始後のピア評価設定は作成できません。')
 

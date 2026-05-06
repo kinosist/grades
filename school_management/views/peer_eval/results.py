@@ -96,6 +96,7 @@ def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpR
             'group': group,
             'votes_by_rank': dict(votes),
             'total_score': total_score,
+            'internal_points': aggregate_internal_points.get(group.id, 0),
             'evaluations_given': evaluations_given,
             'score': total_score,
         }

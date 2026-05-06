@@ -11,6 +11,117 @@
 <li class="breadcrumb-item active" aria-current="page">ピア評価結果</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+    /* --- Base Styles from class_evaluation.html --- */
+    .table-container {
+        overflow-x: auto;
+        max-height: 80vh;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        position: relative;
+    }
+
+    .evaluation-table {
+        font-size: 14px;
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+        margin-top: 0;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .evaluation-table th,
+    .evaluation-table td {
+        border-bottom: 1px solid #dee2e6;
+        border-right: 1px solid #dee2e6;
+        padding: 12px 8px;
+        text-align: center;
+        vertical-align: middle;
+        background-color: #fff;
+    }
+
+    .evaluation-table th:last-child,
+    .evaluation-table td:last-child {
+        border-right: none;
+    }
+
+    .evaluation-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .evaluation-table th {
+        background-color: #f8f9fa;
+        color: #495057;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    /* --- Sticky Columns --- */
+    .evaluation-table .name-col {
+        width: 160px;
+        min-width: 160px;
+        font-weight: 600;
+        color: #212529;
+        background-color: #fff;
+        position: sticky;
+        left: 0;
+        z-index: 11;
+        border-right: 2px solid #dee2e6;
+        box-shadow: 4px 0 5px -2px rgba(0,0,0,0.1);
+    }
+    .evaluation-table .email-col {
+        width: 200px;
+        min-width: 200px;
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    .evaluation-table td.name-col,
+    .evaluation-table td.email-col {
+        /* データセルは左揃えにする */
+        text-align: left;
+    }
+
+    .evaluation-table .submission-time-col {
+        width: 120px;
+        min-width: 120px;
+    }
+
+    .evaluation-table .submission-status-col {
+        width: 80px;
+        min-width: 80px;
+    }
+
+    /* --- Header Adjustments --- */
+    .evaluation-table thead th.name-col {
+        z-index: 12;
+        background-color: #f8f9fa;
+    }
+
+    /* --- Dynamic detail columns --- */
+    .detail-col {
+        min-width: 120px;
+        font-size: 0.9em;
+    }
+    .detail-col-reason {
+        min-width: 200px;
+        font-size: 0.9em;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .comment-section-divider {
+        /* 評価項目とコメント欄を区切るための、少し太い左境界線 */
+        border-left: 2px solid #dee2e6 !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
     <!-- ヘッダー -->
     <div class="row mb-4">
@@ -98,28 +209,68 @@
         </div>
     </div>
 
+    <!-- Submission Status Table -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5><i class="fas fa-user-check me-2"></i>提出状況</h5>
+                    <div class="btn-group" role="group" aria-label="View mode toggle">
+                        <a href="?mode=simple" class="btn btn-sm {% if view_mode == 'simple' %}btn-primary{% else %}btn-outline-secondary bg-white{% endif %}">
+                            簡易
+                        </a>
+                        <a href="?mode=detail" class="btn btn-sm {% if view_mode == 'detail' %}btn-primary{% else %}btn-outline-secondary bg-white{% endif %}">
+                            詳細
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <p class="m-1">提出した学生名をクリックして、提出内容を確認することができます。</p>
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
+                    {% if submission_rows %}
+                    <div class="table-container">
+                        {% if view_mode == 'simple' %}
+                        <p class="m-3 text-muted small">簡易表示では提出の有無のみ確認できます。詳細な提出内容を確認するには「詳細」表示に切り替えてください。</p>
+                        {% endif %}
+                        <table class="evaluation-table mode-{{ view_mode }}">
+                            <thead>
                                 <tr>
-                                    <th>学生名</th>
-                                    <th>メール</th>
-                                    <th>提出日時</th>
-                                    <th class="text-center">提出</th>
+                                    <th class="name-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>学生名</th>
+                                    <th class="email-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>メール</th>
+                                    <th class="submission-time-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>提出日時</th>
+                                    <th class="text-center submission-status-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>提出</th>
+                                    {% if view_mode == 'detail' %}
+                                        {% if pe_settings.enable_member_evaluation %}
+                                            {% for rank_item in member_ranking_list %}
+                                                <th colspan="2" class="text-center">メンバー{{ rank_item.rank }}位</th>
+                                            {% endfor %}
+                                        {% endif %}
+                                        {% if pe_settings.enable_group_evaluation %}
+                                            {% for rank_item in group_ranking_list %}
+                                                <th colspan="2" class="text-center">グループ{{ rank_item.rank }}位</th>
+                                            {% endfor %}
+                                        {% endif %}
+                                        {% if lesson_session.enable_comments %}
+                                            <th rowspan="2" class="detail-col-reason comment-section-divider">グループワークコメント</th>
+                                        {% endif %}
+                                        {% if lesson_session.enable_feedback %}
+                                            <th rowspan="2" class="detail-col-reason comment-section-divider">授業の感想</th>
+                                        {% endif %}
+                                    {% endif %}
                                 </tr>
+                                {% if view_mode == 'detail' %}
+                                <tr>
+                                    {% if pe_settings.enable_member_evaluation %}{% for rank_item in member_ranking_list %}
+                                        <th class="detail-col">対象者</th><th class="detail-col-reason">理由</th>
+                                    {% endfor %}{% endif %}
+                                    {% if pe_settings.enable_group_evaluation %}{% for rank_item in group_ranking_list %}
+                                        <th class="detail-col">対象グループ</th><th class="detail-col-reason">理由</th>
+                                    {% endfor %}{% endif %}
+                                </tr>
+                                {% endif %}
                             </thead>
                             <tbody>
                                 {% for row in submission_rows %}
-                                <tr {% if row.submitted %}role="button" data-bs-toggle="modal" data-bs-target="#submissionDetailModal{{ row.student.id }}" style="cursor: pointer;"{% endif %}>
-                                    <td>
+                                <tr>
+                                    <td class="name-col">
                                         {% if row.submitted %}
                                             <span class="text-primary fw-semibold">
                                                 {{ row.student.full_name }}
@@ -128,100 +279,71 @@
                                             {{ row.student.full_name }}
                                         {% endif %}
                                     </td>
-                                    <td>{{ row.email|default:'-' }}</td>
-                                    <td>
+                                    <td class="email-col">{{ row.email|default:'-' }}</td>
+                                    <td class="submission-time-col">
                                         {% if row.submitted_at %}
                                             {{ row.submitted_at|date:"Y-m-d H:i" }}
                                         {% else %}
                                             -
                                         {% endif %}
                                     </td>
-                                    <td class="text-center">
+                                    <td class="text-center submission-status-col">
                                         {% if row.submitted %}
                                             <i class="fas fa-check text-success"></i>
                                         {% else %}
                                             <i class="fas fa-times text-danger"></i>
                                         {% endif %}
                                     </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted py-3">履修学生がいません。</td>
+                                    {% if view_mode == 'detail' %}
+                                        {% if row.submitted %}
+                                            {% if pe_settings.enable_member_evaluation %}{% for eval_data in row.member_eval_by_rank %}
+                                                <td class="detail-col">{{ eval_data.target_name|default:"-" }}</td>
+                                                <td class="detail-col-reason">{{ eval_data.reason|default:"-" }}</td>
+                                            {% endfor %}{% endif %}
+                                            {% if pe_settings.enable_group_evaluation %}{% for eval_data in row.group_eval_by_rank %}
+                                                <td class="detail-col">{{ eval_data.target_name|default:"-" }}</td>
+                                                <td class="detail-col-reason">{{ eval_data.reason|default:"-" }}</td>
+                                            {% endfor %}{% endif %}
+                                            {% if lesson_session.enable_comments %}
+                                                <td class="detail-col-reason comment-section-divider">{{ row.submission_detail.general_comment|default:"-" }}</td>
+                                            {% endif %}
+                                            {% if lesson_session.enable_feedback %}
+                                                <td class="detail-col-reason comment-section-divider">{{ row.submission_detail.class_comment|default:"-" }}</td>
+                                            {% endif %}
+                                        {% else %}
+                                            {# Render empty cells to maintain table structure #}
+                                            {% if pe_settings.enable_member_evaluation %}{% for rank_item in member_ranking_list %}
+                                                <td>-</td>
+                                                <td>-</td>
+                                            {% endfor %}{% endif %}
+                                            {% if pe_settings.enable_group_evaluation %}{% for rank_item in group_ranking_list %}
+                                                <td>-</td>
+                                                <td>-</td>
+                                            {% endfor %}{% endif %}
+                                            {% if lesson_session.enable_comments %}
+                                                <td class="comment-section-divider">-</td>
+                                            {% endif %}
+                                            {% if lesson_session.enable_feedback %}
+                                                <td class="comment-section-divider">-</td>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">履修学生がいません。</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
-
-    {% for row in submission_rows %}
-        {% if row.submitted %}
-        <div class="modal fade" id="submissionDetailModal{{ row.student.id }}" tabindex="-1" aria-labelledby="submissionDetailModalLabel{{ row.student.id }}" aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="submissionDetailModalLabel{{ row.student.id }}">
-                            {{ row.student.full_name }} さんの提出内容
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
-                    </div>
-                    <div class="modal-body">
-                        {% if row.submission_detail.has_content %}
-                            {% if row.submission_detail.group_evaluations %}
-                            <div class="mb-4">
-                                <h6 class="fw-bold text-warning"><i class="fas fa-layer-group me-2"></i>他グループ評価</h6>
-                                {% for item in row.submission_detail.group_evaluations %}
-                                <div class="border rounded p-2 mb-2">
-                                    <div><strong>{{ item.rank }}位:</strong> {{ item.target_name }}</div>
-                                    {% if item.reason %}
-                                    <div class="small text-muted mt-1">{{ item.reason }}</div>
-                                    {% endif %}
-                                </div>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-
-                            {% if row.submission_detail.member_evaluations %}
-                            <div class="mb-4">
-                                <h6 class="fw-bold text-success"><i class="fas fa-user-friends me-2"></i>チームメンバー評価</h6>
-                                {% for item in row.submission_detail.member_evaluations %}
-                                <div class="border rounded p-2 mb-2">
-                                    <div><strong>{{ item.rank }}位:</strong> {{ item.target_name }}</div>
-                                    {% if item.reason %}
-                                    <div class="small text-muted mt-1">{{ item.reason }}</div>
-                                    {% endif %}
-                                </div>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-
-                            {% if row.submission_detail.general_comment %}
-                            <div class="mb-3">
-                                <h6 class="fw-bold text-info"><i class="fas fa-comment me-2"></i>コメント</h6>
-                                <p class="mb-0">{{ row.submission_detail.general_comment }}</p>
-                            </div>
-                            {% endif %}
-
-                            {% if row.submission_detail.class_comment %}
-                            <div class="mb-0">
-                                <h6 class="fw-bold text-secondary"><i class="fas fa-lightbulb me-2"></i>授業の感想</h6>
-                                <p class="mb-0">{{ row.submission_detail.class_comment }}</p>
-                            </div>
-                            {% endif %}
-                        {% else %}
-                            <p class="text-muted mb-0">提出内容の詳細データはありません。</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-    {% endfor %}
-
-    <!-- グループランキング -->
+    
+    <!-- グループランキング (remains as a separate section) -->
     <div class="row">
         <div class="col-lg-8">
                 <div class="card">
@@ -306,7 +428,7 @@
             </div>
         </div>
 
-        <!-- 詳細コメント -->
+        <!-- 詳細コメント (This section was previously in a separate tab, now it's a separate card below the main table) -->
         <div class="col-lg-4">
             <div class="card">
                 <div class="card-header">

@@ -60,10 +60,19 @@ def _build_submission_detail(evaluation, group_name_map, student_name_map):
         if rank is None:
             continue
         member_id = _safe_int(entry.get('member_id'))
+        target_name = student_name_map.get(member_id)
+        is_deleted = False
+        if not target_name:
+            if member_id:
+                target_name = '削除済みの生徒'
+                is_deleted = True
+            else:
+                target_name = '不明'
         member_evaluations_list.append({ # Append to the list
             'rank': rank,
-            'target_name': student_name_map.get(member_id, f'学生ID:{member_id}' if member_id else '不明'),
+            'target_name': target_name,
             'reason': (entry.get('reason') or '').strip(),
+            'is_deleted': is_deleted,
         })
     member_evaluations_list.sort(key=lambda x: x['rank']) # Sort by rank for consistent display
 
@@ -921,6 +930,21 @@ def peer_evaluation_results(request, session_id):
     enrolled_students = lesson_session.classroom.students.filter(role='student').order_by('full_name')
     group_name_map = {group.id: group.display_name for group in groups}
     student_name_map = {student.id: student.full_name for student in enrolled_students}
+
+    # Collect all member_ids that were evaluated to build a complete name map
+    all_evaluated_member_ids = set()
+    for ev in evaluations:
+        response = ev.response_json or {}
+        for entry in response.get('group_members_eval', []):
+            member_id = _safe_int(entry.get('member_id'))
+            if member_id:
+                all_evaluated_member_ids.add(member_id)
+
+    # Find evaluated students who are NOT in the current class roster and add them to the map
+    missing_ids = all_evaluated_member_ids - set(student_name_map.keys())
+    if missing_ids:
+        missing_students_map = {s['id']: s['full_name'] for s in Student.objects.filter(id__in=missing_ids).values('id', 'full_name')}
+        student_name_map.update(missing_students_map)
 
     submission_map = {}
     for evaluation in evaluations.order_by('student_id', '-created_at'):

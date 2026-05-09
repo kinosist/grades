@@ -297,7 +297,13 @@
                                     {% if view_mode == 'detail' %}
                                         {% if row.submitted %}
                                             {% if pe_settings.enable_member_evaluation %}{% for eval_data in row.member_eval_by_rank %}
-                                                <td class="detail-col">{{ eval_data.target_name|default:"-" }}</td>
+                                                <td class="detail-col">
+                                                    {% if eval_data.is_deleted %}
+                                                        <span class="text-danger">{{ eval_data.target_name|default:"-" }}</span>
+                                                    {% else %}
+                                                        {{ eval_data.target_name|default:"-" }}
+                                                    {% endif %}
+                                                </td>
                                                 <td class="detail-col-reason">{{ eval_data.reason|default:"-" }}</td>
                                             {% endfor %}{% endif %}
                                             {% if pe_settings.enable_group_evaluation %}{% for eval_data in row.group_eval_by_rank %}

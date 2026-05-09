@@ -166,15 +166,31 @@ def class_evaluation_view(request, class_id):
             peer_evaluation_score = 0
             contrib_score = 0
             vote_score = 0
-            try:
-                if session.has_peer_evaluation:
-                    # 3-1. 貢献度評価 (5段階評価の合計を取得)
-                    contrib_score = ContributionEvaluation.objects.filter(
-                        peer_evaluation__lesson_session=session,
-                        evaluatee=student
-                    ).aggregate(total=Sum('contribution_score'))['total'] or 0
-                    
-                    # 3-2. 投票ポイントの計算（response_json + 設定配点）
+            if session.has_peer_evaluation:
+                try:
+                    pe_settings = session_peer_settings.get(session.id)
+                    if pe_settings and pe_settings.enable_member_evaluation:
+                        if pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
+                            # DIRECTモード: response_jsonと最新設定から動的に計算
+                            member_scores = pe_settings.member_scores or []
+                            evals_for_student = PeerEvaluation.objects.filter(lesson_session=session)
+                            current_contrib_score = 0
+                            for ev in evals_for_student:
+                                response = ev.response_json or {}
+                                for entry in response.get('group_members_eval', []):
+                                    if _safe_int(entry.get('member_id')) == student.id:
+                                        rank = _safe_int(entry.get('rank'))
+                                        if rank and 1 <= rank <= len(member_scores):
+                                            current_contrib_score += member_scores[rank - 1]
+                            contrib_score = current_contrib_score
+                        else: # AGGREGATEモード
+                            # AGGREGATEモード: 既存のContributionEvaluationを集計
+                            contrib_score = ContributionEvaluation.objects.filter(
+                                peer_evaluation__lesson_session=session,
+                                evaluatee=student
+                            ).aggregate(total=Sum('contribution_score'))['total'] or 0
+
+                    # 3-2. 投票ポイントの計算
                     membership = GroupMember.objects.filter(
                         student=student,
                         group__lesson_session=session
@@ -182,7 +198,6 @@ def class_evaluation_view(request, class_id):
                     
                     if membership:
                         group = membership.group
-                        pe_settings = session_peer_settings.get(session.id)
                         score_points = (
                             pe_settings.group_scores or []
                         ) if pe_settings and pe_settings.enable_group_evaluation else []
@@ -191,10 +206,10 @@ def class_evaluation_view(request, class_id):
                             vote_score = group_point_map.get(group.id, 0)
 
                     peer_evaluation_score = contrib_score + vote_score
-            except Exception as e:
-                logger.error(f"ピア評価スコア取得エラー: {e}", exc_info=True)
-                pass
-            
+                except Exception as e:
+                    logger.error(f"ピア評価スコア取得エラー: {e}", exc_info=True)
+                    pass
+
             # セッションごとのデータを辞書に保存
             session_data[session_key] = {
                 'manual_points': manual_points,

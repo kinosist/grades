@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Sum
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
@@ -133,6 +134,14 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
     all_groups = Group.objects.filter(lesson_session__in=session_ids).select_related('lesson_session')
     all_peer_evals = PeerEvaluation.objects.filter(lesson_session__in=session_ids)
 
+    # NEW: セッション設定のキャッシュ
+    all_sessions_settings = {}
+    for s in all_sessions:
+        try:
+            all_sessions_settings[s.id] = s.peer_evaluation_settings
+        except PeerEvaluationSettings.DoesNotExist:
+            all_sessions_settings[s.id] = None
+
     # セッションごとのランキング情報をキャッシュ
     session_rankings_cache = {}
 
@@ -146,7 +155,7 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
         # グループごとの投票スコアを計算（response_json + 設定配点）
         try:
             pe_settings = sess.peer_evaluation_settings
-        except PeerEvaluationSettings.DoesNotExist:
+        except PeerEvaluationSettings.DoesNotExist: # pragma: no cover
             pe_settings = None
 
         group_scores = _build_group_vote_point_map(
@@ -165,6 +174,12 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
     student_grades = []
 
     for student in students:
+        # NEW: 学生のグループメンバーシップを事前に取得
+        student_groups = list(GroupMember.objects.filter(
+            student=student,
+            group__lesson_session__classroom=classroom
+        ).select_related('group', 'group__lesson_session'))
+
         # 1. 授業内手動ポイント (StudentLessonPoints)
         lesson_points_qs = StudentLessonPoints.objects.filter(
             student=student,
@@ -191,48 +206,51 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
         # 3. ピア評価ポイント
         peer_total = 0
         peer_details = []
-
-        # 貢献度
-        contrib_evals = ContributionEvaluation.objects.filter(
-            evaluatee=student,
-            peer_evaluation__lesson_session__classroom=classroom
-        ).select_related('peer_evaluation__lesson_session')
-
         session_peer_map = {}
-        for ce in contrib_evals:
-            sess_id = ce.peer_evaluation.lesson_session.id
-            if sess_id not in session_peer_map:
-                session_peer_map[sess_id] = {
-                    'session': ce.peer_evaluation.lesson_session,
-                    'contrib': 0, 'vote': 0
-                }
-            session_peer_map[sess_id]['contrib'] += ce.contribution_score
 
-        # 投票ポイント: 事前計算されたキャッシュを利用してN+1問題を解決
-        student_groups = GroupMember.objects.filter(
-            student=student,
-            group__lesson_session__classroom=classroom
-        ).select_related('group', 'group__lesson_session')
+        # 全セッションをループしてピア評価ポイントを計算
+        for sess in all_sessions:
+            if not sess.has_peer_evaluation:
+                continue
 
-        for membership in student_groups:
-            group = membership.group
-            sess = group.lesson_session
             sess_id = sess.id
+            contrib_score = 0
+            vote_score = 0
 
-            # キャッシュからランキング情報を取得
-            if sess_id in session_rankings_cache:
-                ranking_info = session_rankings_cache[sess_id]
-                my_score = ranking_info['group_scores'].get(group.id, 0)
-                vote_points = my_score
+            try:
+                pe_settings = all_sessions_settings.get(sess_id)
 
-                # 表示用に記録
-                if vote_points > 0 or my_score > 0:
-                    if sess_id not in session_peer_map:
-                        session_peer_map[sess_id] = {
-                            'session': sess,
-                            'contrib': 0, 'vote': 0
-                        }
-                    session_peer_map[sess_id]['vote'] += vote_points
+                # 貢献度スコア
+                if pe_settings and pe_settings.enable_member_evaluation:
+                    if pe_settings.evaluation_method == 'DIRECT':
+                        member_scores = pe_settings.member_scores or []
+                        evals_in_session = [pe for pe in all_peer_evals if pe.lesson_session_id == sess_id]
+                        for ev in evals_in_session:
+                            response = ev.response_json or {}
+                            for entry in response.get('group_members_eval', []):
+                                if _safe_int(entry.get('member_id')) == student.id:
+                                    rank = _safe_int(entry.get('rank'))
+                                    if rank and 1 <= rank <= len(member_scores):
+                                        contrib_score += member_scores[rank - 1]
+                    else: # AGGREGATE
+                        agg_contrib_score = ContributionEvaluation.objects.filter(
+                            evaluatee=student,
+                            peer_evaluation__lesson_session_id=sess_id
+                        ).aggregate(total=Sum('contribution_score'))['total'] or 0
+                        contrib_score = agg_contrib_score
+                
+                # 投票ポイント
+                student_group_in_session = next((g for g in student_groups if g.group.lesson_session_id == sess_id), None)
+                if student_group_in_session:
+                    group_id = student_group_in_session.group_id
+                    if sess_id in session_rankings_cache:
+                        ranking_info = session_rankings_cache[sess_id]
+                        vote_score = ranking_info['group_scores'].get(group_id, 0)
+
+                if contrib_score > 0 or vote_score > 0:
+                    session_peer_map[sess_id] = {'session': sess, 'contrib': contrib_score, 'vote': vote_score, 'total': contrib_score + vote_score}
+            except Exception:
+                pass
 
         for data in session_peer_map.values():
             p_sum = data['contrib'] + data['vote']

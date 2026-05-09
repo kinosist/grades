@@ -455,22 +455,34 @@
                             
                             {% for item in row.group_reasons %}
                             <div class="mt-1">
-                                <strong class="text-warning">{{ item.rank }}位グループ理由:</strong>
-                                <p class="small mb-1">{{ item.reason }}</p>
+                                <strong class="text-warning">{{ item.rank }}位グループ理由 (対象: {{ item.target_name }}):</strong>
+                                <p class="small mb-1" style="white-space: pre-wrap;">{{ item.reason }}</p>
                             </div>
                             {% endfor %}
 
                             {% for item in row.member_reasons %}
                             <div class="mt-1">
-                                <strong class="text-success">{{ item.rank }}位メンバー理由:</strong>
-                                <p class="small mb-1">{{ item.reason }}</p>
+                                <strong class="text-success">{{ item.rank }}位メンバー理由 (対象:
+                                    {% if item.is_deleted %}
+                                        <span class="text-danger">{{ item.target_name }}</span>
+                                    {% else %}
+                                        {{ item.target_name }}
+                                    {% endif %}
+                                ):</strong>
+                                <p class="small mb-1" style="white-space: pre-wrap;">{{ item.reason }}</p>
                             </div>
                             {% endfor %}
                             
-                            {% if evaluation.general_comment %}
+                            {% if row.general_comment %}
                             <div class="mt-1">
                                 <strong class="text-info">全体コメント:</strong>
-                                <p class="small mb-1">{{ evaluation.general_comment }}</p>
+                                <p class="small mb-1" style="white-space: pre-wrap;">{{ row.general_comment }}</p>
+                            </div>
+                            {% endif %}
+                            {% if row.class_comment %}
+                            <div class="mt-1">
+                                <strong class="text-secondary">授業の感想:</strong>
+                                <p class="small mb-1" style="white-space: pre-wrap;">{{ row.class_comment }}</p>
                             </div>
                             {% endif %}
                         </div>

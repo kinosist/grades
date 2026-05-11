@@ -2,7 +2,7 @@ from collections import defaultdict
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpRequest, HttpResponse
-from ...models import LessonSession
+from ...models import LessonSession, PeerEvaluationSettings
 
 def _safe_int(value):
     try:
@@ -82,6 +82,25 @@ def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpR
     groups = session.group_set.all()
     group_stats = {}
     
+    # AGGREGATEモードの場合の内部ポイントを計算
+    aggregate_internal_points = {}
+    if (
+        pe_settings
+        and pe_settings.enable_group_evaluation
+        and pe_settings.group_evaluation_method == PeerEvaluationSettings.EvaluationMethod.AGGREGATE
+        and session.peer_evaluation_status == LessonSession.PeerEvaluationStatus.CLOSED
+    ):
+        group_ids = [g.id for g in groups]
+        group_count = len(group_ids)
+        aggregate_internal_points = {gid: 0 for gid in group_ids}
+        for ev in evaluations:
+            response = ev.response_json or {}
+            for entry in response.get('other_group_eval', []):
+                gid = _safe_int(entry.get('group_id'))
+                rank = _safe_int(entry.get('rank'))
+                if gid in aggregate_internal_points and rank is not None and 1 <= rank <= group_count:
+                    aggregate_internal_points[gid] += (group_count - rank)
+
     for group in groups:
         votes = group_vote_counts.get(group.id, {})
         total_score = 0

@@ -1209,13 +1209,6 @@ def peer_evaluation_settings_view(request, session_id):
             settings_data['group_scores'] = []
             settings_data['group_reason_control'] = PeerEvaluationSettings.ReasonMode.DISABLED
             settings_data['group_evaluation_method'] = PeerEvaluationSettings.EvaluationMethod.DIRECT
-
-        if settings_data['enable_member_evaluation'] and not settings_data['member_scores']:
-            messages.error(request, 'メンバー評価を有効にする場合は、配点を1つ以上設定してください。')
-            return redirect('school_management:peer_evaluation_settings', session_id=session_id)
-        elif settings_data['enable_group_evaluation'] and not settings_data['group_scores']:
-            messages.error(request, '他グループ評価を有効にする場合は、配点を1つ以上設定してください。')
-            return redirect('school_management:peer_evaluation_settings', session_id=session_id)
         
         # バリデーションエラーがある場合
         if (settings_data['enable_member_evaluation'] and not settings_data['member_scores']) or \

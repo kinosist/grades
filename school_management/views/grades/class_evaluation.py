@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 import logging
 from django.contrib.auth.decorators import login_required
+from collections import defaultdict
 from django.db.models import Sum
 
 import json
@@ -89,12 +90,37 @@ def class_evaluation_view(request, class_id):
     
     # 授業回の一覧を取得
     sessions = LessonSession.objects.filter(classroom=classroom).order_by('session_number')
+    session_ids = list(sessions.values_list('id', flat=True))
     
     # 教員が追加した「独自の評価項目（列）」の一覧を取得
     point_columns = classroom.point_columns.all().order_by('created_at')
     
     # 評価システム（default: 通常, original: カスタマイズ, goal: 目標管理）
     grading_system = classroom.grading_system
+
+    # N+1対策: 関連データを一括で取得
+    all_peer_evals = PeerEvaluation.objects.filter(lesson_session__in=session_ids)
+    all_groups = list(Group.objects.filter(lesson_session__in=session_ids))
+
+    # AGGREGATEモード用の貢献度スコアを事前集計
+    all_contrib_evals = ContributionEvaluation.objects.filter(
+        peer_evaluation__lesson_session__classroom=classroom
+    ).values(
+        'evaluatee_id', 'peer_evaluation__lesson_session_id'
+    ).annotate(
+        total_contrib=Sum('contribution_score')
+    )
+    student_session_contrib_map = defaultdict(dict)
+    for item in all_contrib_evals:
+        student_id = item['evaluatee_id']
+        session_id = item['peer_evaluation__lesson_session_id']
+        score = item['total_contrib']
+        student_session_contrib_map[student_id][session_id] = score
+
+    # セッションIDをキーにした評価データの辞書を作成
+    session_to_evals_map = defaultdict(list)
+    for pe in all_peer_evals:
+        session_to_evals_map[pe.lesson_session_id].append(pe)
 
     # セッション単位で不変な「グループ投票ポイント」を先に計算して使い回す
     session_group_point_maps = {}
@@ -116,8 +142,9 @@ def class_evaluation_view(request, class_id):
             continue
 
         session_group_point_maps[session.id] = _build_group_vote_point_map(
-            session_groups=list(Group.objects.filter(lesson_session=session)),
-            session_peer_evals=PeerEvaluation.objects.filter(lesson_session=session),
+            # N+1対策: 事前取得したデータを利用
+            session_groups=[g for g in all_groups if g.lesson_session_id == session.id],
+            session_peer_evals=session_to_evals_map.get(session.id, []),
             pe_settings=pe_settings,
             peer_status=session.peer_evaluation_status,
         )
@@ -173,9 +200,9 @@ def class_evaluation_view(request, class_id):
                         if pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
                             # DIRECTモード: response_jsonと最新設定から動的に計算
                             member_scores = pe_settings.member_scores or []
-                            evals_for_student = PeerEvaluation.objects.filter(lesson_session=session)
+                            evals_in_session = session_to_evals_map.get(session.id, [])
                             current_contrib_score = 0
-                            for ev in evals_for_student:
+                            for ev in evals_in_session:
                                 response = ev.response_json or {}
                                 for entry in response.get('group_members_eval', []):
                                     if _safe_int(entry.get('member_id')) == student.id:
@@ -184,11 +211,8 @@ def class_evaluation_view(request, class_id):
                                             current_contrib_score += member_scores[rank - 1]
                             contrib_score = current_contrib_score
                         else: # AGGREGATEモード
-                            # AGGREGATEモード: 既存のContributionEvaluationを集計
-                            contrib_score = ContributionEvaluation.objects.filter(
-                                peer_evaluation__lesson_session=session,
-                                evaluatee=student
-                            ).aggregate(total=Sum('contribution_score'))['total'] or 0
+                            # AGGREGATEモード: 事前集計したデータを利用
+                            contrib_score = student_session_contrib_map.get(student.id, {}).get(session.id, 0)
 
                     # 3-2. 投票ポイントの計算
                     membership = GroupMember.objects.filter(

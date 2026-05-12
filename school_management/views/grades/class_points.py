@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from collections import defaultdict
 from django.db.models import Sum
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
@@ -166,6 +167,27 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
             'group_scores': group_scores,
         }
 
+    # NEW: ピア評価の貢献度スコアを事前集計
+    # AGGREGATEモード用の集計
+    all_contrib_evals = ContributionEvaluation.objects.filter(
+        peer_evaluation__lesson_session__classroom=classroom
+    ).values(
+        'evaluatee_id', 'peer_evaluation__lesson_session_id'
+    ).annotate(
+        total_contrib=Sum('contribution_score')
+    )
+    student_session_contrib_map = defaultdict(dict)
+    for item in all_contrib_evals:
+        student_id = item['evaluatee_id']
+        session_id = item['peer_evaluation__lesson_session_id']
+        score = item['total_contrib']
+        student_session_contrib_map[student_id][session_id] = score
+
+    # DIRECTモード用の評価データ辞書
+    session_to_evals_map = defaultdict(list)
+    for pe in all_peer_evals:
+        session_to_evals_map[pe.lesson_session_id].append(pe)
+
     # ===== 各学生のクラス内成績を取得 =====
     student_grades = []
 
@@ -220,7 +242,7 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
                 if pe_settings and pe_settings.enable_member_evaluation:
                     if pe_settings.evaluation_method == 'DIRECT':
                         member_scores = pe_settings.member_scores or []
-                        evals_in_session = [pe for pe in all_peer_evals if pe.lesson_session_id == sess_id]
+                        evals_in_session = session_to_evals_map.get(sess_id, [])
                         for ev in evals_in_session:
                             response = ev.response_json or {}
                             for entry in response.get('group_members_eval', []):
@@ -229,11 +251,7 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
                                     if rank and 1 <= rank <= len(member_scores):
                                         contrib_score += member_scores[rank - 1]
                     else: # AGGREGATE
-                        agg_contrib_score = ContributionEvaluation.objects.filter(
-                            evaluatee=student,
-                            peer_evaluation__lesson_session_id=sess_id
-                        ).aggregate(total=Sum('contribution_score'))['total'] or 0
-                        contrib_score = agg_contrib_score
+                        contrib_score = student_session_contrib_map.get(student.id, {}).get(sess_id, 0)
                 
                 # 投票ポイント
                 student_group_in_session = next((g for g in student_groups if g.group.lesson_session_id == sess_id), None)

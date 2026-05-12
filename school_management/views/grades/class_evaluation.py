@@ -125,6 +125,8 @@ def class_evaluation_view(request, class_id):
     # セッション単位で不変な「グループ投票ポイント」を先に計算して使い回す
     session_group_point_maps = {}
     session_peer_settings = {}
+    # NEW: DIRECTモード用の貢献度スコアを事前集計
+    direct_mode_contrib_scores = defaultdict(lambda: defaultdict(int))
     for session in sessions:
         if not session.has_peer_evaluation:
             session_peer_settings[session.id] = None
@@ -135,19 +137,31 @@ def class_evaluation_view(request, class_id):
             pe_settings = None
         session_peer_settings[session.id] = pe_settings
 
+        # NEW: DIRECTモードのスコア計算
+        if pe_settings and pe_settings.enable_member_evaluation and pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
+            member_scores = pe_settings.member_scores or []
+            if member_scores:
+                evals_in_session = session_to_evals_map.get(session.id, [])
+                for ev in evals_in_session:
+                    response = ev.response_json or {}
+                    for entry in response.get('group_members_eval', []):
+                        member_id = _safe_int(entry.get('member_id'))
+                        rank = _safe_int(entry.get('rank'))
+                        if member_id and rank and 1 <= rank <= len(member_scores):
+                            score = member_scores[rank - 1]
+                            direct_mode_contrib_scores[session.id][member_id] += score
+
         score_points = (
             pe_settings.group_scores or []
         ) if pe_settings and pe_settings.enable_group_evaluation else []
-        if not score_points:
-            continue
-
-        session_group_point_maps[session.id] = _build_group_vote_point_map(
-            # N+1対策: 事前取得したデータを利用
-            session_groups=[g for g in all_groups if g.lesson_session_id == session.id],
-            session_peer_evals=session_to_evals_map.get(session.id, []),
-            pe_settings=pe_settings,
-            peer_status=session.peer_evaluation_status,
-        )
+        if score_points:
+            session_group_point_maps[session.id] = _build_group_vote_point_map(
+                # N+1対策: 事前取得したデータを利用
+                session_groups=[g for g in all_groups if g.lesson_session_id == session.id],
+                session_peer_evals=session_to_evals_map.get(session.id, []),
+                pe_settings=pe_settings,
+                peer_status=session.peer_evaluation_status,
+            )
 
     # 各学生の評価データを格納するリスト
     student_evaluations = []
@@ -198,18 +212,8 @@ def class_evaluation_view(request, class_id):
                     pe_settings = session_peer_settings.get(session.id)
                     if pe_settings and pe_settings.enable_member_evaluation:
                         if pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
-                            # DIRECTモード: response_jsonと最新設定から動的に計算
-                            member_scores = pe_settings.member_scores or []
-                            evals_in_session = session_to_evals_map.get(session.id, [])
-                            current_contrib_score = 0
-                            for ev in evals_in_session:
-                                response = ev.response_json or {}
-                                for entry in response.get('group_members_eval', []):
-                                    if _safe_int(entry.get('member_id')) == student.id:
-                                        rank = _safe_int(entry.get('rank'))
-                                        if rank and 1 <= rank <= len(member_scores):
-                                            current_contrib_score += member_scores[rank - 1]
-                            contrib_score = current_contrib_score
+                            # DIRECTモード: 事前集計したデータを利用
+                            contrib_score = direct_mode_contrib_scores.get(session.id, {}).get(student.id, 0)
                         else: # AGGREGATEモード
                             # AGGREGATEモード: 事前集計したデータを利用
                             contrib_score = student_session_contrib_map.get(student.id, {}).get(session.id, 0)

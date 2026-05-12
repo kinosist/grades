@@ -153,11 +153,7 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
         session_peer_evals = [pe for pe in all_peer_evals if pe.lesson_session_id == sess_id]
 
         # グループごとの投票スコアを計算（response_json + 設定配点）
-        try:
-            pe_settings = sess.peer_evaluation_settings
-        except PeerEvaluationSettings.DoesNotExist: # pragma: no cover
-            pe_settings = None
-
+        pe_settings = all_sessions_settings.get(sess_id)
         group_scores = _build_group_vote_point_map(
             session_groups=session_groups,
             session_peer_evals=session_peer_evals,

@@ -3,6 +3,7 @@ import secrets
 import uuid
 from types import SimpleNamespace
 from datetime import timedelta
+from collections import defaultdict
 from urllib import parse, request as urllib_request, error as urllib_error
 
 from django.conf import settings
@@ -750,8 +751,6 @@ def reopen_peer_evaluation(request, session_id):
 
 def _aggregate_member_scores(lesson_session, pe_settings):
     """集計して付与: グループ内メンバー評価を集計し、ContributionEvaluationを作成"""
-    from collections import defaultdict
-    
     member_score_list = pe_settings.member_scores or []
     if not member_score_list:
         return
@@ -825,10 +824,6 @@ def peer_evaluation_results(request, session_id):
     groups = Group.objects.filter(lesson_session=lesson_session)
     
     # response_jsonからグループ別得票を集計
-    from collections import defaultdict
-    # collections.defaultdict は improved.py の先頭でインポート済み
-    # from collections import defaultdict
-    from collections import defaultdict
     group_vote_counts = defaultdict(lambda: defaultdict(int))  # {group_id: {rank: count}}
     
     pe_settings = None

@@ -1,3 +1,4 @@
+import logging
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from collections import defaultdict
@@ -9,6 +10,9 @@ from django.views.decorators.http import require_POST
 
 from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPoints, SelfEvaluation, QuizScore, \
     ContributionEvaluation, GroupMember, PeerEvaluation, PeerEvaluationSettings
+
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_int(value):
@@ -263,8 +267,9 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
 
                 if contrib_score > 0 or vote_score > 0:
                     session_peer_map[sess_id] = {'session': sess, 'contrib': contrib_score, 'vote': vote_score, 'total': contrib_score + vote_score}
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"ピア評価ポイントの計算中にエラーが発生しました (student: {student.id}, session: {sess_id}): {e}", exc_info=True)
+                pass # エラーが発生しても処理を続行
 
         for data in session_peer_map.values():
             p_sum = data['contrib'] + data['vote']

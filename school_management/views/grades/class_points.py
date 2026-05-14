@@ -32,7 +32,7 @@ def _build_group_vote_point_map(session_groups, session_peer_evals, pe_settings,
         return group_point_map
 
     if pe_settings.group_evaluation_method == PeerEvaluationSettings.EvaluationMethod.AGGREGATE:
-        if peer_status != 'CLOSED':
+        if peer_status != LessonSession.PeerEvaluationStatus.CLOSED:
             return group_point_map
 
         group_internal_points = {group_obj.id: 0 for group_obj in session_groups}
@@ -139,6 +139,11 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
     all_groups = Group.objects.filter(lesson_session__in=session_ids).select_related('lesson_session')
     all_peer_evals = PeerEvaluation.objects.filter(lesson_session__in=session_ids)
 
+    # セッションIDをキーにした評価データの辞書を作成
+    session_to_evals_map = defaultdict(list)
+    for pe in all_peer_evals:
+        session_to_evals_map[pe.lesson_session_id].append(pe)
+
     # NEW: セッション設定のキャッシュ
     all_sessions_settings = {}
     for s in all_sessions:
@@ -149,16 +154,32 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
 
     # セッションごとのランキング情報をキャッシュ
     session_rankings_cache = {}
+    # NEW: DIRECTモード用の貢献度スコアを事前集計
+    direct_mode_contrib_scores = defaultdict(lambda: defaultdict(int))
 
     for sess in all_sessions:
         sess_id = sess.id
         # そのセッションのグループを抽出
         session_groups = [g for g in all_groups if g.lesson_session_id == sess_id]
         # そのセッションの投票を抽出
-        session_peer_evals = [pe for pe in all_peer_evals if pe.lesson_session_id == sess_id]
+        session_peer_evals = session_to_evals_map.get(sess_id, [])
 
         # グループごとの投票スコアを計算（response_json + 設定配点）
         pe_settings = all_sessions_settings.get(sess_id)
+
+        # NEW: DIRECTモードのスコア計算
+        if pe_settings and pe_settings.enable_member_evaluation and pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
+            member_scores = pe_settings.member_scores or []
+            if member_scores:
+                for ev in session_peer_evals:
+                    response = ev.response_json or {}
+                    for entry in response.get('group_members_eval', []):
+                        member_id = _safe_int(entry.get('member_id'))
+                        rank = _safe_int(entry.get('rank'))
+                        if member_id and rank and 1 <= rank <= len(member_scores):
+                            score = member_scores[rank - 1]
+                            direct_mode_contrib_scores[sess_id][member_id] += score
+
         group_scores = _build_group_vote_point_map(
             session_groups=session_groups,
             session_peer_evals=session_peer_evals,
@@ -244,17 +265,10 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
 
                 # 貢献度スコア
                 if pe_settings and pe_settings.enable_member_evaluation:
-                    if pe_settings.evaluation_method == 'DIRECT':
-                        member_scores = pe_settings.member_scores or []
-                        evals_in_session = session_to_evals_map.get(sess_id, [])
-                        for ev in evals_in_session:
-                            response = ev.response_json or {}
-                            for entry in response.get('group_members_eval', []):
-                                if _safe_int(entry.get('member_id')) == student.id:
-                                    rank = _safe_int(entry.get('rank'))
-                                    if rank and 1 <= rank <= len(member_scores):
-                                        contrib_score += member_scores[rank - 1]
-                    else: # AGGREGATE
+                    if pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
+                        # DIRECTモード: 事前集計したデータを利用
+                        contrib_score = direct_mode_contrib_scores.get(sess_id, {}).get(student.id, 0)
+                    else:  # AGGREGATE
                         contrib_score = student_session_contrib_map.get(student.id, {}).get(sess_id, 0)
                 
                 # 投票ポイント

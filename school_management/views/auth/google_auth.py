@@ -132,7 +132,7 @@ def google_auth_callback(request):
 
     # 取得したメールアドレスでシステム内のユーザーを検索
     try:
-        user = CustomUser.objects.get(email=email)
+        user = CustomUser.objects.get(email__iexact=email)
 
         # 教員または管理者のみログインを許可
         if user.is_teacher:

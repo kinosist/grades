@@ -134,8 +134,13 @@ def google_auth_callback(request):
     try:
         user = CustomUser.objects.get(email__iexact=email)
 
+        # アカウントが有効か確認
+        if not user.is_active:
+            messages.error(request, "このアカウントは無効です。")
+            return redirect('school_management:login')
+
         # 教員または管理者のみログインを許可
-        if user.is_teacher:
+        if user.is_teacher: # is_active は上でチェック済み
             login(request, user)
             messages.success(request, f"ようこそ、{user.full_name}さん！")
             next_url = request.session.pop('oauth_next', reverse('school_management:dashboard'))

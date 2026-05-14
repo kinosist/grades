@@ -238,12 +238,12 @@
                                     <th class="submission-time-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>提出日時</th>
                                     <th class="text-center submission-status-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>提出</th>
                                     {% if view_mode == 'detail' %}
-                                        {% if pe_settings.enable_member_evaluation %}
+                                        {% if pe_settings and pe_settings.enable_member_evaluation %}
                                             {% for rank_item in member_ranking_list %}
                                                 <th colspan="2" class="text-center">メンバー{{ rank_item.rank }}位</th>
                                             {% endfor %}
                                         {% endif %}
-                                        {% if pe_settings.enable_group_evaluation %}
+                                        {% if pe_settings and pe_settings.enable_group_evaluation %}
                                             {% for rank_item in group_ranking_list %}
                                                 <th colspan="2" class="text-center">グループ{{ rank_item.rank }}位</th>
                                             {% endfor %}
@@ -258,10 +258,10 @@
                                 </tr>
                                 {% if view_mode == 'detail' %}
                                 <tr>
-                                    {% if pe_settings.enable_member_evaluation %}{% for rank_item in member_ranking_list %}
+                                    {% if pe_settings and pe_settings.enable_member_evaluation %}{% for rank_item in member_ranking_list %}
                                         <th class="detail-col">対象者</th><th class="detail-col-reason">理由</th>
                                     {% endfor %}{% endif %}
-                                    {% if pe_settings.enable_group_evaluation %}{% for rank_item in group_ranking_list %}
+                                    {% if pe_settings and pe_settings.enable_group_evaluation %}{% for rank_item in group_ranking_list %}
                                         <th class="detail-col">対象グループ</th><th class="detail-col-reason">理由</th>
                                     {% endfor %}{% endif %}
                                 </tr>
@@ -296,7 +296,7 @@
                                     </td>
                                     {% if view_mode == 'detail' %}
                                         {% if row.submitted %}
-                                            {% if pe_settings.enable_member_evaluation %}{% for eval_data in row.member_eval_by_rank %}
+                                            {% if pe_settings and pe_settings.enable_member_evaluation %}{% for eval_data in row.member_eval_by_rank %}
                                                 <td class="detail-col">
                                                     {% if eval_data.is_deleted %}
                                                         <span class="text-danger">{{ eval_data.target_name|default:"-" }}</span>
@@ -306,7 +306,7 @@
                                                 </td>
                                                 <td class="detail-col-reason">{{ eval_data.reason|default:"-" }}</td>
                                             {% endfor %}{% endif %}
-                                            {% if pe_settings.enable_group_evaluation %}{% for eval_data in row.group_eval_by_rank %}
+                                            {% if pe_settings and pe_settings.enable_group_evaluation %}{% for eval_data in row.group_eval_by_rank %}
                                                 <td class="detail-col">{{ eval_data.target_name|default:"-" }}</td>
                                                 <td class="detail-col-reason">{{ eval_data.reason|default:"-" }}</td>
                                             {% endfor %}{% endif %}
@@ -318,11 +318,11 @@
                                             {% endif %}
                                         {% else %}
                                             {# Render empty cells to maintain table structure #}
-                                            {% if pe_settings.enable_member_evaluation %}{% for rank_item in member_ranking_list %}
+                                            {% if pe_settings and pe_settings.enable_member_evaluation %}{% for rank_item in member_ranking_list %}
                                                 <td>-</td>
                                                 <td>-</td>
                                             {% endfor %}{% endif %}
-                                            {% if pe_settings.enable_group_evaluation %}{% for rank_item in group_ranking_list %}
+                                            {% if pe_settings and pe_settings.enable_group_evaluation %}{% for rank_item in group_ranking_list %}
                                                 <td>-</td>
                                                 <td>-</td>
                                             {% endfor %}{% endif %}

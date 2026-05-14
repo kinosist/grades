@@ -52,6 +52,14 @@ def google_login(request):
 def google_auth_callback(request):
     """Googleからのコールバックを処理"""
     error = request.GET.get('error')
+    state = request.GET.get('state')
+    expected_state = request.session.pop('oauth_state', None)
+
+    # stateを検証してCSRF攻撃を防ぐ
+    if not state or not expected_state or state != expected_state:
+        messages.error(request, "不正なリクエストです。再度ログインしてください。")
+        return redirect('school_management:login')
+
     if error:
         messages.error(request, f"Google認証でエラーが発生しました: {error}")
         return redirect('school_management:login')
@@ -59,13 +67,6 @@ def google_auth_callback(request):
     code = request.GET.get('code')
     if not code:
         messages.error(request, "Google認証に失敗しました。認証コードが取得できませんでした。")
-        return redirect('school_management:login')
-
-    state = request.GET.get('state')
-    
-    # stateを検証してCSRF攻撃を防ぐ
-    if state != request.session.get('oauth_state'):
-        messages.error(request, "不正なリクエストです。再度ログインしてください。")
         return redirect('school_management:login')
 
     redirect_uri = request.build_absolute_uri(reverse('school_management:google_auth_callback'))

@@ -281,18 +281,27 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
 
                 if contrib_score > 0 or vote_score > 0:
                     session_peer_map[sess_id] = {'session': sess, 'contrib': contrib_score, 'vote': vote_score, 'total': contrib_score + vote_score}
-            except Exception as e:
+            except (AttributeError, IndexError, TypeError, ValueError) as e:
                 logger.error(f"ピア評価ポイントの計算中にエラーが発生しました (student: {student.id}, session: {sess_id}): {e}", exc_info=True)
-                pass # エラーが発生しても処理を続行
+                # エラーが発生した場合、エラー情報を持ったエントリをマップに追加
+                session_peer_map[sess_id] = {
+                    'session': sess,
+                    'contrib': 0,
+                    'vote': 0,
+                    'total': 0,
+                    'error': f"計算エラー: {e}"
+                }
 
         for data in session_peer_map.values():
-            p_sum = data['contrib'] + data['vote']
+            # エラーがある場合は、このセッションのピア評価ポイントを0として扱う
+            p_sum = 0 if data.get('error') else data.get('contrib', 0) + data.get('vote', 0)
             peer_total += p_sum
             peer_details.append({
                 'session': data['session'],
-                'contrib': data['contrib'],
-                'vote': data['vote'],
-                'total': p_sum
+                'contrib': data.get('contrib', 0),
+                'vote': data.get('vote', 0),
+                'total': p_sum,
+                'error': data.get('error')  # テンプレートでエラー表示に利用
             })
         peer_details.sort(key=lambda x: x['session'].session_number)
 

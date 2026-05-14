@@ -125,10 +125,15 @@ def google_auth_callback(request):
         messages.error(request, "Googleアカウントからメールアドレスを取得できませんでした。")
         return redirect('school_management:login')
 
+    # メールアドレスが検証済みであることを確認
+    if not user_info.get("email_verified"):
+        messages.error(request, "Googleアカウントのメールアドレスが未検証のため、ログインできません。")
+        return redirect('school_management:login')
+
     # 取得したメールアドレスでシステム内のユーザーを検索
     try:
         user = CustomUser.objects.get(email=email)
-        
+
         # 教員または管理者のみログインを許可
         if user.is_teacher:
             login(request, user)

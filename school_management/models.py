@@ -340,7 +340,7 @@ class PeerEvaluationSettings(models.Model):
         session_status = self.lesson_session.peer_evaluation_status
         if session_status == LessonSession.PeerEvaluationStatus.CLOSED: # 締切済みの場合のみ変更不可
             if not self.pk:
-                raise ValidationError('受付開始後のピア評価設定は作成できません。')
+                raise ValidationError('締切後のピア評価設定は作成できません。')
 
             old = PeerEvaluationSettings.objects.get(pk=self.pk)
             immutable_fields = (
@@ -356,7 +356,7 @@ class PeerEvaluationSettings(models.Model):
             )
             for field in immutable_fields:
                 if getattr(self, field) != getattr(old, field):
-                    raise ValidationError('受付開始後のピア評価設定は変更できません。')
+                    raise ValidationError('締切後のピア評価設定は変更できません。')
 
     def save(self, *args, **kwargs):
         self.full_clean()

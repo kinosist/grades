@@ -41,7 +41,6 @@ def google_login(request):
         "response_type": "code",
         "scope": "openid email profile",
         "state": state,
-        "access_type": "offline",
         "prompt": "select_account",
     }
     

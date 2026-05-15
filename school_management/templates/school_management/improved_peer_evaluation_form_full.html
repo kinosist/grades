@@ -53,6 +53,14 @@
                     </div>
                 </div>
 
+                <!-- 教員プレビューモードの警告 -->
+                {% if is_teacher_preview %}
+                <div class="alert alert-warning text-center">
+                    <h4><i class="fas fa-eye me-2"></i>教員プレビューモード</h4>
+                    <p class="mb-0">これは学生に表示される画面のプレビューです。入力や提出はできません。</p>
+                </div>
+                {% endif %}
+
                 <!-- 設定未完了エラー -->
                 {% if is_configuration_error %}
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -68,7 +76,7 @@
                 </div>
 
                 <!-- 認証必須 -->
-                {% elif requires_google_auth %}
+                {% elif requires_google_auth and not is_teacher_preview %}
                 <div class="alert alert-primary text-center">
                     <h4><i class="fab fa-google me-2"></i>認証が必要です</h4>
                     <p class="mb-3">{{ auth_error|default:"学校用Googleアカウントで認証してください。" }}</p>
@@ -183,6 +191,7 @@
                                     class="form-select mb-2 member-select"
                                     name="member_rank_{{ rank_item.rank }}"
                                     required
+                                    {% if is_teacher_preview %}disabled{% endif %}
                                 >
                                     <option value="">選択してください</option>
                                     {% for member_obj in evaluator_group_member_objects %}
@@ -196,6 +205,7 @@
                                     rows="2"
                                     placeholder="理由を入力{% if pe_settings.member_reason_control == 'REQUIRED' %}（必須）{% else %}（任意）{% endif %}"
                                     {% if pe_settings.member_reason_control == 'REQUIRED' %}required{% endif %}
+                                    {% if is_teacher_preview %}disabled{% endif %}
                                     style="max-height: 100px; resize: vertical;"
                                 ></textarea>
                                 {% endif %}
@@ -228,6 +238,7 @@
                                     class="form-select mb-2 group-select"
                                     name="group_rank_{{ rank_item.rank }}"
                                     required
+                                    {% if is_teacher_preview %}disabled{% endif %}
                                 >
                                     <option value="">選択してください</option>
                                     {% for group in other_groups %}
@@ -241,6 +252,7 @@
                                     rows="2"
                                     placeholder="理由を入力{% if pe_settings.group_reason_control == 'REQUIRED' %}（必須）{% else %}（任意）{% endif %}"
                                     {% if pe_settings.group_reason_control == 'REQUIRED' %}required{% endif %}
+                                    {% if is_teacher_preview %}disabled{% endif %}
                                     style="max-height: 100px; resize: vertical;"
                                 ></textarea>
                                 {% endif %}
@@ -263,6 +275,7 @@
                                 name="general_comment" 
                                 rows="3"
                                 placeholder="グループの成果や改善点など、自由に記入してください..."
+                                {% if is_teacher_preview %}disabled{% endif %}
                                 style="max-height: 150px; resize: vertical; overflow-y: auto;"
                             ></textarea>
                             <small class="text-muted d-block mt-2">
@@ -285,6 +298,7 @@
                                 name="feedback" 
                                 rows="3"
                                 placeholder="本日の授業での学び、感想など..."
+                                {% if is_teacher_preview %}disabled{% endif %}
                                 style="max-height: 150px; resize: vertical; overflow-y: auto;"
                             ></textarea>
                         </div>
@@ -293,7 +307,7 @@
 
                     <!-- 提出ボタン -->
                     <div class="text-center mb-4">
-                        <button type="submit" class="btn btn-primary btn-lg">
+                        <button type="submit" class="btn btn-primary btn-lg" {% if is_teacher_preview %}disabled{% endif %}>
                             <i class="fas fa-paper-plane me-2"></i>評価を提出する
                         </button>
                     </div>

@@ -4,6 +4,7 @@ from .views import (
     utils, auth, dashboard, classes, sessions,
     students, quizzes, groups, peer_eval, grades, attendance
 )
+from .views.auth import google_auth
 from .views.students import self_eval
 
 app_name = 'school_management'
@@ -15,6 +16,10 @@ urlpatterns = [
     path('login/', auth.login_view, name='login'),
     # path('debug-login/', auth.debug_login_view, name='debug_login'), # 必要ならauth.pyに追加
     path('logout/', auth.logout_view, name='logout'),
+
+    # --- Google認証 ---
+    path('auth/google/', google_auth.google_login, name='google_login'),
+    path('auth/google/callback/', google_auth.google_auth_callback, name='google_auth_callback'),
 
     # --- ダッシュボード ---
     path('dashboard/', dashboard.dashboard_view, name='dashboard'),
@@ -92,6 +97,7 @@ urlpatterns = [
     # 改善版（Improved）
     path('lesson-sessions/<int:session_id>/peer-evaluation-improved/create/', peer_eval.improved_peer_evaluation_create, name='improved_peer_evaluation_create'),
     path('lesson-sessions/<int:session_id>/peer-evaluation-improved/links/', peer_eval.peer_evaluation_links, name='peer_evaluation_links'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/preview/', peer_eval.peer_evaluation_form_preview, name='peer_evaluation_form_preview'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/', peer_eval.peer_evaluation_common_form, name='peer_evaluation_common'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/google/start/', peer_eval.peer_evaluation_google_start, name='peer_evaluation_google_start'),
     path('peer-evaluation/google/callback/', peer_eval.peer_evaluation_google_callback, name='peer_evaluation_google_callback'),

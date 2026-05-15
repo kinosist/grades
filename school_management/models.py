@@ -212,7 +212,7 @@ class LessonSession(models.Model):
     date = models.DateField(verbose_name='実施日')
     topic = models.CharField(max_length=200, blank=True, verbose_name='テーマ・内容')
     has_quiz = models.BooleanField(default=False, verbose_name='小テストあり')
-    has_peer_evaluation = models.BooleanField(default=False, verbose_name='ピア評価あり')
+    has_peer_evaluation = models.BooleanField(default=True, verbose_name='ピア評価あり')
     peer_evaluation_status = models.CharField(
         max_length=10,
         choices=PeerEvaluationStatus.choices,
@@ -338,9 +338,9 @@ class PeerEvaluationSettings(models.Model):
             self.group_evaluation_method = self.EvaluationMethod.DIRECT
 
         session_status = self.lesson_session.peer_evaluation_status
-        if session_status != LessonSession.PeerEvaluationStatus.NOT_OPEN:
+        if session_status == LessonSession.PeerEvaluationStatus.CLOSED: # 締切済みの場合のみ変更不可
             if not self.pk:
-                raise ValidationError('受付開始後のピア評価設定は作成できません。')
+                raise ValidationError('締切後のピア評価設定は作成できません。')
 
             old = PeerEvaluationSettings.objects.get(pk=self.pk)
             immutable_fields = (
@@ -356,7 +356,7 @@ class PeerEvaluationSettings(models.Model):
             )
             for field in immutable_fields:
                 if getattr(self, field) != getattr(old, field):
-                    raise ValidationError('受付開始後のピア評価設定は変更できません。')
+                    raise ValidationError('締切後のピア評価設定は変更できません。')
 
     def save(self, *args, **kwargs):
         self.full_clean()

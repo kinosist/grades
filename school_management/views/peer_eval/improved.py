@@ -3,6 +3,7 @@ import secrets
 import uuid
 from types import SimpleNamespace
 from datetime import timedelta
+from collections import defaultdict
 from urllib import parse, request as urllib_request, error as urllib_error
 
 from django.conf import settings
@@ -14,7 +15,7 @@ from django.db import IntegrityError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
-
+from django.db.models import Q # Import Q for filtering
 from ...models import (
     LessonSession,
     Group,
@@ -41,33 +42,50 @@ def _safe_int(value):
 
 def _build_submission_detail(evaluation, group_name_map, student_name_map):
     response = evaluation.response_json or {}
-    group_evaluations = []
+    group_evaluations_list = [] # Initialize as a list
     for entry in response.get('other_group_eval', []):
+        rank = _safe_int(entry.get('rank'))
+        if rank is None:
+            continue
         group_id = _safe_int(entry.get('group_id'))
-        group_evaluations.append({
-            'rank': entry.get('rank'),
+        group_evaluations_list.append({ # Append to the list
+            'rank': rank,
             'target_name': group_name_map.get(group_id, f'グループID:{group_id}' if group_id else '不明'),
             'reason': (entry.get('reason') or '').strip(),
         })
+    group_evaluations_list.sort(key=lambda x: x['rank']) # Sort by rank for consistent display
 
-    member_evaluations = []
+    member_evaluations_list = [] # Initialize as a list
     for entry in response.get('group_members_eval', []):
+        rank = _safe_int(entry.get('rank'))
+        if rank is None:
+            continue
         member_id = _safe_int(entry.get('member_id'))
-        member_evaluations.append({
-            'rank': entry.get('rank'),
-            'target_name': student_name_map.get(member_id, f'学生ID:{member_id}' if member_id else '不明'),
+        target_name = student_name_map.get(member_id)
+        is_deleted = False
+        if not target_name:
+            if member_id:
+                target_name = '削除済みの生徒'
+                is_deleted = True
+            else:
+                target_name = '不明'
+        member_evaluations_list.append({ # Append to the list
+            'rank': rank,
+            'target_name': target_name,
             'reason': (entry.get('reason') or '').strip(),
+            'is_deleted': is_deleted,
         })
+    member_evaluations_list.sort(key=lambda x: x['rank']) # Sort by rank for consistent display
 
     general_comment = (evaluation.general_comment or '').strip()
     class_comment = (evaluation.class_comment or '').strip()
 
     return {
-        'group_evaluations': group_evaluations,
-        'member_evaluations': member_evaluations,
+        'group_evaluations': group_evaluations_list,
+        'member_evaluations': member_evaluations_list,
         'general_comment': general_comment,
         'class_comment': class_comment,
-        'has_content': bool(group_evaluations or member_evaluations or general_comment or class_comment),
+        'has_content': bool(group_evaluations_list or member_evaluations_list or general_comment or class_comment),
     }
 
 
@@ -512,6 +530,70 @@ def peer_evaluation_common_form(request, session_id):
     })
     return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
 
+@login_required
+def peer_evaluation_form_preview(request, session_id):
+    """教員向けのピア評価フォームプレビュー"""
+    if not request.user.is_teacher:
+        messages.error(request, "権限がありません。")
+        return redirect('school_management:dashboard')
+
+    lesson_session = _get_session_for_teacher_or_admin(request, session_id)
+
+    try:
+        pe_settings = lesson_session.peer_evaluation_settings
+    except PeerEvaluationSettings.DoesNotExist:
+        messages.error(request, 'ピア評価設定が完了していません。先に設定を行ってください。')
+        return redirect('school_management:peer_evaluation_settings', session_id=session_id)
+
+    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student')
+    if not groups.exists():
+        messages.error(request, 'グループが編成されていません。プレビューを表示できません。')
+        return redirect('school_management:group_management', session_id=session_id)
+
+    # プレビュー用のダミーデータを生成
+    teacher_as_student = request.user
+    evaluator_group = groups.first()
+    evaluator_group_member_objects = list(
+        GroupMember.objects.filter(group=evaluator_group)
+        .select_related('student')
+        .values('student__id', 'student__full_name')
+    )
+    other_groups = groups.exclude(id=evaluator_group.id)
+    ordered_other_groups = list(other_groups.order_by('group_number', 'id'))
+
+    member_score_list = pe_settings.member_scores or []
+    group_score_list = pe_settings.group_scores or []
+    
+    max_member_rank = min(len(member_score_list), len(evaluator_group_member_objects))
+    max_group_rank = min(len(group_score_list), len(ordered_other_groups))
+    
+    member_ranking_list = [
+        {'rank': i + 1, 'points': member_score_list[i] if i < len(member_score_list) else 0}
+        for i in range(max_member_rank)
+    ]
+    group_ranking_list = [
+        {'rank': i + 1, 'points': group_score_list[i] if i < len(group_score_list) else 0}
+        for i in range(max_group_rank)
+    ]
+
+    context = {
+        'lesson_session': lesson_session,
+        'pe_settings': pe_settings,
+        'is_teacher_preview': True,
+        'authenticated_student': teacher_as_student,
+        'evaluator_group': evaluator_group,
+        'evaluator_group_member_objects': evaluator_group_member_objects,
+        'other_groups': ordered_other_groups,
+        'member_ranking_list': member_ranking_list,
+        'group_ranking_list': group_ranking_list,
+        'show_scores': pe_settings.show_points,
+        'enable_comments': lesson_session.enable_comments,
+        'enable_feedback': lesson_session.enable_feedback,
+        'enable_member_evaluation': pe_settings.enable_member_evaluation,
+        'enable_group_evaluation': pe_settings.enable_group_evaluation,
+        'groups': groups,
+    }
+    return render(request, 'school_management/improved_peer_evaluation_form_full.html', context)
 
 def peer_evaluation_google_start(request, session_id):
     """Google OAuth認証開始"""
@@ -669,8 +751,6 @@ def reopen_peer_evaluation(request, session_id):
 
 def _aggregate_member_scores(lesson_session, pe_settings):
     """集計して付与: グループ内メンバー評価を集計し、ContributionEvaluationを作成"""
-    from collections import defaultdict
-    
     member_score_list = pe_settings.member_scores or []
     if not member_score_list:
         return
@@ -744,14 +824,25 @@ def peer_evaluation_results(request, session_id):
     groups = Group.objects.filter(lesson_session=lesson_session)
     
     # response_jsonからグループ別得票を集計
-    from collections import defaultdict
     group_vote_counts = defaultdict(lambda: defaultdict(int))  # {group_id: {rank: count}}
     
     pe_settings = None
     if lesson_session.peer_evaluation_configured:
         pe_settings = lesson_session.peer_evaluation_settings
-    
+
+    member_ranking_list = []
+    group_ranking_list = []
     group_score_list = pe_settings.group_scores if pe_settings else []
+    if pe_settings:
+        member_ranking_list = [
+            {'rank': i + 1, 'points': point} # pointsはテンプレートでは使用しないが、データ構造として保持
+            for i, point in enumerate(pe_settings.member_scores or [])
+        ]
+        group_ranking_list = [
+            {'rank': i + 1, 'points': point}
+            for i, point in enumerate(group_score_list)
+        ]
+
     group_rank_headers = [
         {'rank': idx + 1, 'points': point}
         for idx, point in enumerate(group_score_list)
@@ -835,6 +926,21 @@ def peer_evaluation_results(request, session_id):
     group_name_map = {group.id: group.display_name for group in groups}
     student_name_map = {student.id: student.full_name for student in enrolled_students}
 
+    # Collect all member_ids that were evaluated to build a complete name map
+    all_evaluated_member_ids = set()
+    for ev in evaluations:
+        response = ev.response_json or {}
+        for entry in response.get('group_members_eval', []):
+            member_id = _safe_int(entry.get('member_id'))
+            if member_id:
+                all_evaluated_member_ids.add(member_id)
+
+    # Find evaluated students who are NOT in the current class roster and add them to the map
+    missing_ids = all_evaluated_member_ids - set(student_name_map.keys())
+    if missing_ids:
+        missing_students_map = {s['id']: s['full_name'] for s in Student.objects.filter(id__in=missing_ids).values('id', 'full_name')}
+        student_name_map.update(missing_students_map)
+
     submission_map = {}
     for evaluation in evaluations.order_by('student_id', '-created_at'):
         student_id = evaluation.student_id
@@ -848,48 +954,78 @@ def peer_evaluation_results(request, session_id):
         is_submitted = submission is not None
         if is_submitted:
             submitted_count += 1
+
+        submission_detail = _build_submission_detail(submission, group_name_map, student_name_map) if submission else None
+
+        member_eval_by_rank = []
+        if submission_detail and pe_settings and pe_settings.enable_member_evaluation:
+            member_eval_dict = {ev['rank']: ev for ev in submission_detail['member_evaluations']}
+            for rank_item in member_ranking_list:
+                member_eval_by_rank.append(member_eval_dict.get(rank_item['rank']))
+
+        group_eval_by_rank = []
+        if submission_detail and pe_settings and pe_settings.enable_group_evaluation:
+            group_eval_dict = {ev['rank']: ev for ev in submission_detail['group_evaluations']}
+            for rank_item in group_ranking_list:
+                group_eval_by_rank.append(group_eval_dict.get(rank_item['rank']))
+
         student_rows.append({
             'student': enrolled_student,
             'email': enrolled_student.email,
             'submitted': is_submitted,
             'submitted_at': submission.created_at if submission else None,
-            'submission_detail': _build_submission_detail(submission, group_name_map, student_name_map) if submission else None,
+            'submission_detail': submission_detail, # Use the already built detail
+            'member_eval_by_rank': member_eval_by_rank,
+            'group_eval_by_rank': group_eval_by_rank,
         })
 
     total_students = enrolled_students.count()
     submission_rate = round((submitted_count / total_students) * 100, 1) if total_students else 0
 
+    # --- 評価コメントセクション用のデータ準備 ---
     comment_rows = []
-    for evaluation in evaluations:
-        response = evaluation.response_json or {}
-        group_reasons = [
-            entry for entry in response.get('other_group_eval', [])
-            if entry.get('reason')
-        ]
-        member_reasons = [
-            entry for entry in response.get('group_members_eval', [])
-            if entry.get('reason')
-        ]
-        if group_reasons or member_reasons or evaluation.general_comment:
+    # Filter for evaluations that have any comment or non-empty evaluation lists in response_json
+    evaluations_to_process_for_comments = evaluations.filter(
+        Q(general_comment__isnull=False) & ~Q(general_comment='') |
+        Q(class_comment__isnull=False) & ~Q(class_comment='') |
+        Q(response_json__isnull=False) # This will include all with any JSON data
+    ).order_by('created_at')
+
+    for evaluation in evaluations_to_process_for_comments:
+        detail = _build_submission_detail(evaluation, group_name_map, student_name_map)
+        
+        # Convert dictionaries to sorted lists for template iteration
+        # detail['group_evaluations'] and detail['member_evaluations'] are already sorted lists
+        group_reasons_list = [item for item in detail['group_evaluations'] if item.get('reason')]
+        member_reasons_list = [item for item in detail['member_evaluations'] if item.get('reason')]
+
+        # Only add to comment_rows if there's actual comment/reason content
+        if detail['general_comment'] or detail['class_comment'] or group_reasons_list or member_reasons_list:
             comment_rows.append({
                 'evaluation': evaluation,
-                'group_reasons': group_reasons,
-                'member_reasons': member_reasons,
+                'group_reasons': group_reasons_list,
+                'member_reasons': member_reasons_list,
+                'general_comment': detail['general_comment'],
+                'class_comment': detail['class_comment'],
             })
-    
+
     context = {
         'lesson_session': lesson_session,
         'evaluations': evaluations,
         'group_stats': sorted_groups,
         'group_rank_headers': group_rank_headers,
+        'member_ranking_list': member_ranking_list,
+        'group_ranking_list': group_ranking_list,
         'total_evaluations': evaluations.count(),
         'total_groups': groups.count(),
         'submission_rows': student_rows,
         'submitted_count': submitted_count,
         'total_students': total_students,
+        'view_mode': request.GET.get('mode', 'simple'), # 'mode'クエリパラメータからビューモードを取得、デフォルトは'simple'
+        # 'view_mode': request.GET.get('view_mode', 'simple'), # 以前のview_modeを使用する場合はこちら
         'submission_rate': submission_rate,
         'pe_settings': pe_settings,
-        'comment_rows': comment_rows,
+        'comment_rows': comment_rows, # Pass comment_rows to the template
     }
     
     return render(request, 'school_management/peer_evaluation_results.html', context)
@@ -919,22 +1055,67 @@ def delete_all_peer_evaluations(request, session_id):
 @login_required
 def peer_evaluation_settings_view(request, session_id):
     """ピア評価設定管理画面（管理者用）"""
-    lesson_session = get_object_or_404(
+    lesson_session_db = get_object_or_404(
         LessonSession,
         id=session_id,
         classroom__teachers=request.user
     )
     
     # 受付開始済みの設定は変更不可
-    if lesson_session.peer_evaluation_status != LessonSession.PeerEvaluationStatus.NOT_OPEN:
-        messages.warning(request, '受付開始済みのピア評価設定は変更できません。')
+    if lesson_session_db.peer_evaluation_status == LessonSession.PeerEvaluationStatus.CLOSED:
+        messages.warning(request, '締切済みのピア評価設定は変更できません。')
         return redirect('school_management:session_detail', session_id=session_id)
     
     # 既存設定を取得（なければNone）
+    pe_settings_db = None
     try:
-        pe_settings = lesson_session.peer_evaluation_settings
+        pe_settings_db = lesson_session_db.peer_evaluation_settings
     except PeerEvaluationSettings.DoesNotExist:
-        pe_settings = None
+        pass
+
+    # テンプレートに渡すための、変更可能な設定オブジェクトを準備
+    # lesson_session_display は lesson_session_db のコピーとして初期化
+    lesson_session_display = SimpleNamespace(
+        id=lesson_session_db.id,
+        classroom=lesson_session_db.classroom,
+        session_number=lesson_session_db.session_number,
+        date=lesson_session_db.date,
+        topic=lesson_session_db.topic,
+        has_quiz=lesson_session_db.has_quiz,
+        has_peer_evaluation=lesson_session_db.has_peer_evaluation,
+        peer_evaluation_status=lesson_session_db.peer_evaluation_status,
+        enable_comments=lesson_session_db.enable_comments,
+        enable_feedback=lesson_session_db.enable_feedback,
+        peer_evaluation_configured=lesson_session_db.peer_evaluation_configured,
+        peer_evaluation_closed=lesson_session_db.peer_evaluation_closed,
+    )
+
+    # pe_settings_display は pe_settings_db のコピーまたはデフォルト値で初期化
+    if pe_settings_db:
+        pe_settings_display = SimpleNamespace(
+            enable_member_evaluation=pe_settings_db.enable_member_evaluation,
+            member_scores=pe_settings_db.member_scores,
+            member_reason_control=pe_settings_db.member_reason_control,
+            evaluation_method=pe_settings_db.evaluation_method,
+            enable_group_evaluation=pe_settings_db.enable_group_evaluation,
+            group_scores=pe_settings_db.group_scores,
+            group_reason_control=pe_settings_db.group_reason_control,
+            group_evaluation_method=pe_settings_db.group_evaluation_method,
+            show_points=pe_settings_db.show_points,
+        )
+    else:
+        # デフォルト値で初期化 (テンプレートが参照する可能性のある全ての属性を定義)
+        pe_settings_display = SimpleNamespace(
+            enable_member_evaluation=False,
+            member_scores=[],
+            member_reason_control=PeerEvaluationSettings.ReasonMode.DISABLED,
+            evaluation_method=PeerEvaluationSettings.EvaluationMethod.DIRECT,
+            enable_group_evaluation=False,
+            group_scores=[],
+            group_reason_control=PeerEvaluationSettings.ReasonMode.DISABLED,
+            group_evaluation_method=PeerEvaluationSettings.EvaluationMethod.DIRECT,
+            show_points=True, # デフォルトで表示
+        )
     
     # テンプレートコピー処理
     if request.method == 'POST' and request.POST.get('action') == 'copy_template':
@@ -943,47 +1124,35 @@ def peer_evaluation_settings_view(request, session_id):
             try:
                 source_session = LessonSession.objects.get(
                     id=source_session_id,
-                    classroom=lesson_session.classroom,
+                    classroom=lesson_session_db.classroom,
                 )
                 source_settings = source_session.peer_evaluation_settings
-                if pe_settings:
-                    pe_settings.enable_member_evaluation = source_settings.enable_member_evaluation
-                    pe_settings.member_scores = source_settings.member_scores
-                    pe_settings.member_reason_control = source_settings.member_reason_control
-                    pe_settings.evaluation_method = source_settings.evaluation_method
-                    pe_settings.enable_group_evaluation = source_settings.enable_group_evaluation
-                    pe_settings.group_scores = source_settings.group_scores
-                    pe_settings.group_reason_control = source_settings.group_reason_control
-                    pe_settings.group_evaluation_method = source_settings.group_evaluation_method
-                    pe_settings.show_points = source_settings.show_points
-                    pe_settings.save()
-                else:
-                    pe_settings = PeerEvaluationSettings.objects.create(
-                        lesson_session=lesson_session,
-                        enable_member_evaluation=source_settings.enable_member_evaluation,
-                        member_scores=source_settings.member_scores,
-                        member_reason_control=source_settings.member_reason_control,
-                        evaluation_method=source_settings.evaluation_method,
-                        enable_group_evaluation=source_settings.enable_group_evaluation,
-                        group_scores=source_settings.group_scores,
-                        group_reason_control=source_settings.group_reason_control,
-                        group_evaluation_method=source_settings.group_evaluation_method,
-                        show_points=source_settings.show_points,
-                    )
-                # 一般設定もコピー
-                lesson_session.enable_comments = source_session.enable_comments
-                lesson_session.enable_feedback = source_session.enable_feedback
-                lesson_session.save()
-                messages.success(request, f'第{source_session.session_number}回の設定をコピーしました。')
+                
+                # displayオブジェクトを更新 (データベースは更新しない)
+                pe_settings_display.enable_member_evaluation = source_settings.enable_member_evaluation
+                pe_settings_display.member_scores = source_settings.member_scores
+                pe_settings_display.member_reason_control = source_settings.member_reason_control
+                pe_settings_display.evaluation_method = source_settings.evaluation_method
+                pe_settings_display.enable_group_evaluation = source_settings.enable_group_evaluation
+                pe_settings_display.group_scores = source_settings.group_scores
+                pe_settings_display.group_reason_control = source_settings.group_reason_control
+                pe_settings_display.group_evaluation_method = source_settings.group_evaluation_method
+                pe_settings_display.show_points = source_settings.show_points
+                
+                lesson_session_display.enable_comments = source_session.enable_comments
+                lesson_session_display.enable_feedback = source_session.enable_feedback
+                
+                messages.info(request, f'第{source_session.session_number}回の設定をフォームにコピーしました。保存ボタンで確定してください。')
             except (LessonSession.DoesNotExist, PeerEvaluationSettings.DoesNotExist):
                 messages.error(request, 'コピー元の設定が見つかりません。')
-        return redirect('school_management:peer_evaluation_settings', session_id=session_id)
+        # コピー後は、そのままフォームを再レンダリングする (データベース保存はしない)
     
     if request.method == 'POST' and request.POST.get('action') != 'copy_template':
         # 一般設定
-        lesson_session.enable_comments = request.POST.get('enable_comments') == 'on'
-        lesson_session.enable_feedback = request.POST.get('enable_feedback') == 'on'
-        lesson_session.save()
+        # lesson_session_db (データベースオブジェクト) を更新
+        lesson_session_db.enable_comments = request.POST.get('enable_comments') == 'on'
+        lesson_session_db.enable_feedback = request.POST.get('enable_feedback') == 'on'
+        lesson_session_db.save()
         
         # メンバー評価配点をリストで取得
         member_scores_raw = request.POST.get('member_scores_json', '[]')
@@ -1035,36 +1204,45 @@ def peer_evaluation_settings_view(request, session_id):
             settings_data['group_scores'] = []
             settings_data['group_reason_control'] = PeerEvaluationSettings.ReasonMode.DISABLED
             settings_data['group_evaluation_method'] = PeerEvaluationSettings.EvaluationMethod.DIRECT
-
-        if settings_data['enable_member_evaluation'] and not settings_data['member_scores']:
-            messages.error(request, 'メンバー評価を有効にする場合は、配点を1つ以上設定してください。')
-            return redirect('school_management:peer_evaluation_settings', session_id=session_id)
-        if settings_data['enable_group_evaluation'] and not settings_data['group_scores']:
-            messages.error(request, '他グループ評価を有効にする場合は、配点を1つ以上設定してください。')
-            return redirect('school_management:peer_evaluation_settings', session_id=session_id)
         
-        if pe_settings:
-            for key, value in settings_data.items():
-                setattr(pe_settings, key, value)
-            pe_settings.save()
+        # バリデーションエラーがある場合
+        if (settings_data['enable_member_evaluation'] and not settings_data['member_scores']) or \
+           (settings_data['enable_group_evaluation'] and not settings_data['group_scores']):
+            if settings_data['enable_member_evaluation'] and not settings_data['member_scores']:
+                messages.error(request, 'メンバー評価を有効にする場合は、配点を1つ以上設定してください。')
+            if settings_data['enable_group_evaluation'] and not settings_data['group_scores']:
+                messages.error(request, '他グループ評価を有効にする場合は、配点を1つ以上設定してください。')
+            
+            # エラー時はPOSTされたデータをdisplayオブジェクトに反映して再レンダリング
+            pe_settings_display = SimpleNamespace(**settings_data)
+            lesson_session_display.enable_comments = lesson_session_db.enable_comments # データベースの値を維持
+            lesson_session_display.enable_feedback = lesson_session_db.enable_feedback # データベースの値を維持
+            # そのままレンダリングにフォールスルー
         else:
-            pe_settings = PeerEvaluationSettings.objects.create(
-                lesson_session=lesson_session,
-                **settings_data
-            )
-        
-        messages.success(request, 'ピア評価設定を保存しました。')
-        return redirect('school_management:session_detail', session_id=session_id)
+            # バリデーション成功、データベースに保存
+            if pe_settings_db:
+                for key, value in settings_data.items():
+                    setattr(pe_settings_db, key, value)
+                pe_settings_db.save()
+            else:
+                PeerEvaluationSettings.objects.create(
+                    lesson_session=lesson_session_db,
+                    **settings_data
+                )
+            
+            messages.success(request, 'ピア評価設定を保存しました。')
+            return redirect('school_management:session_detail', session_id=session_id)
     
     # テンプレートコピー用: 同じクラスの他の授業回で設定済みのもの
     template_sessions = LessonSession.objects.filter(
-        classroom=lesson_session.classroom,
+        classroom=lesson_session_db.classroom,
         peer_evaluation_settings__isnull=False,
-    ).exclude(id=lesson_session.id).order_by('-session_number')
+    ).exclude(id=lesson_session_db.id).order_by('-session_number')
     
     context = {
-        'lesson_session': lesson_session,
-        'pe_settings': pe_settings,
+        'lesson_session_model_instance': lesson_session_db, # タイトルやパンくずリスト用
+        'lesson_session': lesson_session_display, # フォームの入力値（コピーされたものを含む）用
+        'pe_settings': pe_settings_display,     # displayオブジェクトを渡す
         'template_sessions': template_sessions,
         'reason_mode_choices': PeerEvaluationSettings.ReasonMode.choices,
         'evaluation_method_choices': PeerEvaluationSettings.EvaluationMethod.choices,

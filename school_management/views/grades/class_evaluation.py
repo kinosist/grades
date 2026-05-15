@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 import logging
 from django.contrib.auth.decorators import login_required
+from collections import defaultdict
 from django.db.models import Sum
 
 import json
@@ -89,6 +90,7 @@ def class_evaluation_view(request, class_id):
     
     # 授業回の一覧を取得
     sessions = LessonSession.objects.filter(classroom=classroom).order_by('session_number')
+    session_ids = list(sessions.values_list('id', flat=True))
     
     # 教員が追加した「独自の評価項目（列）」の一覧を取得
     point_columns = classroom.point_columns.all().order_by('created_at')
@@ -96,9 +98,35 @@ def class_evaluation_view(request, class_id):
     # 評価システム（default: 通常, original: カスタマイズ, goal: 目標管理）
     grading_system = classroom.grading_system
 
+    # N+1対策: 関連データを一括で取得
+    all_peer_evals = PeerEvaluation.objects.filter(lesson_session__in=session_ids)
+    all_groups = list(Group.objects.filter(lesson_session__in=session_ids))
+
+    # AGGREGATEモード用の貢献度スコアを事前集計
+    all_contrib_evals = ContributionEvaluation.objects.filter(
+        peer_evaluation__lesson_session__classroom=classroom
+    ).values(
+        'evaluatee_id', 'peer_evaluation__lesson_session_id'
+    ).annotate(
+        total_contrib=Sum('contribution_score')
+    )
+    student_session_contrib_map = defaultdict(dict)
+    for item in all_contrib_evals:
+        student_id = item['evaluatee_id']
+        session_id = item['peer_evaluation__lesson_session_id']
+        score = item['total_contrib']
+        student_session_contrib_map[student_id][session_id] = score
+
+    # セッションIDをキーにした評価データの辞書を作成
+    session_to_evals_map = defaultdict(list)
+    for pe in all_peer_evals:
+        session_to_evals_map[pe.lesson_session_id].append(pe)
+
     # セッション単位で不変な「グループ投票ポイント」を先に計算して使い回す
     session_group_point_maps = {}
     session_peer_settings = {}
+    # NEW: DIRECTモード用の貢献度スコアを事前集計
+    direct_mode_contrib_scores = defaultdict(lambda: defaultdict(int))
     for session in sessions:
         if not session.has_peer_evaluation:
             session_peer_settings[session.id] = None
@@ -109,18 +137,31 @@ def class_evaluation_view(request, class_id):
             pe_settings = None
         session_peer_settings[session.id] = pe_settings
 
+        # NEW: DIRECTモードのスコア計算
+        if pe_settings and pe_settings.enable_member_evaluation and pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
+            member_scores = pe_settings.member_scores or []
+            if member_scores:
+                evals_in_session = session_to_evals_map.get(session.id, [])
+                for ev in evals_in_session:
+                    response = ev.response_json or {}
+                    for entry in response.get('group_members_eval', []):
+                        member_id = _safe_int(entry.get('member_id'))
+                        rank = _safe_int(entry.get('rank'))
+                        if member_id and rank and 1 <= rank <= len(member_scores):
+                            score = member_scores[rank - 1]
+                            direct_mode_contrib_scores[session.id][member_id] += score
+
         score_points = (
             pe_settings.group_scores or []
         ) if pe_settings and pe_settings.enable_group_evaluation else []
-        if not score_points:
-            continue
-
-        session_group_point_maps[session.id] = _build_group_vote_point_map(
-            session_groups=list(Group.objects.filter(lesson_session=session)),
-            session_peer_evals=PeerEvaluation.objects.filter(lesson_session=session),
-            pe_settings=pe_settings,
-            peer_status=session.peer_evaluation_status,
-        )
+        if score_points:
+            session_group_point_maps[session.id] = _build_group_vote_point_map(
+                # N+1対策: 事前取得したデータを利用
+                session_groups=[g for g in all_groups if g.lesson_session_id == session.id],
+                session_peer_evals=session_to_evals_map.get(session.id, []),
+                pe_settings=pe_settings,
+                peer_status=session.peer_evaluation_status,
+            )
 
     # 各学生の評価データを格納するリスト
     student_evaluations = []
@@ -166,15 +207,18 @@ def class_evaluation_view(request, class_id):
             peer_evaluation_score = 0
             contrib_score = 0
             vote_score = 0
-            try:
-                if session.has_peer_evaluation:
-                    # 3-1. 貢献度評価 (5段階評価の合計を取得)
-                    contrib_score = ContributionEvaluation.objects.filter(
-                        peer_evaluation__lesson_session=session,
-                        evaluatee=student
-                    ).aggregate(total=Sum('contribution_score'))['total'] or 0
-                    
-                    # 3-2. 投票ポイントの計算（response_json + 設定配点）
+            if session.has_peer_evaluation:
+                try:
+                    pe_settings = session_peer_settings.get(session.id)
+                    if pe_settings and pe_settings.enable_member_evaluation:
+                        if pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
+                            # DIRECTモード: 事前集計したデータを利用
+                            contrib_score = direct_mode_contrib_scores.get(session.id, {}).get(student.id, 0)
+                        else: # AGGREGATEモード
+                            # AGGREGATEモード: 事前集計したデータを利用
+                            contrib_score = student_session_contrib_map.get(student.id, {}).get(session.id, 0)
+
+                    # 3-2. 投票ポイントの計算
                     membership = GroupMember.objects.filter(
                         student=student,
                         group__lesson_session=session
@@ -182,7 +226,6 @@ def class_evaluation_view(request, class_id):
                     
                     if membership:
                         group = membership.group
-                        pe_settings = session_peer_settings.get(session.id)
                         score_points = (
                             pe_settings.group_scores or []
                         ) if pe_settings and pe_settings.enable_group_evaluation else []
@@ -191,10 +234,10 @@ def class_evaluation_view(request, class_id):
                             vote_score = group_point_map.get(group.id, 0)
 
                     peer_evaluation_score = contrib_score + vote_score
-            except Exception as e:
-                logger.error(f"ピア評価スコア取得エラー: {e}", exc_info=True)
-                pass
-            
+                except Exception as e:
+                    logger.error(f"ピア評価スコア取得エラー: {e}", exc_info=True)
+                    pass
+
             # セッションごとのデータを辞書に保存
             session_data[session_key] = {
                 'manual_points': manual_points,

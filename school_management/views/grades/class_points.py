@@ -1,5 +1,8 @@
+import logging
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from collections import defaultdict
+from django.db.models import Sum
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
@@ -7,6 +10,9 @@ from django.views.decorators.http import require_POST
 
 from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPoints, SelfEvaluation, QuizScore, \
     ContributionEvaluation, GroupMember, PeerEvaluation, PeerEvaluationSettings
+
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_int(value):
@@ -26,7 +32,7 @@ def _build_group_vote_point_map(session_groups, session_peer_evals, pe_settings,
         return group_point_map
 
     if pe_settings.group_evaluation_method == PeerEvaluationSettings.EvaluationMethod.AGGREGATE:
-        if peer_status != 'CLOSED':
+        if peer_status != LessonSession.PeerEvaluationStatus.CLOSED:
             return group_point_map
 
         group_internal_points = {group_obj.id: 0 for group_obj in session_groups}
@@ -133,21 +139,46 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
     all_groups = Group.objects.filter(lesson_session__in=session_ids).select_related('lesson_session')
     all_peer_evals = PeerEvaluation.objects.filter(lesson_session__in=session_ids)
 
+    # セッションIDをキーにした評価データの辞書を作成
+    session_to_evals_map = defaultdict(list)
+    for pe in all_peer_evals:
+        session_to_evals_map[pe.lesson_session_id].append(pe)
+
+    # NEW: セッション設定のキャッシュ
+    all_sessions_settings = {}
+    for s in all_sessions:
+        try:
+            all_sessions_settings[s.id] = s.peer_evaluation_settings
+        except PeerEvaluationSettings.DoesNotExist:
+            all_sessions_settings[s.id] = None
+
     # セッションごとのランキング情報をキャッシュ
     session_rankings_cache = {}
+    # NEW: DIRECTモード用の貢献度スコアを事前集計
+    direct_mode_contrib_scores = defaultdict(lambda: defaultdict(int))
 
     for sess in all_sessions:
         sess_id = sess.id
         # そのセッションのグループを抽出
         session_groups = [g for g in all_groups if g.lesson_session_id == sess_id]
         # そのセッションの投票を抽出
-        session_peer_evals = [pe for pe in all_peer_evals if pe.lesson_session_id == sess_id]
+        session_peer_evals = session_to_evals_map.get(sess_id, [])
 
         # グループごとの投票スコアを計算（response_json + 設定配点）
-        try:
-            pe_settings = sess.peer_evaluation_settings
-        except PeerEvaluationSettings.DoesNotExist:
-            pe_settings = None
+        pe_settings = all_sessions_settings.get(sess_id)
+
+        # NEW: DIRECTモードのスコア計算
+        if pe_settings and pe_settings.enable_member_evaluation and pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
+            member_scores = pe_settings.member_scores or []
+            if member_scores:
+                for ev in session_peer_evals:
+                    response = ev.response_json or {}
+                    for entry in response.get('group_members_eval', []):
+                        member_id = _safe_int(entry.get('member_id'))
+                        rank = _safe_int(entry.get('rank'))
+                        if member_id and rank and 1 <= rank <= len(member_scores):
+                            score = member_scores[rank - 1]
+                            direct_mode_contrib_scores[sess_id][member_id] += score
 
         group_scores = _build_group_vote_point_map(
             session_groups=session_groups,
@@ -161,10 +192,37 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
             'group_scores': group_scores,
         }
 
+    # NEW: ピア評価の貢献度スコアを事前集計
+    # AGGREGATEモード用の集計
+    all_contrib_evals = ContributionEvaluation.objects.filter(
+        peer_evaluation__lesson_session__classroom=classroom
+    ).values(
+        'evaluatee_id', 'peer_evaluation__lesson_session_id'
+    ).annotate(
+        total_contrib=Sum('contribution_score')
+    )
+    student_session_contrib_map = defaultdict(dict)
+    for item in all_contrib_evals:
+        student_id = item['evaluatee_id']
+        session_id = item['peer_evaluation__lesson_session_id']
+        score = item['total_contrib']
+        student_session_contrib_map[student_id][session_id] = score
+
+    # DIRECTモード用の評価データ辞書
+    session_to_evals_map = defaultdict(list)
+    for pe in all_peer_evals:
+        session_to_evals_map[pe.lesson_session_id].append(pe)
+
     # ===== 各学生のクラス内成績を取得 =====
     student_grades = []
 
     for student in students:
+        # NEW: 学生のグループメンバーシップを事前に取得
+        student_groups = list(GroupMember.objects.filter(
+            student=student,
+            group__lesson_session__classroom=classroom
+        ).select_related('group', 'group__lesson_session'))
+
         # 1. 授業内手動ポイント (StudentLessonPoints)
         lesson_points_qs = StudentLessonPoints.objects.filter(
             student=student,
@@ -191,57 +249,59 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
         # 3. ピア評価ポイント
         peer_total = 0
         peer_details = []
-
-        # 貢献度
-        contrib_evals = ContributionEvaluation.objects.filter(
-            evaluatee=student,
-            peer_evaluation__lesson_session__classroom=classroom
-        ).select_related('peer_evaluation__lesson_session')
-
         session_peer_map = {}
-        for ce in contrib_evals:
-            sess_id = ce.peer_evaluation.lesson_session.id
-            if sess_id not in session_peer_map:
-                session_peer_map[sess_id] = {
-                    'session': ce.peer_evaluation.lesson_session,
-                    'contrib': 0, 'vote': 0
-                }
-            session_peer_map[sess_id]['contrib'] += ce.contribution_score
 
-        # 投票ポイント: 事前計算されたキャッシュを利用してN+1問題を解決
-        student_groups = GroupMember.objects.filter(
-            student=student,
-            group__lesson_session__classroom=classroom
-        ).select_related('group', 'group__lesson_session')
+        # 全セッションをループしてピア評価ポイントを計算
+        for sess in all_sessions:
+            if not sess.has_peer_evaluation:
+                continue
 
-        for membership in student_groups:
-            group = membership.group
-            sess = group.lesson_session
             sess_id = sess.id
+            contrib_score = 0
+            vote_score = 0
 
-            # キャッシュからランキング情報を取得
-            if sess_id in session_rankings_cache:
-                ranking_info = session_rankings_cache[sess_id]
-                my_score = ranking_info['group_scores'].get(group.id, 0)
-                vote_points = my_score
+            try:
+                pe_settings = all_sessions_settings.get(sess_id)
 
-                # 表示用に記録
-                if vote_points > 0 or my_score > 0:
-                    if sess_id not in session_peer_map:
-                        session_peer_map[sess_id] = {
-                            'session': sess,
-                            'contrib': 0, 'vote': 0
-                        }
-                    session_peer_map[sess_id]['vote'] += vote_points
+                # 貢献度スコア
+                if pe_settings and pe_settings.enable_member_evaluation:
+                    if pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
+                        # DIRECTモード: 事前集計したデータを利用
+                        contrib_score = direct_mode_contrib_scores.get(sess_id, {}).get(student.id, 0)
+                    else:  # AGGREGATE
+                        contrib_score = student_session_contrib_map.get(student.id, {}).get(sess_id, 0)
+                
+                # 投票ポイント
+                student_group_in_session = next((g for g in student_groups if g.group.lesson_session_id == sess_id), None)
+                if student_group_in_session:
+                    group_id = student_group_in_session.group_id
+                    if sess_id in session_rankings_cache:
+                        ranking_info = session_rankings_cache[sess_id]
+                        vote_score = ranking_info['group_scores'].get(group_id, 0)
+
+                if contrib_score > 0 or vote_score > 0:
+                    session_peer_map[sess_id] = {'session': sess, 'contrib': contrib_score, 'vote': vote_score, 'total': contrib_score + vote_score}
+            except (AttributeError, IndexError, TypeError, ValueError) as e:
+                logger.error(f"ピア評価ポイントの計算中にエラーが発生しました (student: {student.id}, session: {sess_id}): {e}", exc_info=True)
+                # エラーが発生した場合、エラー情報を持ったエントリをマップに追加
+                session_peer_map[sess_id] = {
+                    'session': sess,
+                    'contrib': 0,
+                    'vote': 0,
+                    'total': 0,
+                    'error': f"計算エラー: {e}"
+                }
 
         for data in session_peer_map.values():
-            p_sum = data['contrib'] + data['vote']
+            # エラーがある場合は、このセッションのピア評価ポイントを0として扱う
+            p_sum = 0 if data.get('error') else data.get('contrib', 0) + data.get('vote', 0)
             peer_total += p_sum
             peer_details.append({
                 'session': data['session'],
-                'contrib': data['contrib'],
-                'vote': data['vote'],
-                'total': p_sum
+                'contrib': data.get('contrib', 0),
+                'vote': data.get('vote', 0),
+                'total': p_sum,
+                'error': data.get('error')  # テンプレートでエラー表示に利用
             })
         peer_details.sort(key=lambda x: x['session'].session_number)
 

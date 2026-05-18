@@ -58,6 +58,18 @@
                 </form>
             </div>
         </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="fas fa-calendar-alt me-2"></i>授業回の一括作成</h5>
+            </div>
+            <div class="card-body">
+                <p>未作成の授業回（1〜15回）を一覧で設定し、まとめて作成するページへ移動します。各回の実施日やテーマを効率的に入力できます。</p>
+                <a {% if available_numbers %}href="{% url 'school_management:session_bulk_edit' classroom.id %}?mode=create"{% endif %} class="btn btn-info {% if not available_numbers %}disabled{% endif %}" {% if not available_numbers %}aria-disabled="true" tabindex="-1"{% endif %}>
+                    <i class="fas fa-edit me-2"></i>一括で設定・作成する
+                </a>
+            </div>
+        </div>
     </div>
     
     <div class="col-md-4">

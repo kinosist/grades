@@ -209,7 +209,7 @@ class LessonSession(models.Model):
     
     classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス')
     session_number = models.IntegerField(verbose_name='回数')
-    date = models.DateField(verbose_name='実施日')
+    date = models.DateField(verbose_name='実施日', null=True, blank=True)
     topic = models.CharField(max_length=200, blank=True, verbose_name='テーマ・内容')
     has_quiz = models.BooleanField(default=False, verbose_name='小テストあり')
     has_peer_evaluation = models.BooleanField(default=True, verbose_name='ピア評価あり')

@@ -2,7 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from ...models import ClassRoom, LessonSession, Quiz, QuizScore, QRCodeScan, PeerEvaluation, Group, Attendance, StudentLessonPoints, LessonReport
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
+from datetime import datetime
 
 @login_required
 def session_create_view(request, class_id):
@@ -10,10 +11,10 @@ def session_create_view(request, class_id):
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
     
     if request.method == 'POST':
+        # Single session creation
         session_number = request.POST.get('session_number')
         date = request.POST.get('date')
         topic = request.POST.get('topic')
-        has_quiz = request.POST.get('has_quiz') == 'on'
         if session_number and date:
             try:
                 session = LessonSession.objects.create(
@@ -21,7 +22,6 @@ def session_create_view(request, class_id):
                     session_number=int(session_number),
                     date=date,
                     topic=topic or "",
-                    has_quiz=has_quiz,
                     has_peer_evaluation=True
                 )
                 messages.success(request, f'第{session_number}回授業を作成しました。')
@@ -143,3 +143,148 @@ def lesson_session_delete(request, session_id):
         return redirect('school_management:class_detail', class_id=classroom_id)
     
     return redirect('school_management:session_detail', session_id=session.id)
+
+@login_required
+def session_bulk_edit_view(request, class_id):
+    """授業回の一括作成・編集"""
+    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+    
+    # 既存の授業回を辞書に格納して高速アクセスできるようにする
+    existing_sessions_map = {
+        s.session_number: s 
+        for s in LessonSession.objects.filter(classroom=classroom)
+    }
+
+    # ユーザーの意図（作成か編集か）をクエリパラメータから判断する
+    mode = request.GET.get('mode', 'edit') # デフォルトは編集モード
+
+    if request.method == 'POST':
+        sessions_to_create = []
+        sessions_to_update = []
+        created_count = 0
+        updated_count = 0
+
+        # フォームから送信された授業回番号のみを処理対象とする
+        submitted_numbers = set()
+        for key in request.POST:
+            if key.startswith('date-') or key.startswith('topic-'):
+                try:
+                    num = int(key.split('-')[1])
+                    submitted_numbers.add(num)
+                except (ValueError, IndexError):
+                    continue
+
+        for num in sorted(list(submitted_numbers)):
+            date_str = request.POST.get(f'date-{num}')
+            topic_str = request.POST.get(f'topic-{num}', '').strip()
+
+            new_date = None
+            if date_str:
+                try:
+                    new_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                except ValueError:
+                    # 不正な日付フォーマットは無視
+                    pass
+            
+            if num in existing_sessions_map:
+                # 既存の授業回を更新
+                session_obj = existing_sessions_map[num]
+                if session_obj.date != new_date or session_obj.topic != topic_str:
+                    session_obj.date = new_date
+                    session_obj.topic = topic_str
+                    sessions_to_update.append(session_obj)
+                    updated_count += 1
+            else:
+                # 新しい授業回を作成
+                # 「一括作成」モードからのPOSTでは、入力がなくても授業回の枠を作成する
+                sessions_to_create.append(
+                    LessonSession(
+                        classroom=classroom,
+                        session_number=num,
+                        date=new_date,
+                        topic=topic_str,
+                        has_peer_evaluation=True
+                    )
+                )
+                created_count += 1
+
+        if sessions_to_create or sessions_to_update:
+            with transaction.atomic(): # トランザクションで一括処理
+                if sessions_to_create:
+                    LessonSession.objects.bulk_create(sessions_to_create)
+                if sessions_to_update:
+                    # bulk_updateは更新するフィールドを指定する必要がある
+                    # ここではdateとtopicのみを更新対象とする
+                    LessonSession.objects.bulk_update(sessions_to_update, ['date', 'topic'])
+            
+            message_parts = []
+            if created_count > 0:
+                message_parts.append(f'{created_count}件の授業回を新規作成')
+            if updated_count > 0:
+                message_parts.append(f'{updated_count}件の授業回を更新')
+            
+            if message_parts:
+                messages.success(request, '、'.join(message_parts) + 'しました。')
+            else:
+                messages.info(request, '変更された項目はありませんでした。')
+        else:
+            messages.info(request, '変更された項目はありませんでした。')
+        
+        return redirect('school_management:class_detail', class_id=classroom.id)
+
+    # GETリクエストの処理
+    sessions_to_display = []
+    is_creation_mode = False # デフォルトは編集モード
+
+    if mode == 'create':
+        # 「一括作成」モード: 未作成の授業回のみをリストアップ
+        for num in range(1, 16):
+            if num not in existing_sessions_map:
+                sessions_to_display.append(
+                    LessonSession(classroom=classroom, session_number=num, date=None, topic="")
+                )
+        
+        if sessions_to_display:
+            is_creation_mode = True
+        else:
+            # 作成対象がない場合、編集モードとして既存の全件を表示する
+            messages.info(request, 'すべての授業回（1～15回）が作成済みのため、編集モードで表示します。')
+            sessions_to_display = sorted(list(existing_sessions_map.values()), key=lambda s: s.session_number)
+            is_creation_mode = False
+    else:
+        # 「一括編集」モード: 作成済みの授業回のみを表示
+        sessions_to_display = sorted(list(existing_sessions_map.values()), key=lambda s: s.session_number)
+        if not sessions_to_display:
+            messages.info(request, '編集可能な授業回がありません。まず授業回を作成してください。')
+            return redirect('school_management:session_create', class_id=classroom.id)
+        is_creation_mode = False
+    
+    context = {
+        'classroom': classroom,
+        'sessions': sessions_to_display,
+        'is_creation_mode': is_creation_mode,
+    }
+    return render(request, 'school_management/session_bulk_edit.html', context)
+
+@login_required
+def session_edit_view(request, session_id):
+    """授業回編集"""
+    session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
+    
+    if request.method == 'POST':
+        date_str = request.POST.get('date')
+        topic = request.POST.get('topic', '').strip()
+        
+        try:
+            session.date = date_str if date_str else None
+            session.topic = topic
+            session.save(update_fields=['date', 'topic'])
+            messages.success(request, f'第{session.session_number}回の情報を更新しました。')
+            return redirect('school_management:session_detail', session_id=session.id)
+        except Exception as e:
+            messages.error(request, f'更新中にエラーが発生しました: {e}')
+    
+    context = {
+        'session': session,
+    }
+    return render(request, 'school_management/session_edit.html', context)

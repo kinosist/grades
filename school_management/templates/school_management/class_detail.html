@@ -140,22 +140,14 @@
                                     <th>回</th>
                                     <th>日付</th>
                                     <th>トピック</th>
-                                    <th>ピア評価</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for lesson in lessons|dictsortreversed:"session_number" %}
                                 <tr class="clickable-row" onclick="window.location=`{% url 'school_management:lesson_session_detail' lesson.id %}`">
                                     <td><strong>第{{ lesson.session_number }}回</strong></td>
-                                    <td>{{ lesson.date|date:"m/d" }}</td>
+                                    <td>{{ lesson.date|date:"m/d"|default:"-" }}</td>
                                     <td>{{ lesson.topic|default:"-" }}</td>
-                                    <td>
-                                        {% if lesson.has_peer_evaluation %}
-                                            <span class="badge bg-info">あり</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">なし</span>
-                                        {% endif %}
-                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

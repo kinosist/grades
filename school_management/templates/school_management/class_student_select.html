@@ -43,7 +43,7 @@
                                 <option value="">コピー元のクラスを選択...</option>
                                 {% for item in other_classes_with_student_ids %}
                                     <option value="{{ item.class.id }}" data-student-ids='{{ item.student_ids_json }}'>
-                                        {{ item.class.year }} {{ item.class.get_semester_display }} {{ item.class.class_name }} ({{ item.class.students.count }}名)
+                                        {{ item.class.year }} {{ item.class.get_semester_display }} {{ item.class.class_name }} ({{ item.class.student_count }}名)
                                     </option>
                                 {% endfor %}
                             </select>
@@ -113,7 +113,7 @@
                                                     <br><small class="text-muted">{{ student.email|default:"-" }}</small>
                                                     <div class="mt-2">
                                                         {% for classroom in student.teacher_classrooms %}
-                                                            <span class="badge {% if classroom.semester == 'first' %}bg-primary-soft text-primary{% else %}bg-secondary-soft text-secondary{% endif %} me-1">
+                                                            <span class="badge {% if classroom.semester == 'first' %}bg-white text-primary border border-primary{% else %}bg-white text-secondary border border-secondary{% endif %} me-1">
                                                                 {% if classroom.semester == 'first' %}前{% else %}後{% endif %} {{ classroom.class_name }}
                                                             </span>
                                                         {% empty %}

@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Q, Count
 from ...models import ClassRoom, CustomUser, Student, StudentClassPoints
 
 
@@ -72,7 +72,11 @@ def bulk_student_add(request, class_id):
     # 他のクラスから学生をコピーするためのクラスリストを取得
     other_classes = ClassRoom.objects.filter(
         teachers=request.user
-    ).exclude(id=class_id).prefetch_related('students').order_by('-year', 'semester')
+    ).exclude(id=class_id).annotate(
+        student_count=Count('students')
+    ).filter(
+        student_count__gt=0
+    ).prefetch_related('students').order_by('-year', 'semester')
 
     other_classes_with_student_ids = []
     for oc in other_classes:

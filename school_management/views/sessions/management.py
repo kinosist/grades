@@ -159,8 +159,8 @@ def session_bulk_edit_view(request, class_id):
     mode = request.GET.get('mode', 'edit') # デフォルトは編集モード
 
     if request.method == 'POST':
-        sessions_to_create = []
         sessions_to_update = []
+        sessions_to_create_data = [] # 新規作成するセッションのデータを格納
         created_count = 0
         updated_count = 0
 
@@ -197,32 +197,52 @@ def session_bulk_edit_view(request, class_id):
             else:
                 # 新しい授業回を作成
                 # 「一括作成」モードからのPOSTでは、入力がなくても授業回の枠を作成する
-                sessions_to_create.append(
-                    LessonSession(
-                        classroom=classroom,
-                        session_number=num,
-                        date=new_date,
-                        topic=topic_str,
-                        has_peer_evaluation=True
-                    )
-                )
-                created_count += 1
+                sessions_to_create_data.append({
+                    'session_number': num,
+                    'date': new_date,
+                    'topic': topic_str,
+                    'has_peer_evaluation': True
+                })
 
-        if sessions_to_create or sessions_to_update:
-            with transaction.atomic(): # トランザクションで一括処理
-                if sessions_to_create:
-                    LessonSession.objects.bulk_create(sessions_to_create)
-                if sessions_to_update:
-                    # bulk_updateは更新するフィールドを指定する必要がある
-                    # ここではdateとtopicのみを更新対象とする
-                    LessonSession.objects.bulk_update(sessions_to_update, ['date', 'topic'])
-            
+        if sessions_to_create_data or sessions_to_update:
+            actual_created_count = 0
+            actual_skipped_count = 0 # 競合によりスキップされた数
+            try:
+                with transaction.atomic(): # トランザクションで一括処理
+                    for session_data in sessions_to_create_data:
+                        session_obj, created = LessonSession.objects.update_or_create(
+                            classroom=classroom,
+                            session_number=session_data['session_number'],
+                            defaults={
+                                'date': session_data['date'],
+                                'topic': session_data['topic'],
+                                'has_peer_evaluation': session_data['has_peer_evaluation']
+                            }
+                        )
+                        if created:
+                            actual_created_count += 1
+                        else:
+                            actual_skipped_count += 1
+
+                    if sessions_to_update:
+                        # bulk_updateは更新するフィールドを指定する必要がある
+                        # ここではdateとtopicのみを更新対象とする
+                        LessonSession.objects.bulk_update(sessions_to_update, ['date', 'topic'])
+            except IntegrityError as e:
+                messages.error(request, f'データベースの整合性エラーが発生しました。入力内容を確認してください: {e}')
+                return redirect('school_management:class_detail', class_id=classroom.id)
+            except Exception as e:
+                messages.error(request, f'授業回の一括処理中に予期せぬエラーが発生しました: {e}')
+                return redirect('school_management:class_detail', class_id=classroom.id)
+
             message_parts = []
-            if created_count > 0:
-                message_parts.append(f'{created_count}件の授業回を新規作成')
-            if updated_count > 0:
-                message_parts.append(f'{updated_count}件の授業回を更新')
-            
+            if actual_created_count > 0:
+                message_parts.append(f'{actual_created_count}件の授業回を新規作成')
+            if len(sessions_to_update) > 0:
+                message_parts.append(f'{len(sessions_to_update)}件の授業回を更新')
+            if actual_skipped_count > 0:
+                message_parts.append(f'{actual_skipped_count}件の授業回は既に存在していたためスキップ')
+
             if message_parts:
                 messages.success(request, '、'.join(message_parts) + 'しました。')
             else:

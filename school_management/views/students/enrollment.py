@@ -116,18 +116,25 @@ def copy_students_from_class(request, class_id, source_class_id):
     added_count = len(students_to_add)
 
     if students_to_add:
-        # bulk_add to the through model
-        through_model = ClassRoom.students.through
-        through_model.objects.bulk_create([
-            through_model(classroom_id=target_class.id, customuser_id=student.id)
-            for student in students_to_add
-        ], ignore_conflicts=True)
+        # transaction.atomic() でまとめて実行
+        from django.db import transaction
+        try:
+            with transaction.atomic():
+                # bulk_add to the through model
+                through_model = ClassRoom.students.through
+                through_model.objects.bulk_create([
+                    through_model(classroom_id=target_class.id, customuser_id=student.id)
+                    for student in students_to_add
+                ], ignore_conflicts=True)
 
-        # bulk_create StudentClassPoints
-        StudentClassPoints.objects.bulk_create([
-            StudentClassPoints(student=student, classroom=target_class, points=0)
-            for student in students_to_add
-        ], ignore_conflicts=True)
+                # bulk_create StudentClassPoints
+                StudentClassPoints.objects.bulk_create([
+                    StudentClassPoints(student=student, classroom=target_class, points=0)
+                    for student in students_to_add
+                ], ignore_conflicts=True)
+        except Exception as e:
+            messages.error(request, f'学生のコピー中にエラーが発生しました: {e}')
+            return redirect('school_management:class_detail', class_id=class_id)
 
     if added_count > 0:
         messages.success(request, f'「{source_class.class_name}」から{added_count}人の学生をコピーしました。')

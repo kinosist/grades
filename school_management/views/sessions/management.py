@@ -170,7 +170,9 @@ def session_bulk_edit_view(request, class_id):
             if key.startswith('date-') or key.startswith('topic-'):
                 try:
                     num = int(key.split('-')[1])
-                    submitted_numbers.add(num)
+                    # 1~15 の範囲チェック
+                    if 1 <= num <= 15:
+                        submitted_numbers.add(num)
                 except (ValueError, IndexError):
                     continue
 
@@ -296,11 +298,16 @@ def session_edit_view(request, session_id):
         topic = request.POST.get('topic', '').strip()
         
         try:
-            session.date = date_str if date_str else None
+            parsed_date = None
+            if date_str:
+                parsed_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            session.date = parsed_date
             session.topic = topic
             session.save(update_fields=['date', 'topic'])
             messages.success(request, f'第{session.session_number}回の情報を更新しました。')
             return redirect('school_management:session_detail', session_id=session.id)
+        except ValueError:
+            messages.error(request, '日付は YYYY-MM-DD 形式でご入力ください。')
         except Exception as e:
             messages.error(request, f'更新中にエラーが発生しました: {e}')
     

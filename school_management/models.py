@@ -158,8 +158,6 @@ class ClassRoom(models.Model):
 
     def get_average_points(self):
         """クラスの平均総合ポイントを計算"""
-        from django.db.models import Avg
-        
         # クラスに在籍している学生のIDリストを取得
         enrolled_student_ids = self.students.values_list('id', flat=True)
         # 在籍学生のStudentClassPointsのみを対象にする

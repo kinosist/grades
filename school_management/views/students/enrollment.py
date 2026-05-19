@@ -80,7 +80,7 @@ def bulk_student_add(request, class_id):
 
     other_classes_with_student_ids = []
     for oc in other_classes:
-        student_ids = [str(s.id) for s in oc.students.all()]
+        student_ids = [s.id for s in oc.students.values_list('id', flat=True)]
         other_classes_with_student_ids.append({
             'class': oc,
             'student_ids_json': json.dumps(student_ids)

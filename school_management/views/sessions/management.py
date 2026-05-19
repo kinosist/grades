@@ -184,7 +184,7 @@ def session_bulk_edit_view(request, class_id):
                     new_date = datetime.strptime(date_str, '%Y-%m-%d').date()
                 except ValueError:
                     # 不正な日付フォーマット: エラーメッセージを出力して続ける
-                    messages.error(request, f'第{num}回の日付 [{date_str}] は正正な形式です。YYYY-MM-DD 形式でご入力ください。')
+                    messages.error(request, f'第{num}回の日付 [{date_str}] は正しい形式ではありません。YYYY-MM-DD 形式でご入力ください。')
                     continue
             
             if num in existing_sessions_map:
@@ -194,7 +194,6 @@ def session_bulk_edit_view(request, class_id):
                     session_obj.date = new_date
                     session_obj.topic = topic_str
                     sessions_to_update.append(session_obj)
-                    updated_count += 1
             else:
                 # 新しい授業回を作成
                 # 「一括作成」モードからのPOSTでは、入力がなくても授業回の枠を作成する

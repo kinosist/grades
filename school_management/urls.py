@@ -46,6 +46,7 @@ urlpatterns = [
     # --- クラスへの学生追加・詳細 ---
     path('classes/<int:class_id>/students/select/', students.bulk_student_add, name='class_student_select'),
     path('classes/<int:class_id>/students/bulk-csv/', students.bulk_student_add_csv, name='bulk_student_add_csv'),
+    path('classes/<int:class_id>/copy-from/<int:source_class_id>/', students.copy_students_from_class, name='copy_students_from_class'),
     path('classes/<int:class_id>/students/<str:student_number>/', students.class_student_detail_view, name='class_student_detail'),
 
     # --- 自己評価システム ---

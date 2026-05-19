@@ -161,8 +161,6 @@ def session_bulk_edit_view(request, class_id):
     if request.method == 'POST':
         sessions_to_update = []
         sessions_to_create_data = [] # 新規作成するセッションのデータを格納
-        created_count = 0
-        updated_count = 0
 
         # フォームから送信された授業回番号のみを処理対象とする
         submitted_numbers = set()
@@ -185,8 +183,9 @@ def session_bulk_edit_view(request, class_id):
                 try:
                     new_date = datetime.strptime(date_str, '%Y-%m-%d').date()
                 except ValueError:
-                    # 不正な日付フォーマットは無視
-                    pass
+                    # 不正な日付フォーマット: エラーメッセージを出力して続ける
+                    messages.error(request, f'第{num}回の日付 [{date_str}] は正正な形式です。YYYY-MM-DD 形式でご入力ください。')
+                    continue
             
             if num in existing_sessions_map:
                 # 既存の授業回を更新

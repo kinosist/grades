@@ -158,7 +158,7 @@ class ClassRoom(models.Model):
 
     def get_average_points(self):
         """クラスの平均総合ポイントを計算"""
-        from django.db.models import Q, F, Sum, Avg, Case, When, Value, IntegerField
+        from django.db.models import Avg
         
         # クラスに在籍している学生のIDリストを取得
         enrolled_student_ids = self.students.values_list('id', flat=True)
@@ -169,12 +169,10 @@ class ClassRoom(models.Model):
         if count == 0:
             return 0.0
         
-        # DB で集計して N+1 を回避
-        total_points = points_list.aggregate(
-            avg_total=Avg('total_points')
-        )['avg_total'] or 0.0
-        
-        return total_points
+        # クエリ実行してリスト化し、total_pointsプロパティ（Python @property）を集計
+        # total_points は DB 計算では不可（@property のため）
+        total_points = sum(sp.total_points for sp in points_list) / count
+        return round(total_points, 1)
 
 
 class PointColumn(models.Model):
@@ -236,7 +234,7 @@ class LessonSession(models.Model):
         verbose_name = '授業回'
         verbose_name_plural = '授業回'
         unique_together = ['classroom', 'session_number']
-        ordering = ['-date', 'session_number']
+        ordering = [models.F('date').desc(nulls_last=True), 'session_number']
 
     def __str__(self):
         return f"{self.classroom.class_name} 第{self.session_number}回"

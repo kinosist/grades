@@ -117,7 +117,6 @@ def copy_students_from_class(request, class_id, source_class_id):
 
     if students_to_add:
         # transaction.atomic() でまとめて実行
-        from django.db import transaction
         try:
             with transaction.atomic():
                 # bulk_add to the through model

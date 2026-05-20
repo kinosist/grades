@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPoints, SelfEvaluation, QuizScore, \
-    ContributionEvaluation, GroupMember, PeerEvaluation, PeerEvaluationSettings
+    ContributionEvaluation, GroupMember, PeerEvaluation, PeerEvaluationSettings, LessonSession
 
 
 logger = logging.getLogger(__name__)

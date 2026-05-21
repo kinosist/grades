@@ -35,6 +35,9 @@ body {
                     <button type="button" class="btn btn-success btn-sm" onclick="addNewGroup()">
                         <i class="fas fa-plus me-1"></i>グループ追加
                     </button>
+                    <a href="{% url 'school_management:group_master_copy' lesson_session.id %}" class="btn btn-info btn-sm">
+                        <i class="fas fa-copy me-1"></i>マスタからコピー
+                    </a>
                     <button type="button" class="btn btn-outline-info btn-sm" onclick="shuffleMembers()">
                         <i class="fas fa-random me-1"></i>ランダム配置
                     </button>

@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-05-21T08:37:53.007393",
+  "tests": [
+    {
+      "name": "StudentClassPoints N+1",
+      "status": "WARN",
+      "query_count": 11,
+      "details": "期待: ≤5, 実績: 11"
+    },
+    {
+      "name": "PeerEvaluation N+1",
+      "status": "PASS",
+      "query_count": 4,
+      "details": "期待: ≤4, 実績: 4"
+    },
+    {
+      "name": "GroupMember N+1",
+      "status": "WARN",
+      "query_count": 18,
+      "details": "期待: ≤10, 実績: 18"
+    },
+    {
+      "name": "成績計算",
+      "status": "PASS",
+      "query_count": null,
+      "details": {}
+    },
+    {
+      "name": "平均点計算",
+      "status": "PASS",
+      "query_count": null,
+      "details": {}
+    },
+    {
+      "name": "クイズ集計",
+      "status": "FAIL",
+      "query_count": null,
+      "details": "Cannot query \"2025年 前期 2026年1年B組\": Must be \"Quiz\" instance."
+    },
+    {
+      "name": "孤立レコード検査",
+      "status": "PASS",
+      "query_count": null,
+      "details": {}
+    },
+    {
+      "name": "FK参照検証",
+      "status": "PASS",
+      "query_count": null,
+      "details": {}
+    },
+    {
+      "name": "ダッシュボード応答",
+      "status": "PASS",
+      "query_count": null,
+      "details": {}
+    },
+    {
+      "name": "クラス一覧応答",
+      "status": "PASS",
+      "query_count": null,
+      "details": {}
+    },
+    {
+      "name": "レスポンシブ設定",
+      "status": "PASS",
+      "query_count": null,
+      "details": {}
+    },
+    {
+      "name": "静的ファイル",
+      "status": "PASS",
+      "query_count": null,
+      "details": "CSSファイル: 4個"
+    }
+  ],
+  "summary": {
+    "total": 12,
+    "passed": 9,
+    "failed": 3,
+    "issues": [
+      "StudentClassPoints N+1: 期待: ≤5, 実績: 11",
+      "GroupMember N+1: 期待: ≤10, 実績: 18",
+      "クイズ集計: Cannot query \"2025年 前期 2026年1年B組\": Must be \"Quiz\" instance."
+    ]
+  }
+}

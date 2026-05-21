@@ -101,6 +101,16 @@ def class_evaluation_view(request, class_id):
     # N+1対策: 関連データを一括で取得
     all_peer_evals = PeerEvaluation.objects.filter(lesson_session__in=session_ids)
     all_groups = list(Group.objects.filter(lesson_session__in=session_ids))
+    
+    # N+1対策: StudentClassPointsを一括で取得 (select_relatedで最適化)
+    student_ids = [s.id for s in students]
+    student_class_points_map = {
+        scp.student_id: scp
+        for scp in StudentClassPoints.objects.filter(
+            student_id__in=student_ids,
+            classroom=classroom
+        )
+    }
 
     # AGGREGATEモード用の貢献度スコアを事前集計
     all_contrib_evals = ContributionEvaluation.objects.filter(
@@ -264,12 +274,10 @@ def class_evaluation_view(request, class_id):
         # 5. データベースから保存された出席率、出席点を取得
         attendance_rate = 0
         saved_attendance_points = 0
-        try:
-            student_class_points = StudentClassPoints.objects.get(student=student, classroom=classroom)
+        student_class_points = student_class_points_map.get(student.id)
+        if student_class_points:
             attendance_rate = student_class_points.attendance_rate
             saved_attendance_points = student_class_points.attendance_points
-        except StudentClassPoints.DoesNotExist:
-            pass
         
         # 6. 各種スコアの合計を計算
         total_peer_score = sum(data['peer_score'] for data in session_data.values())

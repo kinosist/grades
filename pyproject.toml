@@ -13,4 +13,5 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "dj-database-url>=2.1.0",
     "django-stubs>=5.2.9",
+    "requests>=2.34.2",
 ]

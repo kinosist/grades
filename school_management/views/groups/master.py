@@ -105,7 +105,7 @@ def group_master_copy_to_session(request, session_id):
     
     if not group_masters.exists():
         messages.error(request, 'グループマスタが設定されていません。先にグループマスタを作成してください。')
-        return redirect('school_management:group_list', session_id=session_id)
+        return redirect('school_management:group_master_management', class_id=classroom.id)
     
     if request.method == 'POST':
         # 既存のグループを削除（オプション）

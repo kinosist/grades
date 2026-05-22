@@ -30,6 +30,7 @@ urlpatterns = [
     path('classes/', classes.class_list_view, name='class_list'),
     path('classes/create/', classes.class_create_view, name='class_create'),
     path('classes/<int:class_id>/', classes.class_detail_view, name='class_detail'),
+    path('classes/<int:class_id>/edit/', classes.class_edit_view, name='class_edit'),
     path('classes/<int:class_id>/delete/', classes.class_delete_view, name='class_delete'),
     
     # 独自の評価項目（列）管理用ルーティングを追加

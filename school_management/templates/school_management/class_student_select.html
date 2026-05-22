@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             let newlySelectedCount = 0;
             checkboxes.forEach(checkbox => {
-                if (studentIdsToSelect.includes(checkbox.value) && !checkbox.checked) {
+                if (studentIdsToSelect.includes(parseInt(checkbox.value, 10)) && !checkbox.checked) {
                     checkbox.checked = true;
                     newlySelectedCount++;
                 }

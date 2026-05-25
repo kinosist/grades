@@ -30,12 +30,8 @@ def student_detail_view(request, student_number):
                 messages.error(request, f'削除中にエラーが発生しました: {str(e)}')
                 return redirect('school_management:student_detail', student_number=student_number)
     
-    # 所属クラス一覧とそれぞれのクラスポイントを取得（担当クラスのみ）
-    classes = student.classroom_set.filter(teachers=request.user)
-    
-    # 担当クラスに所属していない場合は、すべてのクラスを表示（アクセス制御を緩和）
-    if not classes.exists():
-        classes = student.classroom_set.all()
+    # 所属クラス一覧とそれぞれのクラスポイントを取得
+    classes = student.classroom_set.filter(teachers=request.user).prefetch_related('teachers')
     
     class_data = []
     for classroom in classes:

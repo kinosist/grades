@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Q, Count
 from ...models import ClassRoom, CustomUser, Student, StudentClassPoints
 
 
@@ -48,7 +48,7 @@ def bulk_student_add(request, class_id):
         role='student',
         student_number__isnull=False,
         student_number__gt=''
-    ).exclude(id__in=existing_student_ids).order_by('student_number')
+    ).exclude(id__in=existing_student_ids).prefetch_related('classroom_set').order_by('student_number')
     
     # 検索機能
     search_query = request.GET.get('search', '')
@@ -59,12 +59,88 @@ def bulk_student_add(request, class_id):
             Q(email__icontains=search_query)
         )
     
+    # ログイン教員の担当クラスIDセットを取得
+    teacher_classroom_ids = set(request.user.classrooms.all().values_list('id', flat=True))
+
+    # 各学生オブジェクトに、ログイン教員が担当するクラスのリストを追加
+    # prefetch_relatedされたデータを効率的に利用
+    for student in available_students:
+        student.teacher_classrooms = [
+            c for c in student.classroom_set.all() if c.id in teacher_classroom_ids
+        ]
+
+    # 他のクラスから学生をコピーするためのクラスリストを取得
+    other_classes = ClassRoom.objects.filter(
+        teachers=request.user
+    ).exclude(id=class_id).annotate(
+        student_count=Count('students')
+    ).filter(
+        student_count__gt=0
+    ).prefetch_related('students').order_by('-year', 'semester')
+
+    other_classes_with_student_ids = []
+    for oc in other_classes:
+        student_ids = list(oc.students.values_list('id', flat=True))
+        other_classes_with_student_ids.append({
+            'class': oc,
+            'student_ids_json': json.dumps(student_ids)
+        })
+
     context = {
         'classroom': classroom,
         'available_students': available_students,
         'search_query': search_query,
+        'other_classes_with_student_ids': other_classes_with_student_ids,
     }
     return render(request, 'school_management/class_student_select.html', context)
+
+
+@login_required
+@require_POST
+def copy_students_from_class(request, class_id, source_class_id):
+    """ 指定されたクラスから現在のクラスへ学生をコピーする """
+    target_class = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+    source_class = get_object_or_404(ClassRoom, id=source_class_id, teachers=request.user)
+
+    if target_class.id == source_class.id:
+        messages.error(request, '同じクラスからはコピーできません。')
+        return redirect('school_management:class_detail', class_id=class_id)
+
+    source_students = source_class.students.all()
+    target_student_ids = set(target_class.students.values_list('id', flat=True))
+    
+    students_to_add = [
+        student for student in source_students if student.id not in target_student_ids
+    ]
+    
+    added_count = len(students_to_add)
+
+    if students_to_add:
+        # transaction.atomic() でまとめて実行
+        try:
+            with transaction.atomic():
+                # bulk_add to the through model
+                through_model = ClassRoom.students.through
+                through_model.objects.bulk_create([
+                    through_model(classroom_id=target_class.id, customuser_id=student.id)
+                    for student in students_to_add
+                ], ignore_conflicts=True)
+
+                # bulk_create StudentClassPoints
+                StudentClassPoints.objects.bulk_create([
+                    StudentClassPoints(student=student, classroom=target_class, points=0)
+                    for student in students_to_add
+                ], ignore_conflicts=True)
+        except Exception as e:
+            messages.error(request, f'学生のコピー中にエラーが発生しました: {e}')
+            return redirect('school_management:class_detail', class_id=class_id)
+
+    if added_count > 0:
+        messages.success(request, f'「{source_class.class_name}」から{added_count}人の学生をコピーしました。')
+    else:
+        messages.info(request, '追加する新しい学生はいませんでした（全員既に所属しています）。')
+
+    return redirect('school_management:class_detail', class_id=class_id)
 
 
 @login_required

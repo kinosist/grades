@@ -21,9 +21,6 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-users me-2"></i>グループ一覧</h5>
                 <div>
-                    <a href="{% url 'school_management:group_master_copy' lesson_session.id %}" class="btn btn-info">
-                        <i class="fas fa-copy me-1"></i>マスタからコピー
-                    </a>
                     <a href="{% url 'school_management:group_management' lesson_session.id %}" class="btn btn-primary">
                         <i class="fas fa-users me-1"></i>グループ編成
                     </a>

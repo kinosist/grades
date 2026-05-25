@@ -145,6 +145,7 @@
                                 <tr>
                                     <th style="width: 180px;">学籍番号</th>
                                     <th>氏名</th>
+                                    <th>所属クラス</th>
                                     <th class="d-none d-lg-table-cell">メールアドレス</th>
                                     <th style="width: 120px; text-align: center;">役割</th>
                                 </tr>
@@ -158,6 +159,15 @@
                                         </span>
                                     </td>
                                     <td class="fw-bold text-dark text-nowrap">{{ student.full_name }}</td>
+                                    <td>
+                                        {% for classroom in student.teacher_classrooms %}
+                                            <span class="badge {% if classroom.semester == 'first' %}bg-white text-primary border border-primary{% else %}bg-white text-secondary border border-secondary{% endif %} me-1">
+                                                {% if classroom.semester == 'first' %}前{% else %}後{% endif %} {{ classroom.class_name }}
+                                            </span>
+                                        {% empty %}
+                                            <span class="text-muted small">-</span>
+                                        {% endfor %}
+                                    </td>
                                     <td class="text-muted d-none d-lg-table-cell text-truncate" style="max-width: 250px;">
                                         {{ student.email|default:"-" }}
                                     </td>
@@ -186,6 +196,15 @@
                                         </span>
                                     </div>
                                     <h5 class="fw-bold text-dark mb-1">{{ student.full_name }}</h5>
+                                    <div class="mb-2">
+                                        {% for classroom in student.teacher_classrooms %}
+                                            <span class="badge {% if classroom.semester == 'first' %}bg-white text-primary border border-primary{% else %}bg-white text-secondary border border-secondary{% endif %} me-1">
+                                                {% if classroom.semester == 'first' %}前{% else %}後{% endif %} {{ classroom.class_name }}
+                                            </span>
+                                        {% empty %}
+                                            <span class="text-muted small">-</span>
+                                        {% endfor %}
+                                    </div>
                                     <p class="text-muted small mb-0 text-truncate">
                                         <i class="far fa-envelope me-1"></i>{{ student.email|default:"メール未設定" }}
                                     </p>

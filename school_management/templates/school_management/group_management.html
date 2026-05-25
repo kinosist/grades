@@ -20,8 +20,11 @@ body {
 <div class="row">
     <div class="col-lg-8">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="m-0"><i class="fas fa-users me-2"></i>グループ編成</h5>
+                <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>授業回に戻る
+                </a>
             </div>
             <div class="card-body">
                 <div class="d-flex flex-wrap gap-2 mb-3">
@@ -32,17 +35,20 @@ body {
                     <button type="button" class="btn btn-success btn-sm" onclick="addNewGroup()">
                         <i class="fas fa-plus me-1"></i>グループ追加
                     </button>
+                    <a href="{% url 'school_management:group_master_copy' lesson_session.id %}" class="btn btn-info btn-sm">
+                        <i class="fas fa-copy me-1"></i>マスタからコピー
+                    </a>
                     <button type="button" class="btn btn-outline-info btn-sm" onclick="shuffleMembers()">
                         <i class="fas fa-random me-1"></i>ランダム配置
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="balanceGroups()">
+                        <i class="fas fa-balance-scale me-1"></i>人数均等配置
                     </button>
                     <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearAll()">
                         <i class="fas fa-eraser me-1"></i>全クリア
                     </button>
                     <a href="{% url 'school_management:group_list' lesson_session.id %}" class="btn btn-outline-info btn-sm">
                         <i class="fas fa-list me-1"></i>グループ一覧
-                    </a>
-                    <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}" class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-arrow-left me-1"></i>授業回に戻る
                     </a>
                 </div>
 
@@ -133,14 +139,13 @@ body {
                     <li>グループ数を選択</li>
                     <li>学生をドラッグ＆ドロップでグループに配置</li>
                     <li>必要に応じて役割を設定</li>
-                    <li>「グループ編成を保存」をクリック</li>
+                    <li>「グループ編成を更新」または「保存」をクリック</li>
                 </ol>
                 <hr>
-                <div class="text-center">
-                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="balanceGroups()">
-                        <i class="fas fa-balance-scale me-1"></i>人数均等配置
-                    </button>
-                </div>
+                <p class="small text-muted">
+                    <strong>ランダム配置:</strong> 全学生をランダムにグループ分けします。<br>
+                    <strong>人数均等配置:</strong> 全学生をグループに均等な人数で配置します。
+                </p>
             </div>
         </div>
     </div>

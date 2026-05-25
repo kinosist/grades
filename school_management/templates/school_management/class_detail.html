@@ -119,10 +119,19 @@
     <div class="tab-pane fade {% if not active_tab and not request.GET.active_tab or not active_tab and request.GET.active_tab == 'lessons' %}show active{% endif %}" id="lessons" role="tabpanel" aria-labelledby="lessons-tab">
         <div class="card shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5><i class="fas fa-calendar me-2"></i>授業回一覧</h5>
-                <a href="{% url 'school_management:lesson_session_create' classroom.id %}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-plus me-1"></i>授業回を追加
-                </a>
+                <h5 class="mb-0"><i class="fas fa-calendar me-2"></i>授業回一覧</h5>
+                <div class="d-flex gap-2">
+                    {% if lessons %}
+                        <a href="{% url 'school_management:session_bulk_edit' classroom.id %}" class="btn btn-success btn-sm">
+                            <i class="fas fa-edit me-1"></i>一括編集
+                        </a>
+                    {% endif %}
+                    {% if sessions.count < 15 %}
+                        <a href="{% url 'school_management:session_create' classroom.id %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus me-1"></i>授業回を追加
+                        </a>
+                    {% endif %}
+                </div>
             </div>
             <div class="card-body">
                 {% if lessons %}
@@ -133,22 +142,14 @@
                                     <th>回</th>
                                     <th>日付</th>
                                     <th>トピック</th>
-                                    <th>ピア評価</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for lesson in lessons|dictsortreversed:"session_number" %}
                                 <tr class="clickable-row" onclick="window.location=`{% url 'school_management:lesson_session_detail' lesson.id %}`">
                                     <td><strong>第{{ lesson.session_number }}回</strong></td>
-                                    <td>{{ lesson.date|date:"m/d" }}</td>
+                                    <td>{{ lesson.date|date:"m/d"|default:"-" }}</td>
                                     <td>{{ lesson.topic|default:"-" }}</td>
-                                    <td>
-                                        {% if lesson.has_peer_evaluation %}
-                                            <span class="badge bg-info">あり</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">なし</span>
-                                        {% endif %}
-                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -158,7 +159,7 @@
                     <div class="text-center py-4">
                         <i class="fas fa-calendar-plus fa-2x text-muted mb-3"></i>
                         <p class="text-muted">まだ授業回が作成されていません。</p>
-                        <a href="{% url 'school_management:lesson_session_create' classroom.id %}" class="btn btn-primary">
+                        <a href="{% url 'school_management:session_create' classroom.id %}" class="btn btn-primary">
                             <i class="fas fa-plus me-1"></i>最初の授業回を作成
                         </a>
                     </div>
@@ -178,7 +179,7 @@
                     </button>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="{% url 'school_management:class_student_select' classroom.id %}"><i class="fas fa-user-check me-2"></i>既存学生から選択</a></li>
-                        <li><a class="dropdown-item" href="{% url 'school_management:bulk_student_add' classroom.id %}"><i class="fas fa-file-csv me-2"></i>CSV一括追加</a></li>
+                        <li><a class="dropdown-item" href="{% url 'school_management:bulk_student_add_csv' classroom.id %}"><i class="fas fa-file-csv me-2"></i>CSV一括追加</a></li>
                     </ul>
                 </div>
             </div>
@@ -222,6 +223,20 @@
                         </table>
                     </div>
                 {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-user-plus fa-3x text-muted mb-3 opacity-50"></i>
+                        <h5 class="text-muted">まだ学生が登録されていません</h5>
+                        <p class="text-muted small">このクラスに学生を追加して、名簿の管理を始めましょう。</p>
+                        <div class="dropdown mt-3">
+                            <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-user-plus me-1"></i>最初の学生を追加
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'school_management:class_student_select' classroom.id %}"><i class="fas fa-user-check me-2"></i>既存学生から選択</a></li>
+                                <li><a class="dropdown-item" href="{% url 'school_management:bulk_student_add_csv' classroom.id %}"><i class="fas fa-file-csv me-2"></i>CSV一括追加</a></li>
+                            </ul>
+                        </div>
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -286,8 +301,11 @@
             <!-- 左上：基本設定 -->
             <div class="col-md-6 mb-4">
                 <div class="card h-100 shadow-sm">
-                    <div class="card-header">
+                    <div class="card-header d-flex justify-content-between align-items-center">
                         <h6><i class="fas fa-sliders-h me-2"></i>基本設定</h6>
+                        <a href="{% url 'school_management:class_edit' classroom.id %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-edit me-1"></i>編集
+                        </a>
                     </div>
                     <div class="card-body">
                         <!-- 評価システム -->

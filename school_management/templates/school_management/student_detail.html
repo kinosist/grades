@@ -97,11 +97,11 @@
                             </thead>
                             <tbody>
                                 {% for data in class_data %}
-                                <tr class="clickable-row" data-href="{% url 'school_management:class_detail' data.classroom.id %}">
+                                <tr class="clickable-row" data-href="{% url 'school_management:class_student_detail' class_id=data.classroom.id student_number=student.student_number %}">
                                     <td><strong>{{ data.classroom.class_name }}</strong></td>
                                     <td>
-                                        {{ data.classroom.year }} 
-                                        <span class="badge bg-light text-dark border ms-1">
+                                        {{ data.classroom.year }}
+                                        <span class="badge bg-{% if data.classroom.semester == 'first' %}primary{% else %}secondary{% endif %} ms-1">
                                             {{ data.classroom.get_semester_display }}
                                         </span>
                                     </td>

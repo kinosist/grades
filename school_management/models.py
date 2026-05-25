@@ -158,15 +158,19 @@ class ClassRoom(models.Model):
 
     def get_average_points(self):
         """クラスの平均総合ポイントを計算"""
-        points_list = self.student_class_points.all()
+        # クラスに在籍している学生のIDリストを取得
+        enrolled_student_ids = self.students.values_list('id', flat=True)
+        # 在籍学生のStudentClassPointsのみを対象にする
+        points_list = self.student_class_points.filter(student_id__in=enrolled_student_ids)
         count = points_list.count()
         
         if count == 0:
             return 0.0
-            
-        # 各学生のtotal_pointsプロパティ（出席点 + 授業点*2）の合計を計算
-        total_sum = sum(sp.total_points for sp in points_list)
-        return round(total_sum / count, 1)
+        
+        # クエリ実行してリスト化し、total_pointsプロパティ（Python @property）を集計
+        # total_points は DB 計算では不可（@property のため）
+        total_points = sum(sp.total_points for sp in points_list) / count
+        return round(total_points, 1)
 
 
 class PointColumn(models.Model):
@@ -209,7 +213,7 @@ class LessonSession(models.Model):
     
     classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name='クラス')
     session_number = models.IntegerField(verbose_name='回数')
-    date = models.DateField(verbose_name='実施日')
+    date = models.DateField(verbose_name='実施日', null=True, blank=True)
     topic = models.CharField(max_length=200, blank=True, verbose_name='テーマ・内容')
     has_quiz = models.BooleanField(default=False, verbose_name='小テストあり')
     has_peer_evaluation = models.BooleanField(default=True, verbose_name='ピア評価あり')
@@ -228,6 +232,7 @@ class LessonSession(models.Model):
         verbose_name = '授業回'
         verbose_name_plural = '授業回'
         unique_together = ['classroom', 'session_number']
+        ordering = [models.F('date').desc(nulls_last=True), 'session_number']
 
     def __str__(self):
         return f"{self.classroom.class_name} 第{self.session_number}回"

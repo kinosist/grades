@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Max
+from django.urls import reverse
 from ...models import ClassRoom, LessonSession, GroupMaster, GroupMasterMember, Group, GroupMember, CustomUser
 
 @login_required
@@ -86,6 +87,11 @@ def group_master_management(request, class_id):
                         messages.warning(request, f'学籍番号 {student_id} の学生が見つかりません。')
         
         messages.success(request, 'グループマスタを保存しました。')
+
+        from_session_id = request.POST.get('from_session')
+        if from_session_id:
+            return redirect('school_management:group_management', session_id=from_session_id)
+
         return redirect('school_management:group_master_list', class_id=class_id)
     
     context = {
@@ -105,7 +111,8 @@ def group_master_copy_to_session(request, session_id):
     
     if not group_masters.exists():
         messages.error(request, 'グループマスタが設定されていません。先にグループマスタを作成してください。')
-        return redirect('school_management:group_list', session_id=session_id)
+        redirect_url = reverse('school_management:group_master_management', kwargs={'class_id': classroom.id})
+        return redirect(f'{redirect_url}?from_session={session_id}')
     
     if request.method == 'POST':
         # 既存のグループを削除（オプション）

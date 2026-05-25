@@ -6,7 +6,7 @@ from ...models import LessonSession, Group, GroupMember, CustomUser, PeerEvaluat
 
 @login_required
 def group_management(request, session_id):
-    """グループマスタ編集"""
+    """グループ編成"""
     lesson_session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
     students = lesson_session.classroom.students.all()
     groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student').order_by('group_number')
@@ -58,7 +58,7 @@ def group_management(request, session_id):
                         messages.warning(request, f'学籍番号 {student_id} の学生が見つかりません。')
         
         messages.success(request, 'グループ編成を保存しました。')
-        return redirect('school_management:group_list', session_id=session_id)
+        return redirect('school_management:group_management', session_id=session_id)
     
     context = {
         'lesson_session': lesson_session,

@@ -6,16 +6,18 @@ from ...models import LessonSession, Group, GroupMember
 def group_list_view(request, session_id):
     """グループ一覧表示"""
     lesson_session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
-    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student').order_by('group_number')
+    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related(
+        'groupmember_set__student'  # N+1対策: メンバーと関連学生を一括取得
+    ).order_by('group_number')
     
-    # グループ統計情報を計算
+    # グループ統計情報を計算（prefetch_relatedされたデータを使用）
     group_stats = []
     for group in groups:
-        member_count = group.groupmember_set.count()
+        members = list(group.groupmember_set.all())  # キャッシュから取得
         group_stats.append({
             'group': group,
-            'member_count': member_count,
-            'members': group.groupmember_set.all()
+            'member_count': len(members),  # countではなくlenを使用（DBクエリ回避）
+            'members': members
         })
     
     # 実際にグループに所属しているユニークな学生数を計算

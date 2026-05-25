@@ -30,6 +30,7 @@ urlpatterns = [
     path('classes/', classes.class_list_view, name='class_list'),
     path('classes/create/', classes.class_create_view, name='class_create'),
     path('classes/<int:class_id>/', classes.class_detail_view, name='class_detail'),
+    path('classes/<int:class_id>/edit/', classes.class_edit_view, name='class_edit'),
     path('classes/<int:class_id>/delete/', classes.class_delete_view, name='class_delete'),
     
     # 独自の評価項目（列）管理用ルーティングを追加
@@ -45,7 +46,8 @@ urlpatterns = [
 
     # --- クラスへの学生追加・詳細 ---
     path('classes/<int:class_id>/students/select/', students.bulk_student_add, name='class_student_select'),
-    path('classes/<int:class_id>/students/bulk-csv/', students.bulk_student_add_csv, name='bulk_student_add'),
+    path('classes/<int:class_id>/students/bulk-csv/', students.bulk_student_add_csv, name='bulk_student_add_csv'),
+    path('classes/<int:class_id>/copy-from/<int:source_class_id>/', students.copy_students_from_class, name='copy_students_from_class'),
     path('classes/<int:class_id>/students/<str:student_number>/', students.class_student_detail_view, name='class_student_detail'),
 
     # --- 自己評価システム ---
@@ -56,7 +58,9 @@ urlpatterns = [
     # --- 授業セッション（Sessions） ---
     path('classes/<int:class_id>/sessions/', sessions.session_list_view, name='session_list'),
     path('classes/<int:class_id>/sessions/create/', sessions.session_create_view, name='session_create'),
+    path('classes/<int:class_id>/sessions/bulk-edit/', sessions.session_bulk_edit_view, name='session_bulk_edit'),
     path('sessions/<int:session_id>/', sessions.session_detail_view, name='session_detail'),
+    path('sessions/<int:session_id>/edit/', sessions.session_edit_view, name='session_edit'),
     # 新しい授業作成機能
     path('classes/<int:class_id>/lesson-sessions/create/', sessions.lesson_session_create, name='lesson_session_create'),
     path('lesson-sessions/<int:session_id>/', sessions.lesson_session_detail, name='lesson_session_detail'),

@@ -35,7 +35,7 @@ def student_list_view(request):
         role='student',
         student_number__isnull=False,
         student_number__gt=''
-    ).order_by('student_number')
+    ).prefetch_related('classroom_set').order_by('student_number')
     
     # 検索機能を追加
     search_query = request.GET.get('search', '')
@@ -49,6 +49,16 @@ def student_list_view(request):
     page_number = request.GET.get('page')
     students_page = paginator.get_page(page_number)
     
+    # ログイン教員の担当クラスIDセットを取得
+    teacher_classroom_ids = set(request.user.classrooms.all().values_list('id', flat=True))
+
+    # 各学生オブジェクトに、ログイン教員が担当するクラスのリストを追加
+    # prefetch_relatedされたデータを効率的に利用
+    for student in students_page:
+        student.teacher_classrooms = [
+            c for c in student.classroom_set.all() if c.id in teacher_classroom_ids
+        ]
+
     context = {
         'students': students_page,
         'students_page': students_page,

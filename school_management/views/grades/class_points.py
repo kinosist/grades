@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from ...models import ClassRoom, CustomUser, StudentClassPoints, StudentLessonPoints, SelfEvaluation, QuizScore, \
-    ContributionEvaluation, GroupMember, PeerEvaluation, PeerEvaluationSettings
+    ContributionEvaluation, GroupMember, PeerEvaluation, PeerEvaluationSettings, LessonSession
 
 
 logger = logging.getLogger(__name__)
@@ -213,15 +213,24 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
     for pe in all_peer_evals:
         session_to_evals_map[pe.lesson_session_id].append(pe)
 
+    # N+1対策: 全学生のグループメンバーシップを一括で取得
+    student_ids = [s.id for s in students]
+    all_group_members = GroupMember.objects.filter(
+        student_id__in=student_ids,
+        group__lesson_session__classroom=classroom
+    ).select_related('group', 'group__lesson_session')
+    
+    # 学生ごとのグループメンバーシップマップ
+    student_group_members_map = defaultdict(list)
+    for gm in all_group_members:
+        student_group_members_map[gm.student_id].append(gm)
+
     # ===== 各学生のクラス内成績を取得 =====
     student_grades = []
 
     for student in students:
-        # NEW: 学生のグループメンバーシップを事前に取得
-        student_groups = list(GroupMember.objects.filter(
-            student=student,
-            group__lesson_session__classroom=classroom
-        ).select_related('group', 'group__lesson_session'))
+        # N+1対策: 事前取得したマップから学生のグループメンバーシップを取得
+        student_groups = student_group_members_map.get(student.id, [])
 
         # 1. 授業内手動ポイント (StudentLessonPoints)
         lesson_points_qs = StudentLessonPoints.objects.filter(

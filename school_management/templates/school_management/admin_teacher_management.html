@@ -253,7 +253,6 @@
 <body>
     <div class="container">
         <div class="header">
-            <a href="{% url 'school_management:logout' %}" class="logout-btn">ログアウト</a>
             <h1>教員管理システム</h1>
             <p>管理者: {{ user.full_name }}さん</p>
         </div>
@@ -348,10 +347,6 @@
                     <p>上のフォームから教員を追加してください。</p>
                 </div>
             {% endif %}
-        </div>
-        
-        <div class="nav-buttons" style="margin-top: 30px; justify-content: center;">
-            <a href="{% url 'school_management:logout' %}" class="nav-btn">ログアウト</a>
         </div>
     </div>
 </body>

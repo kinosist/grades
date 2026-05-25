@@ -19,7 +19,7 @@
                     <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary btn-sm">
                         <i class="fas fa-arrow-left me-1"></i>戻る
                     </a>
-                    <a href="{% url 'school_management:bulk_student_add' classroom.id %}" class="btn btn-outline-info btn-sm">
+                    <a href="{% url 'school_management:bulk_student_add_csv' classroom.id %}" class="btn btn-outline-info btn-sm">
                         <i class="fas fa-file-csv me-1"></i>CSV一括追加
                     </a>
                 </div>
@@ -30,6 +30,30 @@
                     <strong>{{ classroom.class_name }}</strong> - {{ classroom.year }}年度 {{ classroom.get_semester_display }}
                     <br><small class="text-muted">現在の学生数: {{ classroom.students.count }}名</small>
                 </div>
+
+                {% if other_classes_with_student_ids %}
+                <div class="card mb-4 border-info">
+                    <div class="card-header bg-info-soft">
+                        <h6 class="mb-0"><i class="fas fa-copy me-2"></i>他のクラスから学生を選択</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">クラスを選択すると、そのクラスに所属する学生が下のリストで自動的に選択されます。</p>
+                        <div class="input-group">
+                            <select id="copy-class-select" class="form-select">
+                                <option value="">コピー元のクラスを選択...</option>
+                                {% for item in other_classes_with_student_ids %}
+                                    <option value="{{ item.class.id }}" data-student-ids='{{ item.student_ids_json }}'>
+                                        {{ item.class.year }} {{ item.class.get_semester_display }} {{ item.class.class_name }} ({{ item.class.student_count }}名)
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn btn-outline-primary" id="copy-students-btn">
+                                <i class="fas fa-check-double me-1"></i>このクラスの学生を選択
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
 
                 <form method="get" class="mb-4">
                     <div class="row">
@@ -63,10 +87,10 @@
                             {% endif %}
                         </div>
                         <div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAll()">
+                            <button type="button" id="selectAllBtn" class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-check-square me-1"></i>全選択
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAll()">
+                            <button type="button" id="deselectAllBtn" class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-square me-1"></i>全解除
                             </button>
                         </div>
@@ -86,7 +110,16 @@
                                                 <div>
                                                     <strong>{{ student.student_number }}</strong>
                                                     <br>{{ student.full_name }}
-                                                    <br><small class="text-muted">{{ student.email }}</small>
+                                                    <br><small class="text-muted">{{ student.email|default:"-" }}</small>
+                                                    <div class="mt-2">
+                                                        {% for classroom in student.teacher_classrooms %}
+                                                            <span class="badge {% if classroom.semester == 'first' %}bg-white text-primary border border-primary{% else %}bg-white text-secondary border border-secondary{% endif %} me-1">
+                                                                {% if classroom.semester == 'first' %}前{% else %}後{% endif %} {{ classroom.class_name }}
+                                                            </span>
+                                                        {% empty %}
+                                                            <span class="badge bg-secondary">未所属</span>
+                                                        {% endfor %}
+                                                    </div>
                                                 </div>
                                                 <span class="badge bg-success">学生</span>
                                             </div>
@@ -122,7 +155,7 @@
                             {% endif %}
                         </p>
                         {% if not search_query %}
-                        <a href="{% url 'school_management:bulk_student_add' classroom.id %}" class="btn btn-primary">
+                        <a href="{% url 'school_management:bulk_student_add_csv' classroom.id %}" class="btn btn-primary">
                             <i class="fas fa-file-csv me-1"></i>新しい学生を追加
                         </a>
                         {% endif %}
@@ -141,6 +174,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const checkboxes = document.querySelectorAll('input[name="selected_students"]');
     const submitBtn = document.getElementById('submitBtn');
     const submitText = document.getElementById('submitText');
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    const deselectAllBtn = document.getElementById('deselectAllBtn');
 
     function updateSubmitButton() {
         const checkedCount = document.querySelectorAll('input[name="selected_students"]:checked').length;
@@ -153,38 +188,63 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function selectAll() {
+        checkboxes.forEach(checkbox => checkbox.checked = true);
+        updateSubmitButton();
+    }
+
+    function deselectAll() {
+        checkboxes.forEach(checkbox => checkbox.checked = false);
+        updateSubmitButton();
+    }
+
     checkboxes.forEach(checkbox => {
         checkbox.addEventListener('change', updateSubmitButton);
     });
 
-    // 初期状態の更新
-    updateSubmitButton();
-});
-
-function selectAll() {
-    const checkboxes = document.querySelectorAll('input[name="selected_students"]');
-    checkboxes.forEach(checkbox => checkbox.checked = true);
-    updateSubmitButton();
-}
-
-function deselectAll() {
-    const checkboxes = document.querySelectorAll('input[name="selected_students"]');
-    checkboxes.forEach(checkbox => checkbox.checked = false);
-    updateSubmitButton();
-}
-
-function updateSubmitButton() {
-    const checkedCount = document.querySelectorAll('input[name="selected_students"]:checked').length;
-    const submitBtn = document.getElementById('submitBtn');
-    const submitText = document.getElementById('submitText');
-    
-    if (checkedCount > 0) {
-        submitBtn.disabled = false;
-        submitText.textContent = `${checkedCount}名の学生を追加`;
-    } else {
-        submitBtn.disabled = true;
-        submitText.textContent = '学生を追加';
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', selectAll);
     }
-}
+    if (deselectAllBtn) {
+        deselectAllBtn.addEventListener('click', deselectAll);
+    }
+
+    updateSubmitButton();
+
+    const copyBtn = document.getElementById('copy-students-btn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', function() {
+            const select = document.getElementById('copy-class-select');
+            const selectedOption = select.options[select.selectedIndex];
+            
+            if (!selectedOption || !selectedOption.value) {
+                alert('コピー元のクラスを選択してください。');
+                return;
+            }
+            
+            const studentIdsToSelect = JSON.parse(selectedOption.dataset.studentIds || '[]');
+            
+            if (studentIdsToSelect.length === 0) {
+                alert('選択したクラスには学生がいません。');
+                return;
+            }
+
+            let newlySelectedCount = 0;
+            checkboxes.forEach(checkbox => {
+                if (studentIdsToSelect.includes(parseInt(checkbox.value, 10)) && !checkbox.checked) {
+                    checkbox.checked = true;
+                    newlySelectedCount++;
+                }
+            });
+
+            if (newlySelectedCount > 0) {
+                alert(`${newlySelectedCount}名の学生を選択しました。`);
+            } else {
+                alert('対象の学生は、現在の一覧に表示されていないか、既に全員選択済みです。');
+            }
+            updateSubmitButton();
+        });
+    }
+});
 </script>
 {% endblock %}

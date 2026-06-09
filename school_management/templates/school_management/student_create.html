@@ -114,10 +114,7 @@
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <label for="bulk_student_data" class="form-label mb-0">学生データ <span class="text-danger">*</span></label>
-                                    <div class="d-flex gap-2">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertTemplate()">
-                                            <i class="fas fa-magic me-1"></i>入力例を挿入
-                                        </button>
+                                    <div>
                                         <button type="button" class="btn btn-outline-primary btn-sm" id="btn_upload_csv">
                                             <i class="fas fa-file-csv me-1"></i>CSVファイルを選択
                                         </button>
@@ -188,18 +185,6 @@ S2025003,田中次郎,タナカジロウ,tanaka@example.com" required></textarea
 </div>
 
 <script>
-function insertTemplate() {
-    const textarea = document.getElementById('bulk_student_data');
-    const template = `S2025001,山田太郎,ヤマダタロウ,yamada@example.com
-S2025002,佐藤花子,サトウハナコ,sato@example.com
-S2025003,田中次郎,タナカジロウ,tanaka@example.com
-S2025004,鈴木一郎,スズキイチロウ,suzuki@example.com
-S2025005,高橋美香,タカハシミカ,takahashi@example.com`;
-    
-    textarea.value = template;
-    document.getElementById('csv_status_msg').style.display = 'none';
-    textarea.focus();
-}
 
 const textareaElement = document.getElementById('bulk_student_data');
 if (textareaElement) {

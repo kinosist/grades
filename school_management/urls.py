@@ -80,6 +80,8 @@ urlpatterns = [
     # --- 学生管理（Students） ---
     path('students/', students.student_list_view, name='student_list'),
     path('students/create/', students.student_create_view, name='student_create'),
+    path('students/bulk-delete/confirm/', students.student_bulk_delete_confirm, name='student_bulk_delete_confirm'),
+    path('students/bulk-delete/execute/', students.student_bulk_delete_execute, name='student_bulk_delete_execute'),
     path('students/<str:student_number>/', students.student_detail_view, name='student_detail'),
     path('students/<str:student_number>/edit/', students.student_edit_view, name='student_edit'),
     path('student/<int:student_id>/update-points/', students.update_student_points, name='update_student_points'),

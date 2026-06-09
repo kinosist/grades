@@ -1,0 +1,294 @@
+{% extends 'school_management/base.html' %}
+
+{% block title %}学生一括削除確認 - 学校管理システム{% endblock %}
+{% block page_title %}学生一括削除確認{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:student_list' %}">学生管理</a></li>
+<li class="breadcrumb-item active" aria-current="page">一括削除確認</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    body { background-color: #f8fafc; }
+    
+    .modern-card {
+        border: none !important;
+        border-radius: 20px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        background-color: #ffffff;
+    }
+
+    .warning-banner {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        border-left: 4px solid #dc2626;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+
+    .warning-banner i {
+        color: #dc2626;
+        font-size: 24px;
+        margin-right: 12px;
+    }
+
+    .warning-text {
+        color: #7f1d1d;
+        font-weight: 600;
+    }
+
+    .student-item {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+    }
+
+    .student-item:hover {
+        background-color: #f1f5f9;
+        border-color: #cbd5e1;
+    }
+
+    .student-number {
+        display: inline-block;
+        background-color: #dbeafe;
+        color: #1e40af;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-right: 12px;
+    }
+
+    .student-name {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 1.0625rem;
+    }
+
+    .classroom-badges {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .classroom-badge {
+        display: inline-block;
+        background-color: #f0fdf4;
+        color: #166534;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        margin-right: 6px;
+        margin-top: 6px;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 12px;
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .btn-secondary-custom {
+        background-color: #e2e8f0;
+        color: #334155;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-secondary-custom:hover {
+        background-color: #cbd5e1;
+        text-decoration: none;
+        color: #1e293b;
+    }
+
+    .btn-danger-custom {
+        background-color: #dc2626;
+        color: #ffffff;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-danger-custom:hover {
+        background-color: #b91c1c;
+    }
+
+    .summary-box {
+        background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+        border-left: 4px solid #f59e0b;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+
+    .summary-text {
+        color: #92400e;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .count-badge {
+        display: inline-block;
+        background-color: #f59e0b;
+        color: #ffffff;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-weight: 700;
+        margin: 0 4px;
+    }
+
+    .no-classrooms-text {
+        color: #64748b;
+        font-size: 0.875rem;
+        font-style: italic;
+    }
+
+    .section-title {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 16px;
+        margin-top: 24px;
+    }
+
+    .note-box {
+        background-color: #f0f9ff;
+        border-left: 4px solid #0284c7;
+        border-radius: 8px;
+        padding: 16px;
+        margin-top: 24px;
+    }
+
+    .note-title {
+        color: #0c4a6e;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .note-content {
+        color: #0c4a6e;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .note-content ul {
+        margin: 8px 0 0 0;
+        padding-left: 20px;
+    }
+
+    .note-content li {
+        margin: 4px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card modern-card">
+            <div class="card-body p-4">
+                <!-- 警告バナー -->
+                <div class="warning-banner">
+                    <div style="display: flex; align-items: flex-start;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <div>
+                            <div class="warning-text">重要な警告</div>
+                            <div style="color: #9a3412; font-size: 0.95rem; margin-top: 4px;">
+                                以下の学生を<strong>完全に削除</strong>します。この操作は<strong>取り消せません</strong>。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- サマリー -->
+                <div class="summary-box">
+                    <p class="summary-text">
+                        <span class="count-badge">{{ total_count }}</span>人の学生を削除しようとしています
+                    </p>
+                </div>
+
+                <!-- 削除対象の学生リスト -->
+                <div>
+                    <h5 class="section-title"><i class="fas fa-list me-2 text-danger"></i>削除対象の学生</h5>
+                    <div style="max-height: 500px; overflow-y: auto;">
+                        {% for detail in students_to_delete %}
+                        <div class="student-item">
+                            <div>
+                                <span class="student-number">{{ detail.student.student_number }}</span>
+                                <span class="student-name">{{ detail.student.full_name }}</span>
+                            </div>
+                            {% if detail.classroom_count > 0 %}
+                            <div class="classroom-badges">
+                                <div style="font-size: 0.8125rem; color: #64748b; margin-bottom: 6px;">
+                                    所属クラス: <strong>{{ detail.classroom_count }}</strong> 件
+                                </div>
+                                {% for classroom_name in detail.classrooms %}
+                                <span class="classroom-badge">
+                                    <i class="fas fa-graduation-cap me-1"></i>{{ classroom_name }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="classroom-badges">
+                                <span class="no-classrooms-text">
+                                    <i class="fas fa-info-circle me-1"></i>所属クラスなし
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 削除による影響 -->
+                <div class="note-box">
+                    <div class="note-title"><i class="fas fa-info-circle me-2"></i>削除による影響</div>
+                    <div class="note-content">
+                        <p style="margin: 0 0 10px 0;">以下のデータが<strong>すべて削除されます</strong>:</p>
+                        <ul>
+                            <li>学生の基本情報（学籍番号、氏名、メール等）</li>
+                            <li>すべてのクラス登録</li>
+                            <li>小テストのスコア</li>
+                            <li>出席記録</li>
+                            <li>授業ポイント</li>
+                            <li>ピア評価結果</li>
+                            <li>QRコードスキャン履歴</li>
+                            <li>自己評価・レポート</li>
+                            <li>その他関連する評価データ</li>
+                        </ul>
+                        <p style="margin-top: 10px; margin-bottom: 0;"><strong>⚠ 他のクラスに属する学生の場合、そのクラスの成績データも削除されます。</strong></p>
+                    </div>
+                </div>
+
+                <!-- ボタン -->
+                <div class="action-buttons">
+                    <a href="{% url 'school_management:student_list' %}" class="btn-secondary-custom">
+                        <i class="fas fa-arrow-left me-2"></i>キャンセル
+                    </a>
+                    <form method="POST" action="{% url 'school_management:student_bulk_delete_execute' %}" style="margin-left: auto;">
+                        {% csrf_token %}
+                        <input type="hidden" name="student_ids" value="{{ student_ids }}">
+                        <button type="submit" class="btn-danger-custom" onclick="return confirm('本当に削除してよろしいですか？この操作は取り消せません。');">
+                            <i class="fas fa-trash-alt me-2"></i>削除を実行
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="py-5"></div>
+{% endblock %}

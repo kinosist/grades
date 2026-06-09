@@ -4,6 +4,7 @@ from django.views.decorators.http import require_POST
 from django.middleware.csrf import get_token
 from django.contrib import messages
 from ...models import ClassRoom
+from django.urls import reverse
 import datetime
 
 @login_required
@@ -80,6 +81,46 @@ def class_create_view(request):
         context['form_data'] = request.POST
 
     return render(request, 'school_management/class_create.html', context)
+
+@login_required
+def class_edit_view(request, class_id):
+    """
+    クラス編集機能
+    
+    既存のクラスの基本情報（クラス名、年度、学期）を編集する。
+    """
+    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+
+    if request.method == 'POST':
+        class_name = request.POST.get('class_name')
+        year = request.POST.get('year')
+        semester = request.POST.get('semester')
+
+        if class_name and year and semester:
+            try:
+                classroom.class_name = class_name
+                classroom.year = int(year)
+                classroom.semester = semester
+                classroom.save()
+                messages.success(request, 'クラスの基本情報を更新しました。')
+                return redirect(f"{reverse('school_management:class_detail', args=[classroom.id])}?active_tab=settings")
+            except ValueError:
+                messages.error(request, '年度は数値で入力してください。')
+        else:
+            messages.error(request, '必須項目を入力してください。')
+        
+        # エラーがあった場合、入力値をフォームに渡す
+        context = {
+            'classroom': classroom,
+            'form_data': request.POST,
+        }
+        return render(request, 'school_management/class_edit.html', context)
+
+    # GETリクエスト
+    context = {
+        'classroom': classroom,
+    }
+    return render(request, 'school_management/class_edit.html', context)
 
 @login_required
 @require_POST

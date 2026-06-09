@@ -56,6 +56,9 @@
 
                 <form method="post" id="groupForm">
                     {% csrf_token %}
+                    {% if request.GET.from_session %}
+                    <input type="hidden" name="from_session" value="{{ request.GET.from_session }}">
+                    {% endif %}
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="group_count" class="form-label">グループ数</label>

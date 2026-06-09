@@ -12,4 +12,4 @@ from .detail import (
     add_point_column,     # 独自の評価項目（列）を追加する関数
     delete_point_column   # 独自の評価項目（列）を削除する関数
 )
-from .management import class_create_view, class_delete_view
+from .management import class_create_view, class_edit_view, class_delete_view

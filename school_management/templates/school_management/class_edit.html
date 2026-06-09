@@ -1,0 +1,87 @@
+{% extends 'school_management/base.html' %}
+
+{% block title %}クラス編集 - {{ classroom.class_name }}{% endblock %}
+{% block page_title %}クラス編集{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">クラス編集</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-edit me-2"></i>クラスの基本情報を編集</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <!-- 年度・学期の入力 -->
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="mb-3">
+                                <label for="year" class="form-label">年度 <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="year" name="year"
+                                       value="{% if form_data %}{{ form_data.year }}{% else %}{{ classroom.year }}{% endif %}" required>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="mb-3">
+                                <label for="semester" class="form-label">学期 <span class="text-danger">*</span></label>
+                                {% with selected_semester=form_data.semester|default:classroom.semester %}
+                                <select class="form-select" id="semester" name="semester" required>
+                                    <option value="first" {% if selected_semester == 'first' %}selected{% endif %}>前期</option>
+                                    <option value="second" {% if selected_semester == 'second' %}selected{% endif %}>後期</option>
+                                </select>
+                                {% endwith %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- クラス名の入力 -->
+                    <div class="mb-4">
+                        <label for="class_name" class="form-label">クラス名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="class_name" name="class_name" 
+                               value="{% if form_data %}{{ form_data.class_name }}{% else %}{{ classroom.class_name }}{% endif %}"
+                               placeholder="例: 1年A組" required>
+                        <div class="form-text">分かりやすいクラス名を入力してください</div>
+                    </div>
+
+                    <!-- アクションボタン -->
+                    <div class="d-flex gap-2 border-top pt-4">
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="fas fa-save me-2"></i>更新を保存
+                        </button>
+                        <a href="{% url 'school_management:class_detail' classroom.id %}?active_tab=settings" class="btn btn-secondary px-4">
+                            <i class="fas fa-arrow-left me-2"></i>キャンセル
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 右側のヘルプパネル -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-info-circle me-2"></i>クラス情報の編集</h6>
+            </div>
+            <div class="card-body">
+                <p>クラスの基本情報を変更します。</p>
+                <ul class="list-unstyled mb-0 small">
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>クラス名</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>年度</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>学期</li>
+                </ul>
+                <hr>
+                <p class="small text-muted">評価システムやポイント設定などの詳細な設定は、クラス詳細ページの「クラス管理」タブから直接変更できます。</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

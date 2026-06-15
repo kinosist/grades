@@ -44,7 +44,7 @@ class CustomUser(AbstractUser):
     ]
     
     username = None  # usernameフィールドを無効化
-    email = models.EmailField(unique=True, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
     full_name = models.CharField(max_length=100, verbose_name='氏名')
     furigana = models.CharField(max_length=100, blank=True, verbose_name='ふりがな')
     points = models.IntegerField(default=0, verbose_name='ポイント')
@@ -98,6 +98,11 @@ class CustomUser(AbstractUser):
                 fields=['student_number', 'managed_by'],
                 condition=Q(role='student') & ~Q(student_number=''),
                 name='unique_student_number_per_teacher',
+            ),
+            models.UniqueConstraint(
+                fields=['email'],
+                condition=Q(role__in=['teacher', 'admin']) & ~Q(email__isnull=True),
+                name='unique_email_for_teachers_and_admins',
             ),
         ]
         indexes = [

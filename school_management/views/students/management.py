@@ -108,14 +108,6 @@ def student_create_view(request):
                     continue
                 seen_student_numbers[student_number] = line_num
 
-                if normalized_email:
-                    duplicate_email_line = seen_emails.get(normalized_email)
-                    if duplicate_email_line is not None:
-                        errors.append(
-                            f'行{line_num}: メールアドレス "{email}" が入力内で重複しています（行{duplicate_email_line}）'
-                        )
-                        continue
-                    seen_emails[normalized_email] = line_num
 
                 pending_students.append({
                     'line_num': line_num,
@@ -136,21 +128,14 @@ def student_create_view(request):
                         managed_by=request.user,
                     ).values_list('student_number', flat=True)
                 )
-                existing_emails = {
-                    Student.objects.normalize_email(item)
-                    for item in Student.objects.filter(email__in=emails).values_list('email', flat=True)
-                    if item
-                } if emails else set()
+
 
                 for row in pending_students:
                     if row['student_number'] in existing_student_numbers:
                         errors.append(
                             f'行{row["line_num"]}: 学籍番号 "{row["student_number"]}" は既に登録されています'
                         )
-                    if row['email'] and row['email'] in existing_emails:
-                        errors.append(
-                            f'行{row["line_num"]}: メールアドレス "{row["email"]}" は既に登録されています'
-                        )
+
 
             if errors:
                 for error in errors[:10]:
@@ -211,10 +196,7 @@ def student_create_view(request):
                         messages.error(request, f'学籍番号 "{student_number}" は既に登録されています。別の学籍番号を入力してください。')
                         return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
                     
-                    # メールアドレスの重複チェック（null値は除外）
-                    if email and Student.objects.filter(email=email).exists():
-                        messages.error(request, f'メールアドレス "{email}" は既に登録されています。別のメールアドレスを入力してください。')
-                        return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
+
                     
                     # 学生作成
                     # デフォルトパスワードを生成（学籍番号をベースに）

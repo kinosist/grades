@@ -27,7 +27,7 @@ def admin_teacher_management(request):
             if email and full_name and password:
                 try:
                     # メールアドレスの重複チェック
-                    if CustomUser.objects.filter(email=email).exists():
+                    if CustomUser.objects.filter(email=email, role__in=['teacher', 'admin']).exists():
                         messages.error(request, f'メールアドレス "{email}" は既に登録されています。')
                     else:
                         # 教員作成

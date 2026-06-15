@@ -120,6 +120,13 @@ TEMPLATES = [
     },
 ]
 
+AUTHENTICATION_BACKENDS = [
+    'school_management.backends.EmailAuthBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+SILENCED_SYSTEM_CHECKS = ['auth.E003']
+
 WSGI_APPLICATION = 'school_project.wsgi.application'
 
 

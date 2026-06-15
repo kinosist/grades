@@ -194,14 +194,7 @@ def bulk_student_add_csv(request, class_id):
                 continue
             seen_student_numbers[student_number] = line_num
 
-            if normalized_email:
-                duplicate_email_line = seen_emails.get(normalized_email)
-                if duplicate_email_line is not None:
-                    errors.append(
-                        f'行{line_num}: メールアドレス "{email}" が入力内で重複しています（行{duplicate_email_line}）'
-                    )
-                    continue
-                seen_emails[normalized_email] = line_num
+
 
             pending_students.append({
                 'line_num': line_num,
@@ -221,17 +214,12 @@ def bulk_student_add_csv(request, class_id):
                     managed_by=request.user,
                 ).values_list('student_number', flat=True)
             )
-            existing_emails = {
-                Student.objects.normalize_email(item)
-                for item in Student.objects.filter(email__in=emails).values_list('email', flat=True)
-                if item
-            } if emails else set()
+
 
             for row in pending_students:
                 if row['student_number'] in existing_student_numbers:
                     errors.append(f'行{row["line_num"]}: 学生番号が既に存在します - {row["student_number"]}')
-                if row['email'] and row['email'] in existing_emails:
-                    errors.append(f'行{row["line_num"]}: メールアドレスが既に存在します - {row["email"]}')
+
 
         if errors:
             for error in errors[:5]:

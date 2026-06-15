@@ -167,6 +167,18 @@
     </div>
     {% endif %}
 
+    {% if test_mode %}
+    <div class="alert alert-warning shadow-sm border-0 mb-4 position-relative overflow-hidden">
+        <div class="d-flex align-items-center position-relative" style="z-index: 1;">
+            <i class="fas fa-flask fa-2x text-warning me-3"></i>
+            <div>
+                <h5 class="alert-heading mb-1"><i class="fas fa-flask me-2"></i>テストモード（シミュレーション）中</h5>
+                <p class="mb-0 text-muted">ピア評価の点数がシミュレーション用の値に置き換わっています。実際の成績には反映されていません。</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- 統計情報 -->
     <div class="row mb-4">
         <div class="col-md-3">

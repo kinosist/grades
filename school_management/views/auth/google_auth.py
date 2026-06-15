@@ -131,7 +131,7 @@ def google_auth_callback(request):
 
     # 取得したメールアドレスでシステム内のユーザーを検索
     try:
-        user = CustomUser.objects.get(email__iexact=email)
+        user = CustomUser.objects.get(email__iexact=email, role__in=['teacher', 'admin'])
 
         # アカウントが有効か確認
         if not user.is_active:
@@ -140,7 +140,7 @@ def google_auth_callback(request):
 
         # 教員または管理者のみログインを許可
         if user.is_teacher: # is_active は上でチェック済み
-            login(request, user)
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             messages.success(request, f"ようこそ、{user.full_name}さん！")
             next_url = request.session.pop('oauth_next', reverse('school_management:dashboard'))
             return redirect(next_url)

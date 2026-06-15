@@ -147,22 +147,34 @@ def student_create_view(request):
 
             try:
                 with transaction.atomic():
-                    students_to_create = []
+                    created_count = 0
+                    linked_count = 0
                     for row in pending_students:
-                        students_to_create.append(Student(
-                            email=row['email'],
-                            full_name=row['full_name'],
-                            password='',
-                            student_number=row['student_number'],
-                            furigana=row['furigana'],
-                            role='student',
-                            managed_by=request.user,
-                        ))
-                    # bulk_createではset_passwordが使えないため、事前にハッシュ済みパスワードを設定する
-                    for student in students_to_create:
-                        default_password = f"student_{student.student_number}"
-                        student.set_password(default_password)
-                    Student.objects.bulk_create(students_to_create, batch_size=500)
+                        email = row['email']
+                        student_number = row['student_number']
+                        full_name = row['full_name']
+                        furigana = row['furigana']
+                        
+                        student = None
+                        if email:
+                            student = Student.objects.filter(email=email, role='student').first()
+                        
+                        if not student:
+                            default_password = f"student_{student_number}"
+                            student = Student.objects.create_user(
+                                email=email,
+                                full_name=full_name,
+                                password=default_password,
+                                student_number=student_number,
+                                furigana=furigana,
+                                role='student'
+                            )
+                            created_count += 1
+                        else:
+                            linked_count += 1
+                            
+                        # ManyToMany のため、add で担当教員として紐づける
+                        student.managed_by.add(request.user)
             except IntegrityError:
                 messages.error(
                     request,
@@ -176,7 +188,7 @@ def student_create_view(request):
                 )
                 return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
 
-            messages.success(request, f'{len(pending_students)}名の学生を一括登録しました。')
+            messages.success(request, f'合計 {len(pending_students)}名 の学生を登録しました。（新規作成: {created_count}名, 既存共有: {linked_count}名）')
             return redirect('school_management:student_list')
         
         else:
@@ -191,27 +203,36 @@ def student_create_view(request):
                 email = email.strip() if email and email.strip() else None
                 
                 try:
-                    # 学籍番号の重複チェック
+                    # 学籍番号の重複チェック（この教員の管理下でのみ重複チェック）
                     if Student.objects.filter(student_number=student_number, managed_by=request.user).exists():
-                        messages.error(request, f'学籍番号 "{student_number}" は既に登録されています。別の学籍番号を入力してください。')
+                        messages.error(request, f'学籍番号 "{student_number}" は既にあなたの管理下に登録されています。別の学籍番号を入力してください。')
                         return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
                     
-
+                    student = None
+                    if email:
+                        student = Student.objects.filter(email=email, role='student').first()
                     
-                    # 学生作成
-                    # デフォルトパスワードを生成（学籍番号をベースに）
-                    default_password = f"student_{student_number}"
+                    is_new = False
+                    if not student:
+                        # 学生新規作成
+                        default_password = f"student_{student_number}"
+                        student = Student.objects.create_user(
+                            email=email,
+                            full_name=full_name,
+                            password=default_password,
+                            student_number=student_number,
+                            furigana=furigana,
+                            role='student'
+                        )
+                        is_new = True
                     
-                    Student.objects.create_user(
-                        email=email,
-                        full_name=full_name,
-                        password=default_password,
-                        student_number=student_number,
-                        furigana=furigana,
-                        role='student',
-                        managed_by=request.user
-                    )
-                    messages.success(request, f'{full_name}さん（学籍番号: {student_number}）を追加しました。')
+                    # ManyToMany のため add で紐づけ
+                    student.managed_by.add(request.user)
+                    
+                    if is_new:
+                        messages.success(request, f'{full_name}さん（学籍番号: {student_number}）を新規追加しました。')
+                    else:
+                        messages.success(request, f'{full_name}さん（学籍番号: {student_number}）の既存アカウントを紐づけました。')
                     return redirect('school_management:student_list')
                     
                 except IntegrityError as e:

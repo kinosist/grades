@@ -204,23 +204,8 @@ def bulk_student_add_csv(request, class_id):
             })
 
         if pending_students:
-            student_numbers = [row['student_number'] for row in pending_students]
-            emails = [row['email'] for row in pending_students if row['email']]
-
-            existing_student_numbers = set(
-                Student.objects.filter(
-                    role='student',
-                    student_number__in=student_numbers,
-                    managed_by=request.user,
-                ).values_list('student_number', flat=True)
-            )
-
-
-            for row in pending_students:
-                if row['student_number'] in existing_student_numbers:
-                    errors.append(f'行{row["line_num"]}: 学生番号が既に存在します - {row["student_number"]}')
-
-
+            # 重複エラーチェックを削除し、共有機能として動作させる
+            pass
         if errors:
             for error in errors[:5]:
                 messages.error(request, error)
@@ -231,41 +216,44 @@ def bulk_student_add_csv(request, class_id):
 
         try:
             with transaction.atomic():
-                students_to_create = []
+                created_students = []
+                created_count = 0
+                linked_count = 0
                 for row in pending_students:
-                    students_to_create.append(Student(
-                        email=row['email'],
-                        full_name=row['full_name'],
-                        password='',
-                        role='student',
-                        student_number=row['student_number'],
-                        managed_by=request.user,
-                    ))
-                for student in students_to_create:
-                    default_password = f"student_{student.student_number}"
-                    student.set_password(default_password)
-
-                Student.objects.bulk_create(students_to_create, batch_size=500)
-
-                created_students = list(Student.objects.filter(
-                    role='student',
-                    student_number__in=[row['student_number'] for row in pending_students],
-                    managed_by=request.user,
-                ))
-
-                if len(created_students) != len(pending_students):
-                    raise IntegrityError('Created student count mismatch after bulk insert')
+                    email = row['email']
+                    student_number = row['student_number']
+                    full_name = row['full_name']
+                    
+                    student = None
+                    if email:
+                        student = Student.objects.filter(email=email, role='student').first()
+                    
+                    if not student:
+                        default_password = f"student_{student_number}"
+                        student = Student.objects.create_user(
+                            email=email,
+                            full_name=full_name,
+                            password=default_password,
+                            role='student',
+                            student_number=student_number
+                        )
+                        created_count += 1
+                    else:
+                        linked_count += 1
+                    
+                    student.managed_by.add(request.user)
+                    created_students.append(student)
 
                 through_model = ClassRoom.students.through
                 through_model.objects.bulk_create([
                     through_model(classroom_id=classroom.id, customuser_id=student.id)
                     for student in created_students
-                ], batch_size=500)
+                ], batch_size=500, ignore_conflicts=True)
 
                 StudentClassPoints.objects.bulk_create([
                     StudentClassPoints(student=student, classroom=classroom, points=0)
                     for student in created_students
-                ], batch_size=500)
+                ], batch_size=500, ignore_conflicts=True)
         except IntegrityError:
             messages.error(
                 request,
@@ -276,7 +264,7 @@ def bulk_student_add_csv(request, class_id):
             messages.error(request, '一括追加中にエラーが発生したため、処理を中止してロールバックしました。')
             return render(request, 'school_management/bulk_student_add.html', {'classroom': classroom})
         
-        messages.success(request, f'{len(pending_students)}人の学生を追加しました。')
+        messages.success(request, f'合計 {len(created_students)}名の学生をクラスに追加しました。（新規作成: {created_count}名, 既存共有: {linked_count}名）')
         return redirect('school_management:class_detail', class_id=class_id)
     
     context = {

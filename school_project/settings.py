@@ -127,6 +127,9 @@ AUTHENTICATION_BACKENDS = [
 
 SILENCED_SYSTEM_CHECKS = ['auth.E003']
 
+# デバッグ画面を有効化するフラグ（本番環境では環境変数等で切り替えるかFalseにする）
+ENABLE_DEBUG_VIEWS = True
+
 WSGI_APPLICATION = 'school_project.wsgi.application'
 
 

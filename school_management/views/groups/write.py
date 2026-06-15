@@ -47,7 +47,7 @@ def group_management(request, session_id):
                 student_id = request.POST.get(key)
                 if student_id:
                     try:
-                        student = CustomUser.objects.get(student_number=student_id, role='student')
+                        student = lesson_session.classroom.students.get(student_number=student_id)
                         role = request.POST.get(f'group_{group_num}_role_{key.split("_")[-1]}', '')
                         GroupMember.objects.create(
                             group=group,
@@ -101,7 +101,7 @@ def group_edit_view(request, session_id, group_id):
                 role = request.POST.get('role', '')
                 if student_id:
                     try:
-                        student = CustomUser.objects.get(id=student_id, role='student')
+                        student = lesson_session.classroom.students.get(id=student_id)
                         GroupMember.objects.create(
                             group=group,
                             student=student,
@@ -119,7 +119,7 @@ def group_edit_view(request, session_id, group_id):
                     added_count = 0
                     for student_id in selected_student_ids:
                         try:
-                            student = CustomUser.objects.get(id=student_id, role='student')
+                            student = lesson_session.classroom.students.get(id=student_id)
                             # 既にメンバーに含まれていないかチェック
                             if not GroupMember.objects.filter(group=group, student=student).exists():
                                 GroupMember.objects.create(

@@ -54,12 +54,65 @@ def save_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> Ht
         
         session_sim = {}
         for key, value in request.POST.items():
-            if key.startswith('sim_score_') and value.strip():
-                try:
-                    student_id = str(int(key.replace('sim_score_', '')))
-                    session_sim[student_id] = float(value)
-                except ValueError:
-                    pass
+            if value.strip():
+                # 詳細な順位・獲得票の入力形式
+                # 例: sim_member_rank_1_123, sim_group_rank_2_123
+                if key.startswith('sim_member_rank_'):
+                    # parts: ['sim', 'member', 'rank', '1', '123']
+                    parts = key.split('_')
+                    if len(parts) >= 5:
+                        rank = parts[3]
+                        student_id = parts[4]
+                        if student_id not in session_sim:
+                            session_sim[student_id] = {}
+                        try:
+                            session_sim[student_id][f'member_rank_{rank}'] = float(value)
+                        except ValueError:
+                            pass
+                elif key.startswith('sim_group_rank_'):
+                    parts = key.split('_')
+                    if len(parts) >= 5:
+                        rank = parts[3]
+                        student_id = parts[4]
+                        if student_id not in session_sim:
+                            session_sim[student_id] = {}
+                        try:
+                            session_sim[student_id][f'group_rank_{rank}'] = float(value)
+                        except ValueError:
+                            pass
+                elif key.startswith('sim_contrib_'):
+                    student_id = key.replace('sim_contrib_', '')
+                    if student_id not in session_sim:
+                        session_sim[student_id] = {}
+                    try:
+                        session_sim[student_id]['contrib'] = float(value)
+                    except ValueError:
+                        pass
+                # 古い形式との互換性用
+                elif key.startswith('sim_member_score_'):
+                    student_id = key.replace('sim_member_score_', '')
+                    if student_id not in session_sim:
+                        session_sim[student_id] = {}
+                    try:
+                        session_sim[student_id]['member'] = float(value)
+                    except ValueError:
+                        pass
+                elif key.startswith('sim_group_score_'):
+                    student_id = key.replace('sim_group_score_', '')
+                    if student_id not in session_sim:
+                        session_sim[student_id] = {}
+                    try:
+                        session_sim[student_id]['group'] = float(value)
+                    except ValueError:
+                        pass
+                elif key.startswith('sim_score_'):
+                    student_id = key.replace('sim_score_', '')
+                    if student_id not in session_sim:
+                        session_sim[student_id] = {}
+                    try:
+                        session_sim[student_id]['member'] = float(value)
+                    except ValueError:
+                        pass
         
         sim_data[class_id][str(session_id)] = session_sim
         request.session['peer_sim_points'] = sim_data
@@ -194,11 +247,35 @@ def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpR
         if submitted:
             submitted_count += 1
             
-        # シミュレーション用の値を取得
-        sim_score = None
+        # シミュレーション用の値を取得（辞書形式を想定）
+        student_sim_data = {}
         sim_data = request.session.get('peer_sim_points', {}).get(str(session.classroom.id), {}).get(str(session.id), {})
         if str(enrolled_student.id) in sim_data:
-            sim_score = sim_data[str(enrolled_student.id)]
+            data = sim_data[str(enrolled_student.id)]
+            if isinstance(data, dict):
+                student_sim_data = data
+            else:
+                # 過去の単一数値データの場合の互換性
+                student_sim_data = {'member': float(data), 'group': 0}
+        # テンプレートでループしやすいようにリストを作成
+        member_sim_inputs = []
+        if pe_settings and pe_settings.enable_member_evaluation:
+            for i, point in enumerate(pe_settings.member_scores or []):
+                rank = i + 1
+                val = student_sim_data.get(f'member_rank_{rank}', '')
+                member_sim_inputs.append({'rank': rank, 'point': point, 'val': val})
+                
+        group_sim_inputs = []
+        if pe_settings and pe_settings.enable_group_evaluation:
+            for i, point in enumerate(pe_settings.group_scores or []):
+                rank = i + 1
+                val = student_sim_data.get(f'group_rank_{rank}', '')
+                group_sim_inputs.append({'rank': rank, 'point': point, 'val': val})
+                
+        sim_contrib = student_sim_data.get('contrib', '')
+        if not sim_contrib and 'member' in student_sim_data:
+            # 古い互換性データの場合
+            sim_contrib = student_sim_data['member']
             
         submission_rows.append({
             'student': enrolled_student,
@@ -206,7 +283,10 @@ def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpR
             'submitted': submitted,
             'submitted_at': submission.created_at if submission else None,
             'submission_detail': _build_submission_detail(submission, group_name_map, student_name_map) if submission else None,
-            'sim_score': sim_score,
+            'sim_data': student_sim_data,
+            'member_sim_inputs': member_sim_inputs,
+            'group_sim_inputs': group_sim_inputs,
+            'sim_contrib': sim_contrib,
         })
 
     total_students = len(enrolled_students)

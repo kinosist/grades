@@ -972,7 +972,31 @@ def peer_evaluation_results(request, session_id):
             for rank_item in group_ranking_list:
                 group_eval_by_rank.append(group_eval_dict.get(rank_item['rank']))
 
-        sim_score = sim_data.get(str(enrolled_student.id))
+        student_sim_data = {}
+        if sim_data and str(enrolled_student.id) in sim_data:
+            data = sim_data[str(enrolled_student.id)]
+            if isinstance(data, dict):
+                student_sim_data = data
+            else:
+                student_sim_data = {'member': float(data), 'group': 0}
+
+        member_sim_inputs = []
+        if pe_settings and pe_settings.enable_member_evaluation:
+            for i, point in enumerate(pe_settings.member_scores or []):
+                rank = i + 1
+                val = student_sim_data.get(f'member_rank_{rank}', '')
+                member_sim_inputs.append({'rank': rank, 'point': point, 'val': val})
+                
+        group_sim_inputs = []
+        if pe_settings and pe_settings.enable_group_evaluation:
+            for i, point in enumerate(pe_settings.group_scores or []):
+                rank = i + 1
+                val = student_sim_data.get(f'group_rank_{rank}', '')
+                group_sim_inputs.append({'rank': rank, 'point': point, 'val': val})
+                
+        sim_contrib = student_sim_data.get('contrib', '')
+        if not sim_contrib and 'member' in student_sim_data:
+            sim_contrib = student_sim_data['member']
 
         student_rows.append({
             'student': enrolled_student,
@@ -982,7 +1006,10 @@ def peer_evaluation_results(request, session_id):
             'submission_detail': submission_detail, # Use the already built detail
             'member_eval_by_rank': member_eval_by_rank,
             'group_eval_by_rank': group_eval_by_rank,
-            'sim_score': sim_score,
+            'sim_data': student_sim_data,
+            'member_sim_inputs': member_sim_inputs,
+            'group_sim_inputs': group_sim_inputs,
+            'sim_contrib': sim_contrib,
         })
 
     total_students = enrolled_students.count()

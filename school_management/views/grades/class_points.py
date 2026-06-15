@@ -299,10 +299,40 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
                 # シミュレーションによるテスト用スコア計算
                 is_simulated = False
                 if test_mode and has_simulation:
-                    sim_score = sim_data_class.get(str(sess_id), {}).get(str(student.id))
-                    if sim_score is not None:
-                        contrib_score = sim_score
-                        vote_score = 0
+                    sim_data = sim_data_class.get(str(sess_id), {}).get(str(student.id))
+                    if sim_data is not None:
+                        if isinstance(sim_data, dict):
+                            sim_contrib_score = 0
+                            if pe_settings and pe_settings.enable_member_evaluation:
+                                if pe_settings.member_scores:
+                                    for i, points in enumerate(pe_settings.member_scores):
+                                        rank = i + 1
+                                        count = sim_data.get(f'member_rank_{rank}')
+                                        if count:
+                                            sim_contrib_score += float(count) * points
+                                contrib_val = sim_data.get('contrib')
+                                if contrib_val:
+                                    sim_contrib_score += float(contrib_val)
+
+                            sim_vote_score = 0
+                            if pe_settings and pe_settings.enable_group_evaluation:
+                                if pe_settings.group_scores:
+                                    for i, points in enumerate(pe_settings.group_scores):
+                                        rank = i + 1
+                                        count = sim_data.get(f'group_rank_{rank}')
+                                        if count:
+                                            sim_vote_score += float(count) * points
+
+                            contrib_score = sim_contrib_score
+                            vote_score = sim_vote_score
+                            
+                            # 互換性フォールバック (member, group)
+                            if sim_contrib_score == 0 and sim_vote_score == 0 and ('member' in sim_data or 'group' in sim_data):
+                                contrib_score = sim_data.get('member', 0)
+                                vote_score = sim_data.get('group', 0)
+                        else:
+                            contrib_score = float(sim_data)
+                            vote_score = 0
                         is_simulated = True
 
                 if contrib_score > 0 or vote_score > 0 or is_simulated:

@@ -397,23 +397,6 @@
                     </div>
                 </div>
             </div>
-            
-            {% if user.is_superuser or user.role == 'admin' %}
-            <!-- 管理者ツール -->
-            <div class="col-12 mb-4">
-                <div class="card h-100 border-primary shadow-sm">
-                    <div class="card-header bg-primary text-white">
-                        <h6><i class="fas fa-tools me-2"></i>管理者ツール</h6>
-                    </div>
-                    <div class="card-body">
-                        <p>システム管理者向けのデバッグ・検証用ツールです。</p>
-                        <a href="{% url 'school_management:debug_peer_eval' classroom.id %}" class="btn btn-outline-primary">
-                            <i class="fas fa-flask me-2"></i>ピア評価デバッグ画面（検証用）
-                        </a>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
 
             <!-- 左下：グループ設定 -->
             <div class="col-md-6 mb-4">

@@ -127,6 +127,14 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
     grading_system = classroom.grading_system
     students = classroom.students.all().order_by('student_number')
+    
+    # テストモードか判定
+    test_mode = request.session.get('test_mode', False)
+    
+    # セッションからシミュレーション用点数を取得
+    # 辞書構造: { class_id: { session_id: { student_id: points } } }
+    sim_data_class = request.session.get('peer_sim_points', {}).get(str(classroom.id), {})
+    has_simulation = len(sim_data_class) > 0
 
     # ===== N+1問題対策: クラス全体の投票データを一度に取得して事前集計 =====
     from ...models import Group
@@ -287,9 +295,18 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
                     if sess_id in session_rankings_cache:
                         ranking_info = session_rankings_cache[sess_id]
                         vote_score = ranking_info['group_scores'].get(group_id, 0)
+                
+                # シミュレーションによるテスト用スコア計算
+                is_simulated = False
+                if test_mode and has_simulation:
+                    sim_score = sim_data_class.get(str(sess_id), {}).get(str(student.id))
+                    if sim_score is not None:
+                        contrib_score = sim_score
+                        vote_score = 0
+                        is_simulated = True
 
-                if contrib_score > 0 or vote_score > 0:
-                    session_peer_map[sess_id] = {'session': sess, 'contrib': contrib_score, 'vote': vote_score, 'total': contrib_score + vote_score}
+                if contrib_score > 0 or vote_score > 0 or is_simulated:
+                    session_peer_map[sess_id] = {'session': sess, 'contrib': contrib_score, 'vote': vote_score, 'total': contrib_score + vote_score, 'is_simulated': is_simulated}
             except (AttributeError, IndexError, TypeError, ValueError) as e:
                 logger.error(f"ピア評価ポイントの計算中にエラーが発生しました (student: {student.id}, session: {sess_id}): {e}", exc_info=True)
                 # エラーが発生した場合、エラー情報を持ったエントリをマップに追加
@@ -389,8 +406,11 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
             'class_average': class_average,
             'max_average': max_average,
             'min_average': min_average,
-        }
+        },
+        'has_simulation': has_simulation,
+        'test_mode': test_mode,
     }
+
     return render(request, 'school_management/class_points.html', context)
 
 

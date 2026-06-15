@@ -6,14 +6,12 @@ from .views import (
 )
 from .views.auth import google_auth
 from .views.students import self_eval
-from .views.debug.peer_eval import debug_peer_eval
 
 app_name = 'school_management'
 
 urlpatterns = [
     # --- システム・認証 ---
     path('health/', utils.health_check, name='health_check'),
-    path('debug/peer_evaluation/<int:class_id>/', debug_peer_eval, name='debug_peer_eval'),
     path('', auth.login_view, name='login'),
     path('login/', auth.login_view, name='login'),
     # path('debug-login/', auth.debug_login_view, name='debug_login'), # 必要ならauth.pyに追加
@@ -114,6 +112,9 @@ urlpatterns = [
     path('lesson-sessions/<int:session_id>/peer-evaluation/reopen/', peer_eval.reopen_peer_evaluation, name='reopen_peer_evaluation'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results, name='peer_evaluation_results'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/delete-all/', peer_eval.delete_all_peer_evaluations, name='delete_all_peer_evaluations'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/simulation/save/', peer_eval.save_peer_evaluation_simulation, name='save_peer_evaluation_simulation'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/simulation/clear/', peer_eval.clear_peer_evaluation_simulation, name='clear_peer_evaluation_simulation'),
+    path('peer-evaluation/test-mode/toggle/', peer_eval.toggle_test_mode, name='toggle_test_mode'),
     
     # 従来版（Original）
     path('sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results_view, name='peer_evaluation_results_legacy'),

@@ -949,6 +949,9 @@ def peer_evaluation_results(request, session_id):
 
     student_rows = []
     submitted_count = 0
+    
+    sim_data = request.session.get('peer_sim_points', {}).get(str(lesson_session.classroom.id), {}).get(str(lesson_session.id), {})
+
     for enrolled_student in enrolled_students:
         submission = submission_map.get(enrolled_student.id)
         is_submitted = submission is not None
@@ -969,6 +972,8 @@ def peer_evaluation_results(request, session_id):
             for rank_item in group_ranking_list:
                 group_eval_by_rank.append(group_eval_dict.get(rank_item['rank']))
 
+        sim_score = sim_data.get(str(enrolled_student.id))
+
         student_rows.append({
             'student': enrolled_student,
             'email': enrolled_student.email,
@@ -977,6 +982,7 @@ def peer_evaluation_results(request, session_id):
             'submission_detail': submission_detail, # Use the already built detail
             'member_eval_by_rank': member_eval_by_rank,
             'group_eval_by_rank': group_eval_by_rank,
+            'sim_score': sim_score,
         })
 
     total_students = enrolled_students.count()
@@ -1009,6 +1015,9 @@ def peer_evaluation_results(request, session_id):
                 'class_comment': detail['class_comment'],
             })
 
+    test_mode = request.session.get('test_mode', False)
+    has_simulation = str(lesson_session.id) in request.session.get('peer_sim_points', {}).get(str(lesson_session.classroom.id), {})
+
     context = {
         'lesson_session': lesson_session,
         'evaluations': evaluations,
@@ -1021,11 +1030,12 @@ def peer_evaluation_results(request, session_id):
         'submission_rows': student_rows,
         'submitted_count': submitted_count,
         'total_students': total_students,
-        'view_mode': request.GET.get('mode', 'simple'), # 'mode'クエリパラメータからビューモードを取得、デフォルトは'simple'
-        # 'view_mode': request.GET.get('view_mode', 'simple'), # 以前のview_modeを使用する場合はこちら
+        'view_mode': request.GET.get('mode', 'simple'),
         'submission_rate': submission_rate,
         'pe_settings': pe_settings,
-        'comment_rows': comment_rows, # Pass comment_rows to the template
+        'comment_rows': comment_rows,
+        'test_mode': test_mode,
+        'has_simulation': has_simulation,
     }
     
     return render(request, 'school_management/peer_evaluation_results.html', context)

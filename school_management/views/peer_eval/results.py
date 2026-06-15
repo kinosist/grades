@@ -1,7 +1,7 @@
 from collections import defaultdict
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from ...models import LessonSession, PeerEvaluationSettings
 
 def _safe_int(value):
@@ -40,6 +40,62 @@ def _build_submission_detail(evaluation, group_name_map, student_name_map):
         'class_comment': class_comment,
         'has_content': bool(group_evaluations or member_evaluations or general_comment or class_comment),
     }
+
+@login_required
+def save_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> HttpResponse:
+    """ピア評価のシミュレーション（テスト用）点数をセッションに保存する"""
+    if request.method == 'POST':
+        session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
+        class_id = str(session.classroom.id)
+        
+        sim_data = request.session.get('peer_sim_points', {})
+        if class_id not in sim_data:
+            sim_data[class_id] = {}
+        
+        session_sim = {}
+        for key, value in request.POST.items():
+            if key.startswith('sim_score_') and value.strip():
+                try:
+                    student_id = str(int(key.replace('sim_score_', '')))
+                    session_sim[student_id] = float(value)
+                except ValueError:
+                    pass
+        
+        sim_data[class_id][str(session_id)] = session_sim
+        request.session['peer_sim_points'] = sim_data
+        
+        from django.contrib import messages
+        messages.success(request, 'シミュレーション用のテスト点数を保存しました。')
+        
+    return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+
+@login_required
+def clear_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> HttpResponse:
+    """特定のセッションのシミュレーションデータをクリアする"""
+    if request.method == 'POST':
+        session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
+        class_id = str(session.classroom.id)
+        
+        sim_data = request.session.get('peer_sim_points', {})
+        if class_id in sim_data and str(session_id) in sim_data[class_id]:
+            del sim_data[class_id][str(session_id)]
+            request.session['peer_sim_points'] = sim_data
+            
+        from django.contrib import messages
+        messages.success(request, 'この授業回のシミュレーションデータをクリアしました。')
+        
+    return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+
+@login_required
+def toggle_test_mode(request: HttpRequest) -> HttpResponse:
+    """テストモードのON/OFFを切り替える"""
+    if request.method == 'POST':
+        current_mode = request.session.get('test_mode', False)
+        request.session['test_mode'] = not current_mode
+        from django.contrib import messages
+        mode_str = 'ON' if not current_mode else 'OFF'
+        messages.success(request, f'テストモードを {mode_str} にしました。')
+    return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
 
 @login_required
 def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpResponse:
@@ -137,17 +193,29 @@ def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpR
         submitted = submission is not None
         if submitted:
             submitted_count += 1
+            
+        # シミュレーション用の値を取得
+        sim_score = None
+        sim_data = request.session.get('peer_sim_points', {}).get(str(session.classroom.id), {}).get(str(session.id), {})
+        if str(enrolled_student.id) in sim_data:
+            sim_score = sim_data[str(enrolled_student.id)]
+            
         submission_rows.append({
             'student': enrolled_student,
             'email': enrolled_student.email,
             'submitted': submitted,
             'submitted_at': submission.created_at if submission else None,
             'submission_detail': _build_submission_detail(submission, group_name_map, student_name_map) if submission else None,
+            'sim_score': sim_score,
         })
 
     total_students = len(enrolled_students)
     submission_rate = round((submitted_count / total_students) * 100, 1) if total_students else 0
     
+    # 現在のセッションのシミュレーション状態
+    has_simulation = str(session.id) in request.session.get('peer_sim_points', {}).get(str(session.classroom.id), {})
+    test_mode = request.session.get('test_mode', False)
+
     context = {
         'lesson_session': session,
         'evaluations': evaluations,
@@ -160,5 +228,7 @@ def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpR
         'total_students': total_students,
         'submission_rate': submission_rate,
         'pe_settings': pe_settings,
+        'has_simulation': has_simulation,
+        'test_mode': test_mode,
     }
     return render(request, 'school_management/peer_evaluation_results.html', context)

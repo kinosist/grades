@@ -85,6 +85,14 @@ def class_evaluation_view(request, class_id):
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
     students = classroom.students.all().order_by('student_number')
     
+    # テストモードか判定
+    test_mode = request.session.get('test_mode', False)
+    
+    # セッションからシミュレーション用点数を取得
+    # 辞書構造: { class_id: { session_id: { student_id: points } } }
+    sim_data_class = request.session.get('peer_sim_points', {}).get(str(classroom.id), {})
+    has_simulation = len(sim_data_class) > 0
+    
     # 表示モード (simple / detail) - デフォルトは詳細モード
     view_mode = request.GET.get('mode', 'detail')
     
@@ -243,6 +251,15 @@ def class_evaluation_view(request, class_id):
                             group_point_map = session_group_point_maps.get(session.id, {})
                             vote_score = group_point_map.get(group.id, 0)
 
+                    # シミュレーションによるテスト用スコア計算
+                    is_simulated = False
+                    if test_mode and has_simulation:
+                        sim_score = sim_data_class.get(str(session.id), {}).get(str(student.id))
+                        if sim_score is not None:
+                            contrib_score = sim_score
+                            vote_score = 0
+                            is_simulated = True
+
                     peer_evaluation_score = contrib_score + vote_score
                 except Exception as e:
                     logger.error(f"ピア評価スコア取得エラー: {e}", exc_info=True)
@@ -255,6 +272,7 @@ def class_evaluation_view(request, class_id):
                 'peer_score': peer_evaluation_score,
                 'peer_contrib': contrib_score,
                 'peer_vote': vote_score,
+                'is_simulated': is_simulated if session.has_peer_evaluation else False,
                 'total_score': manual_points + quiz_score + peer_evaluation_score,
                 'date': session.date,
                 'has_peer_evaluation': session.has_peer_evaluation,
@@ -371,6 +389,8 @@ def class_evaluation_view(request, class_id):
         'grading_system': grading_system,
         'view_mode': view_mode,
         'table_colspan': table_colspan,
+        'has_simulation': has_simulation,
+        'test_mode': test_mode,
     }
     return render(request, 'school_management/class_evaluation.html', context)
 

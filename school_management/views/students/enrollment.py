@@ -218,6 +218,7 @@ def bulk_student_add_csv(request, class_id):
                 Student.objects.filter(
                     role='student',
                     student_number__in=student_numbers,
+                    managed_by=request.user,
                 ).values_list('student_number', flat=True)
             )
             existing_emails = {
@@ -250,6 +251,7 @@ def bulk_student_add_csv(request, class_id):
                         password='',
                         role='student',
                         student_number=row['student_number'],
+                        managed_by=request.user,
                     ))
                 for student in students_to_create:
                     default_password = f"student_{student.student_number}"
@@ -260,6 +262,7 @@ def bulk_student_add_csv(request, class_id):
                 created_students = list(Student.objects.filter(
                     role='student',
                     student_number__in=[row['student_number'] for row in pending_students],
+                    managed_by=request.user,
                 ))
 
                 if len(created_students) != len(pending_students):

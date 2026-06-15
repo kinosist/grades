@@ -379,6 +379,7 @@
                             </div>
                         {% endif %}
 
+                        {% if classroom.grading_system != 'default' %}
                         <!-- 項目の追加フォーム -->
                         <form action="{% url 'school_management:add_point_column' classroom.id %}" method="post" class="mt-2">
                             {% csrf_token %}
@@ -388,6 +389,11 @@
                             </div>
                             <div class="form-text text-muted small mt-2">※追加した項目は成績・評価一覧の「列」として表示されます。</div>
                         </form>
+                        {% else %}
+                        <div class="alert alert-warning py-2 small border-0 shadow-sm mt-3">
+                            <i class="fas fa-exclamation-triangle me-1"></i>通常評価（デフォルトシステム）では独自の評価項目を追加できません。
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>

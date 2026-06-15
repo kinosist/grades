@@ -133,6 +133,7 @@ def student_create_view(request):
                     Student.objects.filter(
                         role='student',
                         student_number__in=student_numbers,
+                        managed_by=request.user,
                     ).values_list('student_number', flat=True)
                 )
                 existing_emails = {
@@ -170,6 +171,7 @@ def student_create_view(request):
                             student_number=row['student_number'],
                             furigana=row['furigana'],
                             role='student',
+                            managed_by=request.user,
                         ))
                     # bulk_createではset_passwordが使えないため、事前にハッシュ済みパスワードを設定する
                     for student in students_to_create:
@@ -205,7 +207,7 @@ def student_create_view(request):
                 
                 try:
                     # 学籍番号の重複チェック
-                    if Student.objects.filter(student_number=student_number).exists():
+                    if Student.objects.filter(student_number=student_number, managed_by=request.user).exists():
                         messages.error(request, f'学籍番号 "{student_number}" は既に登録されています。別の学籍番号を入力してください。')
                         return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
                     
@@ -224,7 +226,8 @@ def student_create_view(request):
                         password=default_password,
                         student_number=student_number,
                         furigana=furigana,
-                        role='student'
+                        role='student',
+                        managed_by=request.user
                     )
                     messages.success(request, f'{full_name}さん（学籍番号: {student_number}）を追加しました。')
                     return redirect('school_management:student_list')

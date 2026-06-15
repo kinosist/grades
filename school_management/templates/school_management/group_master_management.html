@@ -27,11 +27,8 @@
                     <button type="button" class="btn btn-success btn-sm" onclick="addNewGroup()">
                         <i class="fas fa-plus me-1"></i>グループ追加
                     </button>
-                    <button type="button" class="btn btn-outline-info btn-sm" onclick="shuffleMembers()">
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="if(confirm('グループをランダムに再配置しますか？')) shuffleMembers()">
                         <i class="fas fa-random me-1"></i>ランダム配置
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="balanceGroups()">
-                        <i class="fas fa-balance-scale me-1"></i>人数均等配置
                     </button>
                     <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearAll()">
                         <i class="fas fa-eraser me-1"></i>全クリア
@@ -138,8 +135,7 @@
                 </ol>
                 <hr>
                 <p class="small text-muted">
-                    <strong>ランダム配置:</strong> 全学生をランダムにグループ分けします。<br>
-                    <strong>人数均等配置:</strong> 全学生をグループに均等な人数で配置します。
+                    <strong>ランダム配置:</strong> 全学生をランダムにグループ分けします。
                 </p>
             </div>
         </div>
@@ -456,7 +452,9 @@ function updateStudentPool() {
 }
 
 function shuffleMembers() {
-    // 全てのグループをクリア（確認ダイアログなし）
+    if (!confirm('現在のグループ編成をクリアして、ランダムに配置し直しますか？')) return;
+    
+    // 全てのグループをクリア
     const groupCount = parseInt(document.getElementById('group_count').value);
     for (let i = 1; i <= groupCount; i++) {
         const membersDiv = document.getElementById(`group_${i}_members`);
@@ -516,43 +514,6 @@ function clearAll() {
     }
 }
 
-function balanceGroups() {
-    if (confirm('人数を均等に配置しますか？')) {
-        // 全てのグループをクリア（確認ダイアログなし）
-        const groupCount = parseInt(document.getElementById('group_count').value);
-        for (let i = 1; i <= groupCount; i++) {
-            const membersDiv = document.getElementById(`group_${i}_members`);
-            if (membersDiv) {
-                membersDiv.innerHTML = '';
-                const placeholder = document.getElementById(`group_${i}_placeholder`);
-                if (placeholder) {
-                    placeholder.style.display = 'block';
-                }
-            }
-        }
-        
-        // 学生プールを復元
-        const studentPool = document.getElementById('studentPool');
-        studentPool.innerHTML = '';
-        
-        students.forEach(student => {
-            restoreStudentToPool(student.id, student.name);
-        });
-        
-        const studentsPerGroup = Math.ceil(students.length / groupCount);
-        
-        students.forEach((student, index) => {
-            const groupNum = Math.floor(index / studentsPerGroup) + 1;
-            if (groupNum <= groupCount) {
-                addMemberToGroup(groupNum, student.id, student.name);
-            }
-        });
-        
-        // 学生プールをクリア
-        document.getElementById('studentPool').innerHTML = '';
-        markAsDirty();
-    }
-}
 
 function addNewGroup() {
     const container = document.getElementById('groupsContainer');

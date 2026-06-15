@@ -22,7 +22,7 @@ def student_list_view(request):
             student_number = request.POST.get('student_number')
             if student_number:
                 try:
-                    student = Student.objects.get(student_number=student_number, role='student')
+                    student = Student.objects.get(student_number=student_number, role='student', managed_by=request.user)
                     student_name = student.full_name
                     student.delete()
                     messages.success(request, f'{student_name}さんを削除しました。')
@@ -35,8 +35,8 @@ def student_list_view(request):
     # すべての学生を表示
     students = Student.objects.filter(
         role='student',
-        student_number__isnull=False,
-        student_number__gt=''
+        student_number__gt='',
+        managed_by=request.user
     ).prefetch_related('classroom_set').order_by('student_number')
     
     # 検索機能を追加
@@ -91,7 +91,8 @@ def student_bulk_delete_confirm(request):
     # 削除対象の学生を取得
     students_to_delete = Student.objects.filter(
         id__in=student_ids,
-        role='student'
+        role='student',
+        managed_by=request.user
     ).prefetch_related(
         Prefetch('classroom_set', queryset=ClassRoom.objects.all())
     ).order_by('student_number')
@@ -145,7 +146,8 @@ def student_bulk_delete_execute(request):
             # 削除対象の学生を取得
             students_to_delete = Student.objects.filter(
                 id__in=student_ids,
-                role='student'
+                role='student',
+                managed_by=request.user
             )
 
             deleted_count = students_to_delete.count()

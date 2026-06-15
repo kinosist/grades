@@ -58,6 +58,14 @@ class CustomUser(AbstractUser):
     teacher_id = models.CharField(max_length=20, blank=True, verbose_name='教員ID')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='登録日時')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
+    managed_by = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name='担当教員',
+        related_name='managed_students'
+    )
 
     # AbstractUserのrelated_nameを設定
     groups = models.ManyToManyField(
@@ -87,9 +95,9 @@ class CustomUser(AbstractUser):
         verbose_name_plural = 'ユーザー'
         constraints = [
             models.UniqueConstraint(
-                fields=['student_number'],
+                fields=['student_number', 'managed_by'],
                 condition=Q(role='student') & ~Q(student_number=''),
-                name='unique_student_number_for_students',
+                name='unique_student_number_per_teacher',
             ),
         ]
         indexes = [

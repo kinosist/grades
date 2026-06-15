@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q, Prefetch
 from django.db import transaction
+from django.db.utils import OperationalError
 from django.views.decorators.http import require_http_methods
 from ...models import Student, ClassRoom
 
@@ -29,37 +30,44 @@ def student_list_view(request):
                     return redirect('school_management:student_list')
                 except Student.DoesNotExist:
                     messages.error(request, '学生が見つかりません。')
+                except OperationalError:
+                    messages.error(request, 'データベースの構造が最新ではありません。マイグレーションを実行してください。')
                 except Exception as e:
                     messages.error(request, f'削除中にエラーが発生しました: {str(e)}')
     
     # すべての学生を表示
-    students = Student.objects.filter(
-        role='student',
-        student_number__gt='',
-        managed_by=request.user
-    ).prefetch_related('classroom_set').order_by('student_number')
-    
-    # 検索機能を追加
-    search_query = request.GET.get('search', '')
-    if search_query:
-        students = students.filter(
-            Q(student_number__icontains=search_query) |
-            Q(full_name__icontains=search_query)
-        )
+    try:
+        students = Student.objects.filter(
+            role='student',
+            student_number__gt='',
+            managed_by=request.user
+        ).prefetch_related('classroom_set').order_by('student_number')
+        
+        # 検索機能を追加
+        search_query = request.GET.get('search', '')
+        if search_query:
+            students = students.filter(
+                Q(student_number__icontains=search_query) |
+                Q(full_name__icontains=search_query)
+            )
 
-    paginator = Paginator(students, 30)
-    page_number = request.GET.get('page')
-    students_page = paginator.get_page(page_number)
-    
-    # ログイン教員の担当クラスIDセットを取得
-    teacher_classroom_ids = set(request.user.classrooms.all().values_list('id', flat=True))
+        paginator = Paginator(students, 30)
+        page_number = request.GET.get('page')
+        students_page = paginator.get_page(page_number)
+        
+        # ログイン教員の担当クラスIDセットを取得
+        teacher_classroom_ids = set(request.user.classrooms.all().values_list('id', flat=True))
 
-    # 各学生オブジェクトに、ログイン教員が担当するクラスのリストを追加
-    # prefetch_relatedされたデータを効率的に利用
-    for student in students_page:
-        student.teacher_classrooms = [
-            c for c in student.classroom_set.all() if c.id in teacher_classroom_ids
-        ]
+        # 各学生オブジェクトに、ログイン教員が担当するクラスのリストを追加
+        # prefetch_relatedされたデータを効率的に利用
+        for student in students_page:
+            student.teacher_classrooms = [
+                c for c in student.classroom_set.all() if c.id in teacher_classroom_ids
+            ]
+    except OperationalError:
+        messages.error(request, 'データベースの構造が最新ではありません。マイグレーションを実行してください。')
+        students_page = []
+        search_query = request.GET.get('search', '')
 
     context = {
         'students': students_page,
@@ -97,21 +105,25 @@ def student_bulk_delete_confirm(request):
         Prefetch('classroom_set', queryset=ClassRoom.objects.all())
     ).order_by('student_number')
 
-    if not students_to_delete.exists():
-        messages.error(request, '削除対象の学生が見つかりません。')
-        return redirect('school_management:student_list')
+    try:
+        if not students_to_delete.exists():
+            messages.error(request, '削除対象の学生が見つかりません。')
+            return redirect('school_management:student_list')
 
-    # 各学生の関連情報を集計
-    student_details = []
-    for student in students_to_delete:
-        classrooms = student.classroom_set.all()
-        classroom_names = [f"{c.get_semester_display()} {c.class_name} ({c.year})" for c in classrooms]
-        
-        student_details.append({
-            'student': student,
-            'classrooms': classroom_names,
-            'classroom_count': len(classroom_names),
-        })
+        # 各学生の関連情報を集計
+        student_details = []
+        for student in students_to_delete:
+            classrooms = student.classroom_set.all()
+            classroom_names = [f"{c.get_semester_display()} {c.class_name} ({c.year})" for c in classrooms]
+            
+            student_details.append({
+                'student': student,
+                'classrooms': classroom_names,
+                'classroom_count': len(classroom_names),
+            })
+    except OperationalError:
+        messages.error(request, 'データベースの構造が最新ではありません。マイグレーションを実行してください。')
+        return redirect('school_management:student_list')
 
     context = {
         'students_to_delete': student_details,
@@ -162,6 +174,8 @@ def student_bulk_delete_execute(request):
                 message += f' ほか {deleted_count - 5} 人'
             messages.success(request, message)
 
+    except OperationalError:
+        messages.error(request, 'データベースの構造が最新ではありません。マイグレーションを実行してください。')
     except Exception as e:
         messages.error(request, f'削除処理中にエラーが発生しました: {str(e)}')
 

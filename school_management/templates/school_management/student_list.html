@@ -131,7 +131,7 @@
                             <i class="fas fa-user-plus me-2"></i>新しい学生
                         </a>
                         <button type="button" class="btn btn-outline-danger px-4 shadow-sm fw-bold" id="bulk-delete-btn" style="display: none;">
-                            <i class="fas fa-trash-alt me-2"></i>一括削除
+                            <i class="fas fa-cogs me-2"></i>削除・解除の選択画面へ
                         </button>
                     </div>
                 </div>
@@ -324,7 +324,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // 一括削除ボタンの表示/非表示を切り替え
+    // 一括操作ボタンの表示/非表示を切り替え
     function updateBulkDeleteButton() {
         const checkedCount = Array.from(studentCheckboxes).filter(cb => cb.checked).length;
         if (bulkDeleteBtn) {
@@ -353,7 +353,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bulkDeleteBtn.addEventListener('click', function() {
             const checkedStudents = Array.from(studentCheckboxes).filter(cb => cb.checked);
             if (checkedStudents.length === 0) {
-                alert('削除する学生を選択してください。');
+                alert('学生を選択してください。');
                 return;
             }
 

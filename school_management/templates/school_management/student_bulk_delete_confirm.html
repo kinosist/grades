@@ -126,6 +126,21 @@
         background-color: #b91c1c;
     }
 
+    .btn-warning-custom {
+        background-color: #f59e0b;
+        color: #ffffff;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-warning-custom:hover {
+        background-color: #d97706;
+    }
+
     .summary-box {
         background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
         border-left: 4px solid #f59e0b;
@@ -255,21 +270,23 @@
 
                 <!-- 削除による影響 -->
                 <div class="note-box">
-                    <div class="note-title"><i class="fas fa-info-circle me-2"></i>削除による影響</div>
+                    <div class="note-title"><i class="fas fa-info-circle me-2"></i>削除のオプションと影響</div>
                     <div class="note-content">
-                        <p style="margin: 0 0 10px 0;">以下のデータが<strong>すべて削除されます</strong>:</p>
-                        <ul>
+                        <h6 class="fw-bold" style="color: #d97706;"><i class="fas fa-user-minus me-1"></i> 自分の担当から外す</h6>
+                        <p style="margin: 0 0 10px 0; font-size: 0.95rem;">
+                            あなたの担当リストおよび担当クラスから学生を外します。学生の基本情報や成績データはシステムに保持され、他の教員は引き続きその学生を管理できます。
+                        </p>
+                        
+                        <hr style="border-color: #e2e8f0; margin: 15px 0;">
+
+                        <h6 class="fw-bold" style="color: #dc2626;"><i class="fas fa-trash-alt me-1"></i> システムから完全に削除</h6>
+                        <p style="margin: 0 0 10px 0; font-size: 0.95rem;">以下のデータが<strong>すべて削除されます</strong>:</p>
+                        <ul style="font-size: 0.95rem;">
                             <li>学生の基本情報（学籍番号、氏名、メール等）</li>
                             <li>すべてのクラス登録</li>
-                            <li>小テストのスコア</li>
-                            <li>出席記録</li>
-                            <li>授業ポイント</li>
-                            <li>ピア評価結果</li>
-                            <li>QRコードスキャン履歴</li>
-                            <li>自己評価・レポート</li>
-                            <li>その他関連する評価データ</li>
+                            <li>成績・ポイント・小テストなどの関連データすべて</li>
                         </ul>
-                        <p style="margin-top: 10px; margin-bottom: 0;"><strong>⚠ 他のクラスに属する学生の場合、そのクラスの成績データも削除されます。</strong></p>
+                        <p style="margin-top: 10px; margin-bottom: 0; font-size: 0.95rem;"><strong>⚠ 他のクラスに属する学生の場合、そのクラスの成績データも削除されます。</strong></p>
                     </div>
                 </div>
 
@@ -278,11 +295,16 @@
                     <a href="{% url 'school_management:student_list' %}" class="btn-secondary-custom">
                         <i class="fas fa-arrow-left me-2"></i>キャンセル
                     </a>
-                    <form method="POST" action="{% url 'school_management:student_bulk_delete_execute' %}" style="margin-left: auto;">
+                    <form method="POST" action="{% url 'school_management:student_bulk_delete_execute' %}" style="margin-left: auto; display: flex; gap: 10px;">
                         {% csrf_token %}
                         <input type="hidden" name="student_ids" value="{{ student_ids }}">
-                        <button type="submit" class="btn-danger-custom" onclick="return confirm('本当に削除してよろしいですか？この操作は取り消せません。');">
-                            <i class="fas fa-trash-alt me-2"></i>削除を実行
+                        
+                        <button type="submit" name="delete_type" value="unlink" class="btn-warning-custom" onclick="return confirm('選択した学生を自分の担当から外します。よろしいですか？');">
+                            <i class="fas fa-user-minus me-2"></i>自分の担当から外す
+                        </button>
+
+                        <button type="submit" name="delete_type" value="hard_delete" class="btn-danger-custom" onclick="return confirm('本当にシステムから完全に削除してよろしいですか？この操作は取り消せません。他の先生のクラスデータも削除されます。');">
+                            <i class="fas fa-trash-alt me-2"></i>システムから完全に削除
                         </button>
                     </form>
                 </div>

@@ -42,11 +42,13 @@
                         <a href="{% url 'school_management:student_edit' student.student_number %}" class="btn btn-warning btn-sm text-white fw-bold">
                             <i class="fas fa-edit me-1"></i>編集
                         </a>
-                        <form method="post" style="display: inline;" onsubmit="return confirm('{{ student.full_name }}さんを削除してもよろしいですか？この操作は取り消せません。関連するすべてのデータも削除されます。');">
+                        <form method="post" style="display: inline;" class="d-flex gap-2">
                             {% csrf_token %}
-                            <input type="hidden" name="action" value="delete_student">
-                            <button type="submit" class="btn btn-outline-danger btn-sm">
-                                <i class="fas fa-trash me-1"></i>削除
+                            <button type="submit" name="action" value="unlink_student" class="btn btn-outline-warning btn-sm fw-bold" onclick="return confirm('{{ student.full_name }}さんをあなたの担当から外しますか？（システムにはデータが残ります）');">
+                                <i class="fas fa-user-minus me-1"></i>担当から外す
+                            </button>
+                            <button type="submit" name="action" value="delete_student" class="btn btn-outline-danger btn-sm fw-bold" onclick="return confirm('本当にシステムから完全に削除してよろしいですか？この操作は取り消せません。他の先生のクラスデータも含め、関連するすべてのデータが削除されます。');">
+                                <i class="fas fa-trash-alt me-1"></i>完全削除
                             </button>
                         </form>
                         <a href="{% url 'school_management:student_list' %}" class="btn btn-secondary btn-sm">

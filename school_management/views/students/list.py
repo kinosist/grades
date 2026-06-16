@@ -136,14 +136,20 @@ def student_bulk_delete_confirm(request):
 @login_required
 @require_http_methods(["POST"])
 def student_bulk_delete_execute(request):
-    """一括削除実行"""
+    """一括削除・担当解除実行"""
     if not request.user.is_teacher:
         messages.error(request, 'この機能にアクセスする権限がありません。')
         return redirect('school_management:dashboard')
 
     student_ids_str = request.POST.get('student_ids', '')
+    delete_type = request.POST.get('delete_type')
+    
     if not student_ids_str:
-        messages.error(request, '削除対象の学生が選択されていません。')
+        messages.error(request, '対象の学生が選択されていません。')
+        return redirect('school_management:student_list')
+
+    if delete_type not in ['unlink', 'hard_delete']:
+        messages.error(request, '無効な操作です。')
         return redirect('school_management:student_list')
 
     try:
@@ -152,31 +158,49 @@ def student_bulk_delete_execute(request):
         messages.error(request, '無効な学生IDです。')
         return redirect('school_management:student_list')
 
-    # トランザクション内で削除を実行
+    # トランザクション内で処理を実行
     try:
         with transaction.atomic():
-            # 削除対象の学生を取得
-            students_to_delete = Student.objects.filter(
+            # 処理対象の学生を取得
+            target_students = Student.objects.filter(
                 id__in=student_ids,
                 role='student',
                 managed_by=request.user
             )
 
-            deleted_count = students_to_delete.count()
-            deleted_names = list(students_to_delete.values_list('full_name', flat=True))
+            processed_count = target_students.count()
+            processed_names = list(target_students.values_list('full_name', flat=True))
 
-            # 削除実行（関連データはCASCADEで自動削除）
-            students_to_delete.delete()
+            if processed_count == 0:
+                messages.error(request, '対象の学生が見つかりません。')
+                return redirect('school_management:student_list')
+
+            if delete_type == 'unlink':
+                # 担当から外す処理
+                # 1. managed_byから自分を外す
+                for student in target_students:
+                    student.managed_by.remove(request.user)
+                
+                # 2. 自分が担当しているすべてのクラスから学生を外す
+                teacher_classrooms = request.user.classrooms.all()
+                for classroom in teacher_classrooms:
+                    classroom.students.remove(*target_students)
+                
+                action_text = '担当から外しました'
+            else:
+                # 完全削除処理（関連データはCASCADEで自動削除）
+                target_students.delete()
+                action_text = 'システムから完全に削除しました'
 
             # 成功メッセージ
-            message = f'{deleted_count}人の学生を削除しました: {", ".join(deleted_names[:5])}'
-            if deleted_count > 5:
-                message += f' ほか {deleted_count - 5} 人'
+            message = f'{processed_count}人の学生を{action_text}: {", ".join(processed_names[:5])}'
+            if processed_count > 5:
+                message += f' ほか {processed_count - 5} 人'
             messages.success(request, message)
 
     except OperationalError:
         messages.error(request, 'データベースの構造が最新ではありません。マイグレーションを実行してください。')
     except Exception as e:
-        messages.error(request, f'削除処理中にエラーが発生しました: {str(e)}')
+        messages.error(request, f'処理中にエラーが発生しました: {str(e)}')
 
     return redirect('school_management:student_list')

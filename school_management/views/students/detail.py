@@ -17,14 +17,32 @@ def student_detail_view(request, student_number):
 
     student = get_object_or_404(CustomUser, student_number=student_number, role='student')
 
-    # 削除処理
+    # 削除・解除処理
     if request.method == 'POST':
         action = request.POST.get('action')
-        if action == 'delete_student':
+        
+        if action == 'unlink_student':
+            try:
+                student_name = student.full_name
+                # managed_byから自分を外す
+                student.managed_by.remove(request.user)
+                
+                # 自分が担当しているすべてのクラスから学生を外す
+                teacher_classrooms = request.user.classrooms.all()
+                for classroom in teacher_classrooms:
+                    classroom.students.remove(student)
+                    
+                messages.success(request, f'{student_name}さんを担当から外しました。')
+                return redirect('school_management:student_list')
+            except Exception as e:
+                messages.error(request, f'担当解除中にエラーが発生しました: {str(e)}')
+                return redirect('school_management:student_detail', student_number=student_number)
+                
+        elif action == 'delete_student':
             try:
                 student_name = student.full_name
                 student.delete()
-                messages.success(request, f'{student_name}さんを削除しました。')
+                messages.success(request, f'{student_name}さんをシステムから完全に削除しました。')
                 return redirect('school_management:student_list')
             except Exception as e:
                 messages.error(request, f'削除中にエラーが発生しました: {str(e)}')

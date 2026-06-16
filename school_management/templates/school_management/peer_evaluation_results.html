@@ -243,13 +243,7 @@
                         </form>
                         
                         {% if test_mode %}
-                            {% if has_simulation %}
-                                <form action="{% url 'school_management:clear_peer_evaluation_simulation' lesson_session.id %}" method="post" class="m-0">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">クリア</button>
-                                </form>
-                            {% endif %}
-                            <button type="submit" form="simulation-form" class="btn btn-sm btn-warning text-nowrap"><i class="fas fa-save"></i> <span class="d-none d-sm-inline">テスト点数を</span>保存</button>
+
                         {% else %}
                             <div class="btn-group ms-md-2" role="group" aria-label="View mode toggle">
                                 <a href="?mode=simple" class="btn btn-sm {% if view_mode == 'simple' %}btn-primary{% else %}btn-outline-secondary bg-white{% endif %}">
@@ -266,72 +260,132 @@
                     {% if submission_rows %}
                     <div class="table-container">
                         {% if test_mode %}
-                            <p class="m-3 text-muted small">テスト用の点数（シミュレーション用）を生徒ごとに入力して保存してください。この点数は「ポイント一覧」および「評価一覧」画面で反映されます。</p>
-                            <form id="simulation-form" action="{% url 'school_management:save_peer_evaluation_simulation' lesson_session.id %}" method="post">
-                                {% csrf_token %}
-                                <div class="table-responsive">
-                                <table class="evaluation-table mode-simple" style="min-width: 800px;">
-                                    <thead>
-                                        <tr>
-                                            <th class="name-col" rowspan="2">学生名</th>
-                                            <th class="email-col" rowspan="2">メール</th>
-                                            {% if pe_settings and pe_settings.enable_member_evaluation %}
-                                            <th colspan="{{ pe_settings.member_scores|length|add:1 }}" class="text-center bg-light">メンバー評価 (獲得数)</th>
-                                            {% endif %}
-                                            {% if pe_settings and pe_settings.enable_group_evaluation %}
-                                            <th colspan="{{ pe_settings.group_scores|length }}" class="text-center bg-light">グループ評価 (獲得数)</th>
-                                            {% endif %}
-                                            {% if not pe_settings or not pe_settings.enable_member_evaluation and not pe_settings.enable_group_evaluation %}
-                                            <th class="text-center" rowspan="2">テスト用点数<br><small class="text-muted">(シミュレーション)</small></th>
-                                            {% endif %}
-                                        </tr>
-                                        <tr>
-                                            {% if pe_settings and pe_settings.enable_member_evaluation %}
-                                                {% for point in pe_settings.member_scores %}
-                                                <th class="text-center" style="font-size: 0.85em;">{{ forloop.counter }}位票<br><span class="text-muted">{{ point }}点</span></th>
-                                                {% endfor %}
-                                                <th class="text-center" style="font-size: 0.85em;">貢献度<br><span class="text-muted">1-5平均</span></th>
-                                            {% endif %}
-                                            {% if pe_settings and pe_settings.enable_group_evaluation %}
-                                                {% for point in pe_settings.group_scores %}
-                                                <th class="text-center" style="font-size: 0.85em;">{{ forloop.counter }}位票<br><span class="text-muted">{{ point }}点</span></th>
-                                                {% endfor %}
-                                            {% endif %}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for row in submission_rows %}
-                                        <tr>
-                                            <td class="name-col">{{ row.student.full_name }}</td>
-                                            <td class="email-col">{{ row.email|default:'-' }}</td>
-                                            {% if pe_settings and pe_settings.enable_member_evaluation %}
-                                                {% for m in row.member_sim_inputs %}
-                                                <td class="text-center" style="vertical-align: middle;">
-                                                    <input type="number" step="1" name="sim_member_rank_{{ m.rank }}_{{ row.student.id }}" value="{{ m.val|default_if_none:'' }}" class="form-control form-control-sm mx-auto" style="width: 60px;" placeholder="票">
-                                                </td>
-                                                {% endfor %}
-                                                <td class="text-center" style="vertical-align: middle;">
-                                                    <input type="number" step="0.1" name="sim_contrib_{{ row.student.id }}" value="{{ row.sim_contrib|default_if_none:'' }}" class="form-control form-control-sm mx-auto" style="width: 70px;" placeholder="点">
-                                                </td>
-                                            {% endif %}
-                                            {% if pe_settings and pe_settings.enable_group_evaluation %}
-                                                {% for g in row.group_sim_inputs %}
-                                                <td class="text-center" style="vertical-align: middle;">
-                                                    <input type="number" step="1" name="sim_group_rank_{{ g.rank }}_{{ row.student.id }}" value="{{ g.val|default_if_none:'' }}" class="form-control form-control-sm mx-auto" style="width: 60px;" placeholder="票">
-                                                </td>
-                                                {% endfor %}
-                                            {% endif %}
-                                            {% if not pe_settings or not pe_settings.enable_member_evaluation and not pe_settings.enable_group_evaluation %}
-                                            <td class="text-center" style="vertical-align: middle;">
-                                                <input type="number" step="0.1" name="sim_score_{{ row.student.id }}" value="{{ row.sim_contrib|default_if_none:'' }}" class="form-control form-control-sm mx-auto" style="width: 100px;" placeholder="空欄">
-                                            </td>
-                                            {% endif %}
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                            {% if pe_settings and pe_settings.enable_member_evaluation or pe_settings.enable_group_evaluation %}
+                                <form action="{% url 'school_management:save_peer_evaluation_simulation' lesson_session.id %}" method="post" id="simulationForm">
+                                    {% csrf_token %}
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3 bg-white p-3 rounded shadow-sm border">
+                                        <div class="btn-group" role="group" aria-label="Point Mode">
+                                            <input type="radio" class="btn-check point-mode-toggle" name="sim_point_mode" id="mode_settings" value="settings" {% if sim_point_mode != 'manual' %}checked{% endif %} onchange="togglePointMode()">
+                                            <label class="btn btn-outline-primary fw-medium" for="mode_settings"><i class="fas fa-magic me-1"></i>設定点の自動反映</label>
+
+                                            <input type="radio" class="btn-check point-mode-toggle" name="sim_point_mode" id="mode_manual" value="manual" {% if sim_point_mode == 'manual' %}checked{% endif %} onchange="togglePointMode()">
+                                            <label class="btn btn-outline-primary fw-medium" for="mode_manual"><i class="fas fa-keyboard me-1"></i>点数の直接入力</label>
+                                        </div>
+                                        <div>
+                                            <button type="button" class="btn btn-outline-secondary me-2" onclick="clearAllSimulations()">
+                                                <i class="fas fa-eraser me-1"></i>全クリア
+                                            </button>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-save me-1"></i>シミュレーション保存
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    {% regroup submission_rows by student_group as grouped_rows %}
+                                    <div class="row">
+                                    {% for group_data in grouped_rows %}
+                                        <div class="col-12 mb-4">
+                                            <div class="card shadow-sm border-0">
+                                                <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                                    <h6 class="mb-0 fw-bold">
+                                                        {% if group_data.grouper %}
+                                                            <i class="fas fa-users me-2 text-primary"></i>グループ {{ group_data.grouper.group_number }}
+                                                        {% else %}
+                                                            <i class="fas fa-user-slash me-2 text-secondary"></i>グループ未所属
+                                                        {% endif %}
+                                                    </h6>
+                                                </div>
+                                                
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover mb-0" style="min-width: 600px;">
+                                                        <thead class="table-light">
+                                                            <tr>
+                                                                <th style="width: 20%;">学生名</th>
+                                                                <th style="width: 20%;">メール</th>
+                                                                {% if pe_settings.enable_member_evaluation %}
+                                                                <th class="text-center" style="width: 30%;">メンバー評価</th>
+                                                                {% endif %}
+                                                                {% if pe_settings.enable_group_evaluation %}
+                                                                <th class="text-center" style="width: 30%;">グループ評価</th>
+                                                                {% endif %}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for row in group_data.list %}
+                                                            <tr class="student-row" data-group-id="{{ group_data.grouper.id|default:'' }}">
+                                                                <td class="align-middle fw-medium">{{ row.student.full_name }}</td>
+                                                                <td class="align-middle text-muted small">{{ row.email|default:'-' }}</td>
+                                                                
+                                                                {% if pe_settings.enable_member_evaluation %}
+                                                                <td class="align-middle text-center">
+                                                                    <div class="d-flex flex-wrap justify-content-center align-items-center gap-2">
+                                                                        <div class="d-inline-flex align-items-center bg-light p-1 px-2 rounded border">
+                                                                            {% for m in row.member_sim_inputs %}
+                                                                            <div class="form-check form-check-inline mb-0 me-2">
+                                                                                <input class="form-check-input member-rank-checkbox" type="checkbox"
+                                                                                    id="m_rank_{{ row.student.id }}_{{ m.rank }}"
+                                                                                    data-student-id="{{ row.student.id }}"
+                                                                                    data-rank="{{ m.rank }}"
+                                                                                    {% if m.val == "1" or m.val == 1 %}checked{% endif %}
+                                                                                    onchange="applyMemberRank(this, {{ row.student.id }}, {{ m.rank }})">
+                                                                                <label class="form-check-label text-nowrap" style="font-size: 0.85rem;" for="m_rank_{{ row.student.id }}_{{ m.rank }}">{{ m.rank }}位</label>
+                                                                            </div>
+                                                                            <input type="hidden" id="hidden_m_rank_{{ row.student.id }}_{{ m.rank }}" name="sim_member_rank_{{ m.rank }}_{{ row.student.id }}" value="{{ m.val|default_if_none:'' }}">
+                                                                            {% empty %}
+                                                                            <span class="small text-muted">配点未設定</span>
+                                                                            {% endfor %}
+                                                                        </div>
+                                                                        <div class="manual-input-col" style="display: none;">
+                                                                            <input type="number" step="1" min="1" max="100" name="sim_contrib_{{ row.student.id }}" id="sim_contrib_{{ row.student.id }}" value="{{ row.sim_contrib|default_if_none:'' }}" class="form-control form-control-sm sim-manual-input" data-student-id="{{ row.student.id }}" style="width: 80px;" placeholder="任意点数">
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                {% endif %}
+                                                                
+                                                                {% if pe_settings.enable_group_evaluation %}
+                                                                <td class="align-middle text-center">
+                                                                    <div class="d-flex flex-wrap justify-content-center align-items-center gap-2">
+                                                                        <div class="d-inline-flex align-items-center bg-white p-1 px-2 rounded border">
+                                                                            {% for g in row.group_sim_inputs %}
+                                                                            <div class="form-check form-check-inline mb-0 me-2">
+                                                                                <input class="form-check-input group-rank-checkbox" type="checkbox" 
+                                                                                    name="dummy_group_rank_{{ group_data.grouper.id|default:'' }}_{{ row.student.id }}" 
+                                                                                    id="g_rank_{{ row.student.id }}_{{ g.rank }}"
+                                                                                    data-group-id="{{ group_data.grouper.id|default:'' }}"
+                                                                                    data-rank="{{ g.rank }}"
+                                                                                    {% if g.val == "1" or g.val == 1 %}checked{% endif %}
+                                                                                    onchange="applyGroupRank(this, '{{ group_data.grouper.id|default:'' }}', {{ g.rank }}, {{ row.student.id }})">
+                                                                                <label class="form-check-label text-nowrap" style="font-size: 0.85rem;" for="g_rank_{{ row.student.id }}_{{ g.rank }}">{{ g.rank }}位</label>
+                                                                            </div>
+                                                                            <input type="hidden" id="hidden_g_rank_{{ row.student.id }}_{{ g.rank }}" name="sim_group_rank_{{ g.rank }}_{{ row.student.id }}" value="{{ g.val|default_if_none:'' }}">
+                                                                            {% empty %}
+                                                                            <span class="small text-muted">配点未設定</span>
+                                                                            {% endfor %}
+                                                                        </div>
+                                                                        <div class="manual-input-col" style="display: none;">
+                                                                            <input type="number" step="1" min="1" max="100" name="sim_group_manual_{{ row.student.id }}" id="sim_group_manual_{{ row.student.id }}" value="{{ row.sim_group_manual|default_if_none:'' }}" class="form-control form-control-sm sim-manual-input" style="width: 80px;" placeholder="任意点数">
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                {% endif %}
+                                                            </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                    </div>
+                                </form>
+                            {% else %}
+                                <div class="alert alert-info d-flex align-items-center m-4">
+                                    <i class="fas fa-info-circle fa-lg me-3"></i>
+                                    <div>
+                                        ピア評価設定が有効になっていないため、テストモードでのシミュレーション機能は利用できません。
+                                    </div>
                                 </div>
-                            </form>
+                            {% endif %}
                         {% else %}
                             {% if view_mode == 'simple' %}
                             <p class="m-3 text-muted small">簡易表示では提出の有無のみ確認できます。詳細な提出内容を確認するには「詳細」表示に切り替えてください。</p>
@@ -602,4 +656,110 @@
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function togglePointMode() {
+        const checkedMode = document.querySelector('input[name="sim_point_mode"]:checked');
+        if (!checkedMode) return;
+        
+        const mode = checkedMode.value;
+        const manualCols = document.querySelectorAll('.manual-input-col');
+        
+        if (mode === 'settings') {
+            manualCols.forEach(col => {
+                col.style.display = 'none';
+            });
+        } else {
+            manualCols.forEach(col => {
+                col.style.display = 'block';
+            });
+        }
+    }
+
+    // メンバー順位のチェックボックス処理
+    function applyMemberRank(checkbox, studentId, rank) {
+        if (checkbox.checked) {
+            document.querySelectorAll(`.member-rank-checkbox[data-student-id="${studentId}"]`).forEach(cb => {
+                if (cb !== checkbox) cb.checked = false;
+            });
+        }
+        
+        document.querySelectorAll(`input[id^="hidden_m_rank_${studentId}_"]`).forEach(hidden => {
+            hidden.value = '';
+        });
+        
+        if (checkbox.checked) {
+            const hidden = document.getElementById(`hidden_m_rank_${studentId}_${rank}`);
+            if (hidden) hidden.value = '1';
+        }
+        
+        updateMemberInputState(studentId);
+    }
+
+    // グループ順位のチェックボックス処理 (一人ずつ個別に選択するよう修正)
+    function applyGroupRank(checkbox, groupId, rank, currentStudentId) {
+        if (checkbox.checked) {
+            document.querySelectorAll(`.group-rank-checkbox[id^="g_rank_${currentStudentId}_"]`).forEach(cb => {
+                if (cb !== checkbox) cb.checked = false;
+            });
+        }
+        
+        document.querySelectorAll(`input[id^="hidden_g_rank_${currentStudentId}_"]`).forEach(hidden => {
+            hidden.value = '';
+        });
+        
+        if (checkbox.checked) {
+            const hidden = document.getElementById(`hidden_g_rank_${currentStudentId}_${rank}`);
+            if (hidden) hidden.value = '1';
+        }
+        
+        updateGroupInputState(currentStudentId);
+    }
+
+    function updateMemberInputState(studentId) {
+        const input = document.getElementById(`sim_contrib_${studentId}`);
+        if (!input) return;
+        const isAnyChecked = Array.from(document.querySelectorAll(`.member-rank-checkbox[data-student-id="${studentId}"]`)).some(cb => cb.checked);
+        input.disabled = !isAnyChecked;
+        if (!isAnyChecked) input.value = '';
+    }
+
+    function updateGroupInputState(studentId) {
+        const input = document.getElementById(`sim_group_manual_${studentId}`);
+        if (!input) return;
+        const isAnyChecked = Array.from(document.querySelectorAll(`.group-rank-checkbox[id^="g_rank_${studentId}_"]`)).some(cb => cb.checked);
+        input.disabled = !isAnyChecked;
+        if (!isAnyChecked) input.value = '';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        togglePointMode();
+        
+        // 初期状態でのグレーアウト適用
+        document.querySelectorAll('.student-row').forEach(row => {
+            const mCbs = row.querySelectorAll('.member-rank-checkbox');
+            if (mCbs.length > 0) {
+                const sId = mCbs[0].dataset.studentId;
+                updateMemberInputState(sId);
+            }
+            
+            const gCbs = row.querySelectorAll('.group-rank-checkbox');
+            if (gCbs.length > 0) {
+                const sId = gCbs[0].id.split('_')[2];
+                updateGroupInputState(sId);
+            }
+        });
+    });
+
+    function clearAllSimulations() {
+        if (!confirm('入力されたシミュレーションデータを全てクリアしますか？')) return;
+        
+        document.querySelectorAll('.member-rank-checkbox, .group-rank-checkbox').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[type="hidden"][name^="sim_member_rank_"]').forEach(h => h.value = '');
+        document.querySelectorAll('input[type="hidden"][name^="sim_group_rank_"]').forEach(h => h.value = '');
+        document.querySelectorAll('.sim-manual-input').forEach(input => input.value = '');
+    }
+</script>
 {% endblock %}

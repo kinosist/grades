@@ -951,6 +951,13 @@ def peer_evaluation_results(request, session_id):
     submitted_count = 0
     
     sim_data = request.session.get('peer_sim_points', {}).get(str(lesson_session.classroom.id), {}).get(str(lesson_session.id), {})
+    sim_point_mode = sim_data.get('point_mode', 'settings')
+
+    # グループマッピングの作成
+    student_group_map = {}
+    for group in groups:
+        for gm in group.groupmember_set.all():
+            student_group_map[gm.student_id] = group
 
     for enrolled_student in enrolled_students:
         submission = submission_map.get(enrolled_student.id)
@@ -997,6 +1004,14 @@ def peer_evaluation_results(request, session_id):
         sim_contrib = student_sim_data.get('contrib', '')
         if not sim_contrib and 'member' in student_sim_data:
             sim_contrib = student_sim_data['member']
+        if isinstance(sim_contrib, float) and sim_contrib.is_integer():
+            sim_contrib = int(sim_contrib)
+
+        sim_group_manual = student_sim_data.get('group_manual', '')
+        if not sim_group_manual and 'group' in student_sim_data:
+            sim_group_manual = student_sim_data['group']
+        if isinstance(sim_group_manual, float) and sim_group_manual.is_integer():
+            sim_group_manual = int(sim_group_manual)
 
         student_rows.append({
             'student': enrolled_student,
@@ -1010,7 +1025,16 @@ def peer_evaluation_results(request, session_id):
             'member_sim_inputs': member_sim_inputs,
             'group_sim_inputs': group_sim_inputs,
             'sim_contrib': sim_contrib,
+            'sim_group_manual': sim_group_manual,
+            'student_group': student_group_map.get(enrolled_student.id),
         })
+
+    # テンプレートのregroupのために、グループ順、そして学籍番号順にソートする
+    def get_sort_key(row):
+        group_num = row['student_group'].group_number if row['student_group'] else 9999
+        return (group_num, row['student'].student_number)
+        
+    student_rows.sort(key=get_sort_key)
 
     total_students = enrolled_students.count()
     submission_rate = round((submitted_count / total_students) * 100, 1) if total_students else 0
@@ -1063,6 +1087,7 @@ def peer_evaluation_results(request, session_id):
         'comment_rows': comment_rows,
         'test_mode': test_mode,
         'has_simulation': has_simulation,
+        'sim_point_mode': sim_point_mode,
     }
     
     return render(request, 'school_management/peer_evaluation_results.html', context)

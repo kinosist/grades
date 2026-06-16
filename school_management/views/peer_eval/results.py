@@ -53,6 +53,8 @@ def save_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> Ht
             sim_data[class_id] = {}
         
         session_sim = {}
+        session_sim['point_mode'] = request.POST.get('sim_point_mode', 'settings')
+        
         for key, value in request.POST.items():
             if value.strip():
                 # 詳細な順位・獲得票の入力形式
@@ -86,6 +88,14 @@ def save_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> Ht
                         session_sim[student_id] = {}
                     try:
                         session_sim[student_id]['contrib'] = float(value)
+                    except ValueError:
+                        pass
+                elif key.startswith('sim_group_manual_'):
+                    student_id = key.replace('sim_group_manual_', '')
+                    if student_id not in session_sim:
+                        session_sim[student_id] = {}
+                    try:
+                        session_sim[student_id]['group_manual'] = float(value)
                     except ValueError:
                         pass
                 # 古い形式との互換性用

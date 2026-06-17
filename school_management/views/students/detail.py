@@ -52,10 +52,50 @@ def student_detail_view(request, student_number):
         evaluator_group__in=student_groups
     ).count()
     
+    # 3. 最近の活動 (小テストとピア評価を合わせた最新5件)
+    recent_quizzes = []
+    seen_quiz_ids = set()
+    desc_quiz_scores = QuizScore.objects.filter(
+        student=student,
+        is_cancelled=False
+    ).select_related('quiz', 'quiz__lesson_session', 'quiz__lesson_session__classroom').order_by('-graded_at')
+    
+    for qs in desc_quiz_scores:
+        if qs.quiz_id not in seen_quiz_ids:
+            recent_quizzes.append({
+                'type': 'quiz',
+                'date': qs.graded_at,
+                'title': f"小テスト: {qs.quiz.quiz_name} ({qs.quiz.lesson_session.classroom.class_name})",
+                'score': f"{qs.score}点",
+                'icon': 'fa-pen-alt',
+                'color': 'text-primary'
+            })
+            seen_quiz_ids.add(qs.quiz_id)
+            if len(recent_quizzes) >= 5:
+                break
+                
+    recent_peers = []
+    peer_evaluations = PeerEvaluation.objects.filter(
+        evaluator_group__in=student_groups
+    ).select_related('lesson_session', 'lesson_session__classroom').order_by('-created_at')[:5]
+    
+    for pe in peer_evaluations:
+        recent_peers.append({
+            'type': 'peer',
+            'date': pe.created_at,
+            'title': f"ピア評価提出 ({pe.lesson_session.classroom.class_name} 第{pe.lesson_session.session_number}回)",
+            'score': "提出済",
+            'icon': 'fa-users',
+            'color': 'text-success'
+        })
+        
+    recent_activities = sorted(recent_quizzes + recent_peers, key=lambda x: x['date'], reverse=True)[:5]
+    
     context = {
         'student': student,
         'classes': classes,
         'class_data': class_data,
+        'recent_activities': recent_activities,
         'stats': {
             'total_quizzes': total_quizzes,
             'avg_score': avg_score,

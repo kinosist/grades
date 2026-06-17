@@ -165,11 +165,31 @@
             <div class="card-header bg-white py-3">
                 <h6 class="mb-0 fw-bold"><i class="fas fa-clock me-2 text-info"></i>最近の活動</h6>
             </div>
-            <div class="card-body" style="min-height: 200px;">
-                <div class="text-center py-5 opacity-50">
+            <div class="card-body p-0">
+                {% if recent_activities %}
+                <div class="list-group list-group-flush">
+                    {% for activity in recent_activities %}
+                    <div class="list-group-item p-3 border-bottom">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">
+                                    <i class="fas {{ activity.icon }} me-2 {{ activity.color }}"></i>{{ activity.title }}
+                                </h6>
+                                <small class="text-muted">{{ activity.date|date:"Y/m/d H:i" }}</small>
+                            </div>
+                            <span class="badge bg-light text-dark border {% if activity.type == 'quiz' %}border-primary{% else %}border-success{% endif %} px-3 py-2 fs-6">
+                                {{ activity.score }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5 opacity-50" style="min-height: 200px;">
                     <i class="fas fa-history fa-3x text-muted mb-3"></i>
                     <p class="text-muted small">活動履歴はまだありません</p>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>

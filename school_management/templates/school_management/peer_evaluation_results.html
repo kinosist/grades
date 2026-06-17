@@ -349,6 +349,7 @@
                                                                 
                                                                 {% if pe_settings.enable_member_evaluation %}
                                                                 <td class="align-middle text-center">
+                                                                    {% if group_data.grouper %}
                                                                     <div class="d-flex flex-wrap justify-content-center align-items-center gap-2">
                                                                         <div class="d-inline-flex align-items-center bg-light p-1 px-2 rounded border">
                                                                             {% for m in row.member_sim_inputs %}
@@ -373,6 +374,11 @@
                                                                             </div>
                                                                         </div>
                                                                     </div>
+                                                                    {% else %}
+                                                                    <div class="text-muted small">
+                                                                        <i class="fas fa-exclamation-triangle me-1 text-warning"></i>グループ未所属のため評価できません。<br>対象学生をグループに追加してください。
+                                                                    </div>
+                                                                    {% endif %}
                                                                 </td>
                                                                 {% endif %}
                                                                 

@@ -1,0 +1,269 @@
+{% extends 'school_management/base.html' %}
+
+{% block title %}学生削除確認 - 学校管理システム{% endblock %}
+{% block page_title %}学生削除確認{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:student_list' %}">学生管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:student_detail' student.student_number %}">学生詳細</a></li>
+<li class="breadcrumb-item active" aria-current="page">削除確認</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    body { background-color: #f8fafc; }
+    
+    .modern-card {
+        border: none !important;
+        border-radius: 20px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        background-color: #ffffff;
+    }
+
+    .warning-banner {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        border-left: 4px solid #dc2626;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+
+    .warning-banner i {
+        color: #dc2626;
+        font-size: 24px;
+        margin-right: 12px;
+    }
+
+    .warning-text {
+        color: #7f1d1d;
+        font-weight: 600;
+    }
+
+    .student-item {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+
+    .student-number {
+        display: inline-block;
+        background-color: #dbeafe;
+        color: #1e40af;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-right: 12px;
+    }
+
+    .student-name {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 1.0625rem;
+    }
+
+    .classroom-badges {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .classroom-badge {
+        display: inline-block;
+        background-color: #f0fdf4;
+        color: #166534;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        margin-right: 6px;
+        margin-top: 6px;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 12px;
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .btn-secondary-custom {
+        background-color: #e2e8f0;
+        color: #334155;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-secondary-custom:hover {
+        background-color: #cbd5e1;
+        text-decoration: none;
+        color: #1e293b;
+    }
+
+    .btn-danger-custom {
+        background-color: #dc2626;
+        color: #ffffff;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-danger-custom:hover {
+        background-color: #b91c1c;
+    }
+
+    .btn-warning-custom {
+        background-color: #f59e0b;
+        color: #ffffff;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-warning-custom:hover {
+        background-color: #d97706;
+    }
+
+    .section-title {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 16px;
+        margin-top: 24px;
+    }
+
+    .note-box {
+        background-color: #f0f9ff;
+        border-left: 4px solid #0284c7;
+        border-radius: 8px;
+        padding: 16px;
+        margin-top: 24px;
+    }
+
+    .note-title {
+        color: #0c4a6e;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .note-content {
+        color: #0c4a6e;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .note-content ul {
+        margin: 8px 0 0 0;
+        padding-left: 20px;
+    }
+
+    .note-content li {
+        margin: 4px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card modern-card">
+            <div class="card-body p-4">
+                <!-- 警告バナー -->
+                <div class="warning-banner">
+                    <div style="display: flex; align-items: flex-start;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <div>
+                            <div class="warning-text">重要な警告</div>
+                            <div style="color: #9a3412; font-size: 0.95rem; margin-top: 4px;">
+                                以下の学生を削除・解除しようとしています。完全削除の操作は<strong>取り消せません</strong>。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 削除対象の学生リスト -->
+                <div>
+                    <h5 class="section-title"><i class="fas fa-user me-2 text-danger"></i>削除対象の学生</h5>
+                    <div class="student-item">
+                        <div>
+                            <span class="student-number">{{ student.student_number }}</span>
+                            <span class="student-name">{{ student.full_name }}</span>
+                        </div>
+                        {% if classroom_count > 0 %}
+                        <div class="classroom-badges">
+                            <div style="font-size: 0.8125rem; color: #64748b; margin-bottom: 6px;">
+                                所属クラス: <strong>{{ classroom_count }}</strong> 件
+                            </div>
+                            {% for classroom_name in classrooms %}
+                            <span class="classroom-badge">
+                                <i class="fas fa-graduation-cap me-1"></i>{{ classroom_name }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="classroom-badges">
+                            <span class="no-classrooms-text" style="color: #64748b; font-size: 0.875rem; font-style: italic;">
+                                <i class="fas fa-info-circle me-1"></i>所属クラスなし
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 削除による影響 -->
+                <div class="note-box">
+                    <div class="note-title"><i class="fas fa-info-circle me-2"></i>削除のオプションと影響</div>
+                    <div class="note-content">
+                        <h6 class="fw-bold" style="color: #d97706;"><i class="fas fa-user-minus me-1"></i> 自分の担当から外す</h6>
+                        <p style="margin: 0 0 10px 0; font-size: 0.95rem;">
+                            あなたの担当リストおよび担当クラスから学生を外します。学生の基本情報や成績データはシステムに保持され、他の教員は引き続きその学生を管理できます。
+                        </p>
+                        
+                        <hr style="border-color: #e2e8f0; margin: 15px 0;">
+
+                        <h6 class="fw-bold" style="color: #dc2626;"><i class="fas fa-trash-alt me-1"></i> システムから完全に削除</h6>
+                        <p style="margin: 0 0 10px 0; font-size: 0.95rem;">以下のデータが<strong>すべて削除されます</strong>:</p>
+                        <ul style="font-size: 0.95rem;">
+                            <li>学生の基本情報（学籍番号、氏名、メール等）</li>
+                            <li>すべてのクラス登録</li>
+                            <li>成績・ポイント・小テストなどの関連データすべて</li>
+                        </ul>
+                        <p style="margin-top: 10px; margin-bottom: 0; font-size: 0.95rem;"><strong>⚠ 他の教員のクラスに属する学生の場合、そのクラスの成績データも削除されます。</strong></p>
+                    </div>
+                </div>
+
+                <!-- ボタン -->
+                <div class="action-buttons">
+                    <a href="{% url 'school_management:student_detail' student.student_number %}" class="btn-secondary-custom">
+                        <i class="fas fa-arrow-left me-2"></i>キャンセル
+                    </a>
+                    <form method="POST" action="{% url 'school_management:student_delete_execute' student.student_number %}" style="margin-left: auto; display: flex; gap: 10px;">
+                        {% csrf_token %}
+                        
+                        <button type="submit" name="delete_type" value="unlink" class="btn-warning-custom" onclick="return confirm('{{ student.full_name }}さんを自分の担当から外します。よろしいですか？');">
+                            <i class="fas fa-user-minus me-2"></i>自分の担当から外す
+                        </button>
+
+                        <button type="submit" name="delete_type" value="hard_delete" class="btn-danger-custom" onclick="return confirm('本当にシステムから完全に削除してよろしいですか？この操作は取り消せません。他の先生のクラスデータも削除されます。');">
+                            <i class="fas fa-trash-alt me-2"></i>システムから完全に削除
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="py-5"></div>
+{% endblock %}

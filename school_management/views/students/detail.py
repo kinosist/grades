@@ -17,36 +17,7 @@ def student_detail_view(request, student_number):
 
     student = get_object_or_404(CustomUser, student_number=student_number, role='student')
 
-    # 削除・解除処理
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        
-        if action == 'unlink_student':
-            try:
-                student_name = student.full_name
-                # managed_byから自分を外す
-                student.managed_by.remove(request.user)
-                
-                # 自分が担当しているすべてのクラスから学生を外す
-                teacher_classrooms = request.user.classrooms.all()
-                for classroom in teacher_classrooms:
-                    classroom.students.remove(student)
-                    
-                messages.success(request, f'{student_name}さんを担当から外しました。')
-                return redirect('school_management:student_list')
-            except Exception as e:
-                messages.error(request, f'担当解除中にエラーが発生しました: {str(e)}')
-                return redirect('school_management:student_detail', student_number=student_number)
-                
-        elif action == 'delete_student':
-            try:
-                student_name = student.full_name
-                student.delete()
-                messages.success(request, f'{student_name}さんをシステムから完全に削除しました。')
-                return redirect('school_management:student_list')
-            except Exception as e:
-                messages.error(request, f'削除中にエラーが発生しました: {str(e)}')
-                return redirect('school_management:student_detail', student_number=student_number)
+    # 削除・解除処理は別ビュー(student_delete_execute_view)に移動しました
     
     # 所属クラス一覧とそれぞれのクラスポイントを取得
     classes = student.classroom_set.filter(teachers=request.user).prefetch_related('teachers')
@@ -185,3 +156,71 @@ def class_student_detail_view(request, class_id, student_number):
         }
     }
     return render(request, 'school_management/class_student_detail.html', context)
+
+
+@login_required
+def student_delete_confirm_view(request, student_number):
+    """学生削除確認画面"""
+    if not request.user.is_teacher:
+        messages.error(request, 'この機能にアクセスする権限がありません。')
+        return redirect('school_management:dashboard')
+
+    student = get_object_or_404(CustomUser, student_number=student_number, role='student')
+    
+    # 担当外の学生は削除できないようチェック（必要に応じて）
+    if not student.managed_by.filter(id=request.user.id).exists():
+        messages.error(request, '担当外の学生の削除はできません。')
+        return redirect('school_management:student_list')
+
+    classrooms = student.classroom_set.all()
+    classroom_names = [f"{c.get_semester_display()} {c.class_name} ({c.year})" for c in classrooms]
+    
+    context = {
+        'student': student,
+        'classrooms': classroom_names,
+        'classroom_count': len(classroom_names),
+    }
+    return render(request, 'school_management/student_delete_confirm.html', context)
+
+
+@login_required
+def student_delete_execute_view(request, student_number):
+    """学生削除・担当解除実行"""
+    if not request.user.is_teacher:
+        messages.error(request, 'この機能にアクセスする権限がありません。')
+        return redirect('school_management:dashboard')
+
+    if request.method != 'POST':
+        return redirect('school_management:student_detail', student_number=student_number)
+
+    student = get_object_or_404(CustomUser, student_number=student_number, role='student')
+    delete_type = request.POST.get('delete_type')
+
+    if delete_type == 'unlink':
+        try:
+            student_name = student.full_name
+            student.managed_by.remove(request.user)
+            
+            teacher_classrooms = request.user.classrooms.all()
+            for classroom in teacher_classrooms:
+                classroom.students.remove(student)
+                
+            messages.success(request, f'{student_name}さんを担当から外しました。')
+            return redirect('school_management:student_list')
+        except Exception as e:
+            messages.error(request, f'担当解除中にエラーが発生しました: {str(e)}')
+            return redirect('school_management:student_delete_confirm', student_number=student_number)
+            
+    elif delete_type == 'hard_delete':
+        try:
+            student_name = student.full_name
+            student.delete()
+            messages.success(request, f'{student_name}さんをシステムから完全に削除しました。')
+            return redirect('school_management:student_list')
+        except Exception as e:
+            messages.error(request, f'削除中にエラーが発生しました: {str(e)}')
+            return redirect('school_management:student_delete_confirm', student_number=student_number)
+            
+    else:
+        messages.error(request, '無効な操作です。')
+        return redirect('school_management:student_list')

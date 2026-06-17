@@ -406,10 +406,14 @@ def class_evaluation_view(request, class_id):
         # 足切りをクリアした学生の中での最高点を取得（換算の基準値）
         passed_scores = [s for s in all_raw_scores if s > cutoff_line]
         max_val = max(passed_scores) if passed_scores else 0
+        
+        # 統計の平均点（シミュレーションを反映）
+        class_average_points = round(sum(all_raw_scores) / len(all_raw_scores), 1)
     else:
         median_val = 0
         cutoff_line = 0
         max_val = 0
+        class_average_points = 0.0
 
     # --- 評価システムに応じた最終成績の処理（足切りと換算） ---
     for eval_data in student_evaluations:
@@ -452,6 +456,7 @@ def class_evaluation_view(request, class_id):
         'table_colspan': table_colspan,
         'has_simulation': has_simulation,
         'test_mode': test_mode,
+        'class_average_points': class_average_points,
     }
     return render(request, 'school_management/class_evaluation.html', context)
 

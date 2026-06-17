@@ -44,7 +44,19 @@ def student_detail_view(request, student_number):
     
     unique_scores = {qs.quiz_id: qs.score for qs in all_quiz_scores}
     total_quizzes = len(unique_scores)
-    avg_score = round(sum(unique_scores.values()) / total_quizzes, 1) if total_quizzes > 0 else 0
+    quiz_total_score = sum(unique_scores.values())
+    
+    scp_list = StudentClassPoints.objects.filter(student=student)
+    peer_total_score = 0
+    peer_total_count = 0
+    for scp in scp_list:
+        peer_stats = scp.peer_eval_stats
+        peer_total_score += peer_stats.get('total', 0)
+        peer_total_count += peer_stats.get('count', 0)
+        
+    combined_count = total_quizzes + peer_total_count
+    combined_score = quiz_total_score + peer_total_score
+    avg_score = round(combined_score / combined_count, 1) if combined_count > 0 else 0
     
     # 2. ピア評価回数 (評価した回数)
     student_groups = GroupMember.objects.filter(student=student).values_list('group', flat=True)
@@ -158,7 +170,36 @@ def class_student_detail_view(request, class_id, student_number):
         scp = StudentClassPoints.objects.get(student=student, classroom=classroom)
         quiz_stats = scp.quiz_stats
         total_quizzes = quiz_stats['count']
-        avg_score = quiz_stats['average']
+        
+        peer_stats = scp.peer_eval_stats
+        peer_count = peer_stats['count']
+        peer_total = peer_stats['total']
+        
+        # テストモード（シミュレーション）の場合はセッションからデータを取得して上書き
+        sim_data_student = request.session.get('peer_sim_points', {}).get(str(classroom.id), {}).get(str(student.id), {})
+        if request.session.get('peer_eval_test_mode') and sim_data_student:
+            sim_total = 0
+            sim_count = 0
+            for session_id, data in sim_data_student.items():
+                if isinstance(data, dict):
+                    # For advanced point modes
+                    contrib = float(data.get('contrib', data.get('member', 0)))
+                    group = float(data.get('group_manual', data.get('group', 0)))
+                    sim_total += (contrib + group)
+                else:
+                    # Legacy fallback
+                    sim_total += float(data)
+                sim_count += 1
+            if sim_count > 0:
+                # If we have simulation data, we completely replace the DB peer points with the simulated points for those sessions
+                # Note: For simplicity, if test mode is on, we'll just use the simulated total
+                peer_total = sim_total
+                peer_count = sim_count
+            
+        total_count = total_quizzes + peer_count
+        total_score = quiz_stats.get('total', quiz_stats.get('average', 0) * total_quizzes) + peer_total
+        avg_score = round(total_score / total_count, 1) if total_count > 0 else 0
+        
     except StudentClassPoints.DoesNotExist:
         total_quizzes = 0
         avg_score = 0

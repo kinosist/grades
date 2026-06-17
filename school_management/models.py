@@ -855,6 +855,14 @@ class StudentClassPoints(models.Model):
         return {'count': count, 'average': avg}
 
     @property
+    def peer_eval_stats(self):
+        """ピア評価の統計（参加回数と合計点）を返す"""
+        history = self.get_peer_history()
+        count = len(history)
+        total = sum(h['total'] for h in history)
+        return {'count': count, 'total': total}
+
+    @property
     def live_points(self):
         """表示用にリアルタイムで再計算した値を返す（DB保存はしない）"""
         self.calculate_points_internal()

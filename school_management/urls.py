@@ -74,8 +74,7 @@ urlpatterns = [
     path('quizzes/<int:quiz_id>/', quizzes.quiz_results_view, name='quiz_detail'),
     path('quizzes/<int:quiz_id>/grading/', quizzes.quiz_grading_view, name='quiz_grading'),
     path('quizzes/<int:quiz_id>/results/', quizzes.quiz_results_view, name='quiz_results'),
-    path('quizzes/<int:quiz_id>/questions/', quizzes.question_manage_view, name='question_manage'),
-    path('quizzes/<int:quiz_id>/questions/create/', quizzes.question_create_view, name='question_create'),
+
 
     # --- 学生管理（Students） ---
     path('students/', students.student_list_view, name='student_list'),

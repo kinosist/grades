@@ -2,7 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from school_management.models import (
-    ClassRoom, LessonSession, Quiz, Question, QuizScore
+    ClassRoom, LessonSession, Quiz, QuizScore
 )
 
 User = get_user_model()
@@ -56,20 +56,7 @@ class QuizIntegrationTests(TestCase):
         if quiz.quiz_name != 'Midterm Quiz':
             print("Found quiz name:", quiz.quiz_name)
         self.assertEqual(quiz.quiz_name, 'Midterm Quiz')
-        
-        # 3. 問題の追加
-        question_create_url = reverse('school_management:question_create', args=[quiz.id])
-        response = self.client.post(question_create_url, {
-            'question_text': 'What is 1+1?',
-            'question_type': 'short_answer',
-            'points': 10,
-            'correct_answer': '2',
-            'order': 1
-        })
-        self.assertIn(response.status_code, [200, 302])
-        self.assertEqual(Question.objects.filter(quiz=quiz).count(), 1)
-        
-        # 4. 採点（教員が学生の点数を入力）
+        # 3. 採点（教員が学生の点数を入力）
         grading_url = reverse('school_management:quiz_grading', args=[quiz.id])
         response = self.client.post(grading_url, {
             'action': 'save_scores',

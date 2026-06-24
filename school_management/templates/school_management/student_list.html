@@ -331,22 +331,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // CSRF トークンを取得する関数
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-
+    // (CSRF cookie helper removed: not used)
+    
     // 一括削除ボタンクリック
     if (bulkDeleteBtn) {
         bulkDeleteBtn.addEventListener('click', function() {

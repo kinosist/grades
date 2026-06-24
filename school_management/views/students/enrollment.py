@@ -250,13 +250,9 @@ def bulk_student_add_csv(request, class_id):
 
                     student = None
                     if email:
-                        # メールが重複する場合があるため、学籍番号も使って特定する
-                        existing_students = Student.objects.filter(email=email, role='student')
-                        for s in existing_students:
-                            if s.student_number == student_number:
-                                student = s
-                                break
-
+                        student = Student.objects.filter(
+                            email=email, student_number=student_number, role='student'
+                        ).first()
                     is_new = False
                     if not student:
                         default_password = f"student_{student_number}"

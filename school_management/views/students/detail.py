@@ -274,7 +274,7 @@ def student_delete_execute_view(request, student_number):
     if request.method != 'POST':
         return redirect('school_management:student_detail', student_number=student_number)
 
-    student = get_object_or_404(CustomUser, student_number=student_number, role='student')
+    student = get_object_or_404(CustomUser, student_number=student_number, role='student', managed_by=request.user)
     delete_type = request.POST.get('delete_type')
 
     if delete_type == 'unlink':

@@ -15,18 +15,19 @@ def student_detail_view(request, student_number):
         messages.error(request, 'この機能にアクセスする権限がありません。')
         return redirect('school_management:dashboard')
 
-    student = get_object_or_404(CustomUser, student_number=student_number, role='student')
+    # 担当学生に限定
+    student = get_object_or_404(CustomUser, student_number=student_number, role='student', managed_by=request.user)
 
     # 削除・解除処理は別ビュー(student_delete_execute_view)に移動しました
     
-    # 所属クラス一覧とそれぞれのクラスポイントを取得
+    # ログイン教員が担当するクラス一覧とそれぞれのクラスポイントを取得
     classes = student.classroom_set.filter(teachers=request.user).prefetch_related('teachers')
     
     class_data = []
     for classroom in classes:
         try:
             class_points_obj = StudentClassPoints.objects.get(student=student, classroom=classroom)
-            class_points = class_points_obj.class_points
+            class_points = class_points_obj.points
         except StudentClassPoints.DoesNotExist:
             class_points = 0
         
@@ -35,18 +36,20 @@ def student_detail_view(request, student_number):
             'points': class_points
         })
     
-    # 統計情報を計算 (全クラス合計)
+    # 統計情報を計算 (担当クラスの合計)
     # 1. 小テスト統計 (重複除外)
     all_quiz_scores = QuizScore.objects.filter(
         student=student,
+        quiz__lesson_session__classroom__in=classes, # 担当クラスに限定
         is_cancelled=False
     ).order_by('graded_at')
     
     unique_scores = {qs.quiz_id: qs.score for qs in all_quiz_scores}
     total_quizzes = len(unique_scores)
     quiz_total_score = sum(unique_scores.values())
-    
-    scp_list = StudentClassPoints.objects.filter(student=student)
+
+    # 担当クラスのピア評価ポイントを取得
+    scp_list = StudentClassPoints.objects.filter(student=student, classroom__in=classes)
     peer_total_score = 0
     peer_total_count = 0
     for scp in scp_list:
@@ -58,17 +61,22 @@ def student_detail_view(request, student_number):
     combined_score = quiz_total_score + peer_total_score
     avg_score = round(combined_score / combined_count, 1) if combined_count > 0 else 0
     
-    # 2. ピア評価回数 (評価した回数)
-    student_groups = GroupMember.objects.filter(student=student).values_list('group', flat=True)
+    # 2. ピア評価回数 (評価した回数) - 担当クラスに限定
+    student_groups = GroupMember.objects.filter(
+        student=student,
+        group__lesson_session__classroom__in=classes # 担当クラスに限定
+    ).values_list('group', flat=True)
     peer_eval_count = PeerEvaluation.objects.filter(
         evaluator_group__in=student_groups
     ).count()
     
-    # 3. 最近の活動 (小テストとピア評価を合わせた最新5件)
+    # 3. 最近の活動 (小テストとピア評価を合わせた最新5件) - 担当クラスに限定
     recent_quizzes = []
     seen_quiz_ids = set()
+    # 担当クラスの小テストに限定
     desc_quiz_scores = QuizScore.objects.filter(
         student=student,
+        quiz__lesson_session__classroom__in=classes, # 担当クラスに限定
         is_cancelled=False
     ).select_related('quiz', 'quiz__lesson_session', 'quiz__lesson_session__classroom').order_by('-graded_at')
     
@@ -87,6 +95,7 @@ def student_detail_view(request, student_number):
                 break
                 
     recent_peers = []
+    # 担当クラスのピア評価に限定
     peer_evaluations = PeerEvaluation.objects.filter(
         evaluator_group__in=student_groups
     ).select_related('lesson_session', 'lesson_session__classroom').order_by('-created_at')[:5]

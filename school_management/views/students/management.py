@@ -236,19 +236,16 @@ def student_create_view(request):
                     
                     student = None
                     if email:
-                        # メールが重複する可能性があるため、該当メールを持つ全学生をチェック
-                        existing_students = Student.objects.filter(email=email, role='student')
-                        student_with_different_number = None
-                        
-                        for s in existing_students:
-                            if s.student_number == student_number:
-                                student = s
-                                break
-                            student_with_different_number = s
-                        
-                        if not student and student_with_different_number:
-                                # メールは一致するが学籍番号が異なる場合はエラー
-                                messages.error(request, f'メールアドレス "{email}" は学籍番号 "{student_with_different_number.student_number}" のアカウントで既に使用されています。')
+                        # メールが一致する学生を検索
+                        same_email_qs = Student.objects.filter(email=email, role='student')
+                        # 学籍番号も一致する学生を探す (これが本来紐づくべき学生)
+                        student = same_email_qs.filter(student_number=student_number).first()
+
+                        # もし見つからず、かつ同じメールで学籍番号が異なる学生が存在する場合
+                        if student is None and same_email_qs.exclude(student_number=student_number).exists():
+                            # エラーとして処理
+                            existing_sn = same_email_qs.exclude(student_number=student_number).values_list('student_number', flat=True).first()
+                            messages.error(request, f'メールアドレス "{email}" は学籍番号 "{existing_sn}" のアカウントで既に使用されています。')
                                 return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
                     
                     is_new = False

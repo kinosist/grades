@@ -111,7 +111,6 @@
 {% endblock %}
 
 {% block content %}
-{% csrf_token %}
 
 <!-- 一括削除確認用の隠しフォーム -->
 <form id="bulk-delete-form" method="POST" action="{% url 'school_management:student_bulk_delete_confirm' %}" style="display: none;">

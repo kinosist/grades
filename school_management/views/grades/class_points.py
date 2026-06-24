@@ -390,7 +390,8 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
                 'contrib': data.get('simulated_contrib', 0) if test_mode else data.get('real_contrib', 0),
                 'vote': data.get('simulated_vote', 0) if test_mode else data.get('real_vote', 0),
                 'total': sim_p_sum if test_mode else real_p_sum,
-                'error': data.get('error')  # テンプレートでエラー表示に利用
+                'error': data.get('error'),  # テンプレートでエラー表示に利用
+                'is_simulated': data.get('is_simulated', False)
             })
         peer_details.sort(key=lambda x: x['session'].session_number)
 

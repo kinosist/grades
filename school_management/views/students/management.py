@@ -108,6 +108,17 @@ def student_create_view(request):
                     continue
                 seen_student_numbers[student_number] = line_num
 
+                if normalized_email:
+                    seen_email_data = seen_emails.get(normalized_email)
+                    if seen_email_data:
+                        seen_student_number, seen_line_num = seen_email_data
+                        if seen_student_number != student_number:
+                            errors.append(
+                                f'行{line_num}: メールアドレス "{normalized_email}" が入力内で学籍番号の異なる学生（行{seen_line_num}）に使われています。'
+                            )
+                            continue
+                    seen_emails[normalized_email] = (student_number, line_num)
+
 
                 pending_students.append({
                     'line_num': line_num,
@@ -130,23 +141,23 @@ def student_create_view(request):
                 )
                 
                 # メールアドレスの重複と学籍番号の不一致をチェック
-                existing_email_map = {
-                    s.email: s.student_number
-                    for s in Student.objects.filter(role='student', email__in=emails)
-                }
+                from collections import defaultdict
+                existing_email_to_numbers = defaultdict(list)
+                for s in Student.objects.filter(role='student', email__in=emails):
+                    existing_email_to_numbers[s.email].append(s.student_number)
 
                 for row in pending_students:
                     if row['student_number'] in existing_student_numbers:
                         errors.append(
                             f'行{row["line_num"]}: 学籍番号 "{row["student_number"]}" は既に登録されています'
                         )
-
-                    # メールが既存で、学籍番号が異なる場合はエラー
+                    
                     email = row['email']
                     student_number = row['student_number']
-                    if email and email in existing_email_map and existing_email_map[email] != student_number:
+                    # メールが既存で、かつ入力された学籍番号と紐づいていない場合はエラー
+                    if email and email in existing_email_to_numbers and student_number not in existing_email_to_numbers[email]:
                         errors.append(
-                            f'行{row["line_num"]}: メールアドレス "{email}" は学籍番号 "{existing_email_map[email]}" のアカウントで既に使用されています。'
+                            f'行{row["line_num"]}: メールアドレス "{email}" は別の学籍番号（例: "{existing_email_to_numbers[email][0]}"）のアカウントで既に使用されています。'
                         )
 
 
@@ -170,7 +181,12 @@ def student_create_view(request):
                         
                         student = None
                         if email:
-                            student = Student.objects.filter(email=email, role='student').first()
+                            # メールが重複する場合があるため、学籍番号も使って特定する
+                            existing_students = Student.objects.filter(email=email, role='student')
+                            for s in existing_students:
+                                if s.student_number == student_number:
+                                    student = s
+                                    break
                         
                         if not student:
                             default_password = f"student_{student_number}"
@@ -223,14 +239,19 @@ def student_create_view(request):
                     
                     student = None
                     if email:
-                        existing_student = Student.objects.filter(email=email, role='student').first()
-                        if existing_student:
-                            # メールが一致した場合、学籍番号も一致するか確認
-                            if existing_student.student_number == student_number:
-                                student = existing_student
-                            else:
+                        # メールが重複する可能性があるため、該当メールを持つ全学生をチェック
+                        existing_students = Student.objects.filter(email=email, role='student')
+                        student_with_different_number = None
+                        
+                        for s in existing_students:
+                            if s.student_number == student_number:
+                                student = s
+                                break
+                            student_with_different_number = s
+                        
+                        if not student and student_with_different_number:
                                 # メールは一致するが学籍番号が異なる場合はエラー
-                                messages.error(request, f'メールアドレス "{email}" は学籍番号 "{existing_student.student_number}" のアカウントで既に使用されています。')
+                                messages.error(request, f'メールアドレス "{email}" は学籍番号 "{student_with_different_number.student_number}" のアカウントで既に使用されています。')
                                 return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
                     
                     is_new = False

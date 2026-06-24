@@ -18,12 +18,10 @@ class EmailAuthBackend(ModelBackend):
             UserModel().set_password(password)
             return None
         except UserModel.MultipleObjectsReturned:
-            # 同じメールアドレスを持つユーザーを全て取得
-            users = UserModel._default_manager.filter(**{UserModel.USERNAME_FIELD: username})
-            for u in users:
-                if u.check_password(password) and self.user_can_authenticate(u):
-                    return u
-            return None
+            # 同じメールアドレスを持つユーザーが複数いる場合は、パスワード一致が一意なときだけログインさせる
+            users = UserModel._default_manager.filter(**{UserModel.USERNAME_FIELD: username}).order_by('id')
+            matched = [u for u in users if u.check_password(password) and self.user_can_authenticate(u)]
+            return matched[0] if len(matched) == 1 else None
         
         if user.check_password(password) and self.user_can_authenticate(user):
             return user

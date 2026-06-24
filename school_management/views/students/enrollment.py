@@ -205,6 +205,17 @@ def bulk_student_add_csv(request, class_id):
                         continue
                 seen_emails[normalized_email] = (student_number, line_num)
 
+            if normalized_email:
+                seen_email_data = seen_emails.get(normalized_email)
+                if seen_email_data:
+                    seen_student_number, seen_line_num = seen_email_data
+                    if seen_student_number != student_number:
+                        errors.append(
+                            f'行{line_num}: メールアドレス "{normalized_email}" が入力内で学籍番号の異なる学生（行{seen_line_num}）に使われています。'
+                        )
+                        continue
+                seen_emails[normalized_email] = (student_number, line_num)
+
 
 
             pending_students.append({

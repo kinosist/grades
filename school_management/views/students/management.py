@@ -128,12 +128,25 @@ def student_create_view(request):
                         managed_by=request.user,
                     ).values_list('student_number', flat=True)
                 )
-
+                
+                # メールアドレスの重複と学籍番号の不一致をチェック
+                existing_email_map = {
+                    s.email: s.student_number
+                    for s in Student.objects.filter(role='student', email__in=emails)
+                }
 
                 for row in pending_students:
                     if row['student_number'] in existing_student_numbers:
                         errors.append(
                             f'行{row["line_num"]}: 学籍番号 "{row["student_number"]}" は既に登録されています'
+                        )
+
+                    # メールが既存で、学籍番号が異なる場合はエラー
+                    email = row['email']
+                    student_number = row['student_number']
+                    if email and email in existing_email_map and existing_email_map[email] != student_number:
+                        errors.append(
+                            f'行{row["line_num"]}: メールアドレス "{email}" は学籍番号 "{existing_email_map[email]}" のアカウントで既に使用されています。'
                         )
 
 
@@ -210,7 +223,15 @@ def student_create_view(request):
                     
                     student = None
                     if email:
-                        student = Student.objects.filter(email=email, role='student').first()
+                        existing_student = Student.objects.filter(email=email, role='student').first()
+                        if existing_student:
+                            # メールが一致した場合、学籍番号も一致するか確認
+                            if existing_student.student_number == student_number:
+                                student = existing_student
+                            else:
+                                # メールは一致するが学籍番号が異なる場合はエラー
+                                messages.error(request, f'メールアドレス "{email}" は学籍番号 "{existing_student.student_number}" のアカウントで既に使用されています。')
+                                return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
                     
                     is_new = False
                     if not student:

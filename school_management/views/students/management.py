@@ -246,7 +246,7 @@ def student_create_view(request):
                             # エラーとして処理
                             existing_sn = same_email_qs.exclude(student_number=student_number).values_list('student_number', flat=True).first()
                             messages.error(request, f'メールアドレス "{email}" は学籍番号 "{existing_sn}" のアカウントで既に使用されています。')
-                                return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
+                            return render(request, 'school_management/student_create.html', {'csrf_token': csrf_token})
                     
                     is_new = False
                     if not student:

@@ -2,6 +2,7 @@ from collections import defaultdict
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.utils.http import url_has_allowed_host_and_scheme
 from ...models import LessonSession, PeerEvaluationSettings
 
 def _safe_int(value):
@@ -130,7 +131,12 @@ def save_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> Ht
         from django.contrib import messages
         messages.success(request, 'シミュレーション用のテスト点数を保存しました。')
         
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+    next_url = request.META.get('HTTP_REFERER')
+    if not next_url or not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        next_url = '/'
+    return HttpResponseRedirect(next_url)
 
 @login_required
 def clear_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> HttpResponse:
@@ -147,7 +153,12 @@ def clear_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> H
         from django.contrib import messages
         messages.success(request, 'この授業回のシミュレーションデータをクリアしました。')
         
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+    next_url = request.META.get('HTTP_REFERER')
+    if not next_url or not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        next_url = '/'
+    return HttpResponseRedirect(next_url)
 
 @login_required
 def toggle_test_mode(request: HttpRequest) -> HttpResponse:
@@ -158,7 +169,12 @@ def toggle_test_mode(request: HttpRequest) -> HttpResponse:
         from django.contrib import messages
         mode_str = 'ON' if not current_mode else 'OFF'
         messages.success(request, f'テストモードを {mode_str} にしました。')
-    return HttpResponseRedirect(request.POST.get('next') or request.META.get('HTTP_REFERER', '/'))
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER')
+    if not next_url or not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        next_url = '/'
+    return HttpResponseRedirect(next_url)
 
 @login_required
 def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpResponse:

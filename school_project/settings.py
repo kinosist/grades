@@ -125,10 +125,10 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-SILENCED_SYSTEM_CHECKS = ['auth.E003']
+SILENCED_SYSTEM_CHECKS = ['auth.E003'] if os.environ.get('SILENCE_AUTH_E003') == '1' else []
 
 # デバッグ画面を有効化するフラグ（本番環境では環境変数等で切り替えるかFalseにする）
-ENABLE_DEBUG_VIEWS = True
+ENABLE_DEBUG_VIEWS = os.environ.get('ENABLE_DEBUG_VIEWS') == '1'
 
 WSGI_APPLICATION = 'school_project.wsgi.application'
 
@@ -248,4 +248,3 @@ GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '').strip()
 GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '').strip()
 PEER_EVAL_SESSION_COOKIE_NAME = 'peer_eval_session_id'
 PEER_EVAL_SESSION_TTL_HOURS = int(os.environ.get('PEER_EVAL_SESSION_TTL_HOURS', '24'))
-

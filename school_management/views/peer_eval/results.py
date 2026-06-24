@@ -158,7 +158,7 @@ def toggle_test_mode(request: HttpRequest) -> HttpResponse:
         from django.contrib import messages
         mode_str = 'ON' if not current_mode else 'OFF'
         messages.success(request, f'テストモードを {mode_str} にしました。')
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+    return HttpResponseRedirect(request.POST.get('next') or request.META.get('HTTP_REFERER', '/'))
 
 @login_required
 def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpResponse:

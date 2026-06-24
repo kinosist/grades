@@ -231,18 +231,17 @@ def bulk_student_add_csv(request, class_id):
 
         try:
             with transaction.atomic():
-                created_students = []
-                created_count = 0
-                linked_count = 0
+                processed_students_map = {}
                 for row in pending_students:
                     email = row['email']
                     student_number = row['student_number']
                     full_name = row['full_name']
-                    
+
                     student = None
                     if email:
                         student = Student.objects.filter(email=email, role='student').first()
-                    
+
+                    is_new = False
                     if not student:
                         default_password = f"student_{student_number}"
                         student = Student.objects.create_user(
@@ -252,12 +251,15 @@ def bulk_student_add_csv(request, class_id):
                             role='student',
                             student_number=student_number
                         )
-                        created_count += 1
-                    else:
-                        linked_count += 1
-                    
-                    student.managed_by.add(request.user)
-                    created_students.append(student)
+                        is_new = True
+
+                    if student.id not in processed_students_map:
+                        student.managed_by.add(request.user)
+                        processed_students_map[student.id] = {'student': student, 'is_new': is_new}
+
+                created_students = [data['student'] for data in processed_students_map.values()]
+                created_count = sum(1 for data in processed_students_map.values() if data['is_new'])
+                linked_count = len(created_students) - created_count
 
                 through_model = ClassRoom.students.through
                 through_model.objects.bulk_create([

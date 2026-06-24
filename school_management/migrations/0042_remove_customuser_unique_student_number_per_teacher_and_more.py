@@ -4,6 +4,35 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def migrate_managed_by_fk_to_m2m(apps, schema_editor):
+    """
+    Migrates data from the old ForeignKey `managed_by` to the new
+    ManyToManyField `managed_by_new`.
+    """
+    CustomUser = apps.get_model('school_management', 'CustomUser')
+    # At this stage, the model has both the old `managed_by` FK and the new `managed_by_new` M2M field.
+    # We iterate over students who had a teacher assigned.
+    for student in CustomUser.objects.filter(role='student', managed_by__isnull=False):
+        teacher = student.managed_by
+        if teacher:
+            student.managed_by_new.add(teacher)
+
+
+def unmigrate_managed_by_m2m_to_fk(apps, schema_editor):
+    """
+    Reverse operation: migrates data from ManyToManyField `managed_by_new`
+    back to a ForeignKey `managed_by`.
+    Since FK can only hold one relation, it picks the first manager.
+    """
+    CustomUser = apps.get_model('school_management', 'CustomUser')
+    # At this stage on reverse, the model has `managed_by_new` (M2M) and the old `managed_by` (FK) has been recreated.
+    for student in CustomUser.objects.filter(role='student'):
+        first_manager = student.managed_by_new.first()
+        if first_manager:
+            student.managed_by = first_manager
+            student.save(update_fields=['managed_by'])
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -15,13 +44,24 @@ class Migration(migrations.Migration):
             model_name='customuser',
             name='unique_student_number_per_teacher',
         ),
+        migrations.AddField(
+            model_name='customuser',
+            name='managed_by_new',
+            field=models.ManyToManyField(blank=True, related_name='managed_students_new', to=settings.AUTH_USER_MODEL, verbose_name='担当教員'),
+        ),
+        migrations.RunPython(migrate_managed_by_fk_to_m2m, reverse_code=unmigrate_managed_by_m2m_to_fk),
         migrations.RemoveField(
             model_name='customuser',
             name='managed_by',
         ),
-        migrations.AddField(
+        migrations.RenameField(
+            model_name='customuser',
+            old_name='managed_by_new',
+            new_name='managed_by',
+        ),
+        migrations.AlterField(
             model_name='customuser',
             name='managed_by',
-            field=models.ManyToManyField(blank=True, related_name='managed_students', to=settings.AUTH_USER_MODEL, verbose_name='担当教員'),
+            field=models.ManyToManyField(blank=True, limit_choices_to=models.Q(('role__in', ['teacher', 'admin'])), related_name='managed_students', to=settings.AUTH_USER_MODEL, verbose_name='担当教員'),
         ),
     ]

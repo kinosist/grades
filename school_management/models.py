@@ -62,6 +62,7 @@ class CustomUser(AbstractUser):
         'self',
         symmetrical=False,
         blank=True,
+        limit_choices_to=Q(role__in=['teacher', 'admin']),
         verbose_name='担当教員',
         related_name='managed_students'
     )

@@ -204,8 +204,23 @@ def bulk_student_add_csv(request, class_id):
             })
 
         if pending_students:
-            # 重複エラーチェックを削除し、共有機能として動作させる
-            pass
+            emails = [row['email'] for row in pending_students if row['email']]
+
+            # メールアドレスの重複と学籍番号の不一致をチェック
+            existing_email_map = {
+                s.email: s.student_number
+                for s in Student.objects.filter(role='student', email__in=emails)
+            }
+
+            for row in pending_students:
+                email = row['email']
+                student_number = row['student_number']
+                # メールが既存で、学籍番号が異なる場合はエラー
+                if email and email in existing_email_map and existing_email_map[email] != student_number:
+                    errors.append(
+                        f'行{row["line_num"]}: メールアドレス "{email}" は学籍番号 "{existing_email_map[email]}" のアカウントで既に使用されています。'
+                    )
+
         if errors:
             for error in errors[:5]:
                 messages.error(request, error)

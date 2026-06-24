@@ -176,20 +176,27 @@ def class_student_detail_view(request, class_id, student_number):
         peer_total = peer_stats['total']
         
         # テストモード（シミュレーション）の場合はセッションからデータを取得して上書き
-        sim_data_student = request.session.get('peer_sim_points', {}).get(str(classroom.id), {}).get(str(student.id), {})
-        if request.session.get('peer_eval_test_mode') and sim_data_student:
+        sim_data_class = request.session.get('peer_sim_points', {}).get(str(classroom.id), {})
+        if request.session.get('test_mode') and sim_data_class:
             sim_total = 0
             sim_count = 0
-            for session_id, data in sim_data_student.items():
+            for session_id, session_sim in sim_data_class.items():
+                if not isinstance(session_sim, dict):
+                    continue
+                data = session_sim.get(str(student.id))
+                if data is None:
+                    continue
+
                 if isinstance(data, dict):
-                    # For advanced point modes
-                    contrib = float(data.get('contrib', data.get('member', 0)))
-                    group = float(data.get('group_manual', data.get('group', 0)))
+                    # For advanced point modes (manual入力時)
+                    contrib = float(data.get('contrib', data.get('member', 0)) or 0)
+                    group = float(data.get('group_manual', data.get('group', 0)) or 0)
                     sim_total += (contrib + group)
                 else:
                     # Legacy fallback
                     sim_total += float(data)
                 sim_count += 1
+
             if sim_count > 0:
                 # If we have simulation data, we completely replace the DB peer points with the simulated points for those sessions
                 # Note: For simplicity, if test mode is on, we'll just use the simulated total

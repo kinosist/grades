@@ -262,10 +262,12 @@ def student_delete_confirm_view(request, student_number):
         messages.error(request, 'この機能にアクセスする権限がありません。')
         return redirect('school_management:dashboard')
 
-    student = get_object_or_404(CustomUser, student_number=student_number, role='student')
-    
-    # 担当外の学生は削除できないようチェック（必要に応じて）
-    if not student.managed_by.filter(id=request.user.id).exists():
+    student = CustomUser.objects.filter(
+        student_number=student_number,
+        role='student',
+        managed_by=request.user,
+    ).first()
+    if not student:
         messages.error(request, '担当外の学生の削除はできません。')
         return redirect('school_management:student_list')
 

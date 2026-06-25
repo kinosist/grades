@@ -382,14 +382,14 @@
                                                                 </td>
                                                                 {% endif %}
                                                                 
-                                                                    <div class="d-none">
-                                                                        {% if pe_settings.enable_group_evaluation %}
-                                                                        {% for g in row.group_sim_inputs %}
-                                                                        <input type="hidden" class="hidden-group-rank-input" data-student-id="{{ row.student.id }}" data-group-id="{{ group_data.grouper.id|default:'' }}" data-rank="{{ g.rank }}" id="hidden_g_rank_{{ row.student.id }}_{{ g.rank }}" name="sim_group_rank_{{ g.rank }}_{{ row.student.id }}" value="{{ g.val|default_if_none:'' }}">
-                                                                        {% endfor %}
-                                                                        <input type="hidden" id="sim_group_manual_{{ row.student.id }}" name="sim_group_manual_{{ row.student.id }}" value="{{ row.sim_group_manual|default_if_none:'' }}">
-                                                                        {% endif %}
-                                                                    </div>
+                                                                <td class="d-none">
+                                                                    {% if pe_settings.enable_group_evaluation %}
+                                                                    {% for g in row.group_sim_inputs %}
+                                                                    <input type="hidden" class="hidden-group-rank-input" data-student-id="{{ row.student.id }}" data-group-id="{{ group_data.grouper.id|default:'' }}" data-rank="{{ g.rank }}" id="hidden_g_rank_{{ row.student.id }}_{{ g.rank }}" name="sim_group_rank_{{ g.rank }}_{{ row.student.id }}" value="{{ g.val|default_if_none:'' }}">
+                                                                    {% endfor %}
+                                                                    <input type="hidden" id="sim_group_manual_{{ row.student.id }}" name="sim_group_manual_{{ row.student.id }}" value="{{ row.sim_group_manual|default_if_none:'' }}">
+                                                                    {% endif %}
+                                                                </td>
                                                             </tr>
                                                             {% endfor %}
                                                         </tbody>

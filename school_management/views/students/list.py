@@ -86,15 +86,36 @@ def student_bulk_delete_confirm(request):
         return redirect('school_management:dashboard')
 
     student_ids_str = request.POST.get('student_ids', '')
-    if not student_ids_str:
-        messages.error(request, '削除対象の学生が選択されていません。')
-        return redirect('school_management:student_list')
+    select_all_pages = request.POST.get('select_all_pages') == 'true'
+    search_query = request.POST.get('search_query', '')
 
-    try:
-        student_ids = [int(sid.strip()) for sid in student_ids_str.split(',') if sid.strip()]
-    except ValueError:
-        messages.error(request, '無効な学生IDです。')
-        return redirect('school_management:student_list')
+    if select_all_pages:
+        try:
+            students_qs = Student.objects.filter(
+                role='student',
+                student_number__gt='',
+                managed_by=request.user
+            )
+            if search_query:
+                students_qs = students_qs.filter(
+                    Q(student_number__icontains=search_query) |
+                    Q(full_name__icontains=search_query)
+                )
+            student_ids = list(students_qs.values_list('id', flat=True))
+            student_ids_str = ','.join(map(str, student_ids))
+        except OperationalError:
+            messages.error(request, 'データベースの構造が最新ではありません。マイグレーションを実行してください。')
+            return redirect('school_management:student_list')
+    else:
+        if not student_ids_str:
+            messages.error(request, '削除対象の学生が選択されていません。')
+            return redirect('school_management:student_list')
+
+        try:
+            student_ids = [int(sid.strip()) for sid in student_ids_str.split(',') if sid.strip()]
+        except ValueError:
+            messages.error(request, '無効な学生IDです。')
+            return redirect('school_management:student_list')
 
     # 削除対象の学生を取得
     students_to_delete = Student.objects.filter(

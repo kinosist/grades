@@ -39,6 +39,8 @@ class EvaluationCalculationTests(TestCase):
         )
         self.classroom.teachers.add(self.teacher)
         self.classroom.students.add(self.student)
+        self.student.managed_by.add(self.teacher)
+        
         
         # Create session
         self.session = LessonSession.objects.create(

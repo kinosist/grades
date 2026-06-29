@@ -1,11 +1,17 @@
 {% extends 'school_management/base.html' %}
 
-{% block title %}学生登録 - 学校管理システム{% endblock %}
-{% block page_title %}学生登録{% endblock %}
+{% block title %}学生{% if classroom %}追加{% else %}登録{% endif %} - 学校管理システム{% endblock %}
+{% block page_title %}学生{% if classroom %}追加{% else %}登録{% endif %}{% endblock %}
 
 {% block breadcrumbs %}
+{% if classroom %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">学生追加</li>
+{% else %}
 <li class="breadcrumb-item"><a href="{% url 'school_management:student_list' %}">学生管理</a></li>
 <li class="breadcrumb-item active" aria-current="page">学生登録</li>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -17,7 +23,7 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5><i class="fas fa-user-plus me-2"></i>学生登録</h5>
+                <h5><i class="fas fa-user-plus me-2"></i>学生{% if classroom %}追加{% else %}登録{% endif %}</h5>
                 <ul class="nav nav-tabs card-header-tabs" id="registrationTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="single-tab" data-bs-toggle="tab" data-bs-target="#single" 
@@ -39,6 +45,9 @@
                         <form method="post" action="{% url 'school_management:student_create' %}">
                             {% csrf_token %}
                             <input type="hidden" name="registration_type" value="single">
+                            {% if classroom %}
+                            <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
+                            {% endif %}
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
@@ -86,7 +95,7 @@
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-save me-2"></i>学生を登録
                                 </button>
-                                <a href="{% url 'school_management:student_list' %}" class="btn btn-secondary">
+                                <a href="{% if classroom %}{% url 'school_management:class_detail' classroom.id %}{% else %}{% url 'school_management:student_list' %}{% endif %}" class="btn btn-secondary">
                                     <i class="fas fa-arrow-left me-2"></i>キャンセル
                                 </a>
                             </div>
@@ -97,6 +106,9 @@
                         <form method="post" action="{% url 'school_management:student_create' %}">
                             {% csrf_token %}
                             <input type="hidden" name="registration_type" value="bulk">
+                            {% if classroom %}
+                            <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
+                            {% endif %}
                             
                             <div class="alert alert-info mb-4">
                                 <h6><i class="fas fa-info-circle me-2"></i>一括登録の形式</h6>
@@ -292,6 +304,17 @@ function processCSVText(text, filename) {
     csvFileInput.value = '';
     
     textarea.focus();
+}
+
+// URLのクエリパラメータをチェックして、tab=bulkがあれば一括登録タブを表示する
+const urlParams = new URLSearchParams(window.location.search);
+const tabParam = urlParams.get('tab');
+if (tabParam === 'bulk') {
+    const bulkTabBtn = document.getElementById('bulk-tab');
+    if (bulkTabBtn) {
+        const tab = new bootstrap.Tab(bulkTabBtn);
+        tab.show();
+    }
 }
 </script>
 {% endblock %}

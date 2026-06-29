@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.views.decorators.http import require_POST
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Count
+from django.urls import reverse
 from ...models import ClassRoom, CustomUser, Student, StudentClassPoints
 
 
@@ -38,7 +39,7 @@ def bulk_student_add(request, class_id):
             
             if added_count > 0:
                 messages.success(request, f'{added_count}人の学生をクラスに追加しました。')
-                return redirect('school_management:class_detail', class_id=class_id)
+                return redirect(f"{reverse('school_management:class_detail', args=[class_id])}?active_tab=students")
             else:
                 messages.warning(request, '追加された学生はいませんでした。')
     
@@ -104,7 +105,7 @@ def copy_students_from_class(request, class_id, source_class_id):
 
     if target_class.id == source_class.id:
         messages.error(request, '同じクラスからはコピーできません。')
-        return redirect('school_management:class_detail', class_id=class_id)
+        return redirect(f"{reverse('school_management:class_detail', args=[class_id])}?active_tab=students")
 
     source_students = source_class.students.all()
     target_student_ids = set(target_class.students.values_list('id', flat=True))
@@ -133,14 +134,14 @@ def copy_students_from_class(request, class_id, source_class_id):
                 ], ignore_conflicts=True)
         except Exception as e:
             messages.error(request, f'学生のコピー中にエラーが発生しました: {e}')
-            return redirect('school_management:class_detail', class_id=class_id)
+            return redirect(f"{reverse('school_management:class_detail', args=[class_id])}?active_tab=students")
 
     if added_count > 0:
         messages.success(request, f'「{source_class.class_name}」から{added_count}人の学生をコピーしました。')
     else:
         messages.info(request, '追加する新しい学生はいませんでした（全員既に所属しています）。')
 
-    return redirect('school_management:class_detail', class_id=class_id)
+    return redirect(f"{reverse('school_management:class_detail', args=[class_id])}?active_tab=students")
 
 
 @login_required
@@ -296,7 +297,7 @@ def bulk_student_add_csv(request, class_id):
             return render(request, 'school_management/bulk_student_add.html', {'classroom': classroom})
         
         messages.success(request, f'合計 {len(created_students)}名の学生をクラスに追加しました。（新規作成: {created_count}名, 既存共有: {linked_count}名）')
-        return redirect('school_management:class_detail', class_id=class_id)
+        return redirect(f"{reverse('school_management:class_detail', args=[class_id])}?active_tab=students")
     
     context = {
         'classroom': classroom,

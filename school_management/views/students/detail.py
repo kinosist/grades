@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from django.contrib import messages
 from django.db.models import Avg
 from ...models import (
@@ -135,7 +136,7 @@ def class_student_detail_view(request, class_id, student_number):
     # 学生がこのクラスに所属しているかチェック
     if not classroom.students.filter(student_number=student_number).exists():
         messages.error(request, 'この学生は指定されたクラスに所属していません。')
-        return redirect('school_management:class_detail', class_id=class_id)
+        return redirect(f"{reverse('school_management:class_detail', args=[class_id])}?active_tab=students")
     
     # クラス内での学生の成績やアクティビティを取得
     class_sessions = LessonSession.objects.filter(classroom=classroom).order_by('-date')

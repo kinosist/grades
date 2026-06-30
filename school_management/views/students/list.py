@@ -88,6 +88,7 @@ def student_bulk_delete_confirm(request):
     student_ids_str = request.POST.get('student_ids', '')
     select_all_pages = request.POST.get('select_all_pages') == 'true'
     search_query = request.POST.get('search_query', '')
+    deselected_ids_str = request.POST.get('deselected_student_ids', '')
 
     if select_all_pages:
         try:
@@ -101,6 +102,9 @@ def student_bulk_delete_confirm(request):
                     Q(student_number__icontains=search_query) |
                     Q(full_name__icontains=search_query)
                 )
+            if deselected_ids_str:
+                deselected_ids = [int(x.strip()) for x in deselected_ids_str.split(',') if x.strip()]
+                students_qs = students_qs.exclude(id__in=deselected_ids)
             student_ids = list(students_qs.values_list('id', flat=True))
             student_ids_str = ','.join(map(str, student_ids))
         except OperationalError:

@@ -117,6 +117,7 @@
     {% csrf_token %}
     <input type="hidden" name="student_ids" id="student-ids-input" value="">
     <input type="hidden" name="select_all_pages" id="select-all-pages-input" value="false">
+    <input type="hidden" name="deselected_student_ids" id="deselected-student-ids-input" value="">
     <input type="hidden" name="search_query" value="{{ search_query }}">
 </form>
 
@@ -137,7 +138,7 @@
                     </div>
                 </div>
 
-                <form method="get" class="mb-5">
+                <form method="get" class="mb-5" onsubmit="clearSelectionState()">
                     <div class="input-group input-group-lg search-input-group">
                         <span class="input-group-text ps-3">
                             <i class="fas fa-search"></i>
@@ -305,6 +306,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectAllCheckbox = document.getElementById('select-all-checkbox');
     const studentCheckboxes = document.querySelectorAll('.student-checkbox');
     const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+    const clearAllPagesLink = document.getElementById('clear-all-pages-link');
+    const filteredCount = parseInt("{{ students_page.paginator.count }}");
 
     // 行をクリックしてページ移動
     rows.forEach(row => {
@@ -315,9 +318,68 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    let selectAllPages = false;
-    const allPagesSelectedBanner = document.getElementById('all-pages-selected-banner');
-    const clearAllPagesLink = document.getElementById('clear-all-pages-link');
+    // 初期起動時およびページ遷移時の選択状態復元
+    restoreCheckboxes();
+    updateBulkDeleteButton();
+
+    function clearSelectionState() {
+        sessionStorage.removeItem('teacher_student_sel_all');
+        sessionStorage.removeItem('teacher_student_selected_ids');
+        sessionStorage.removeItem('teacher_student_deselected_ids');
+    }
+    // 外部から呼べるようにwindowオブジェクトに登録
+    window.clearSelectionState = clearSelectionState;
+
+    function restoreCheckboxes() {
+        const selectAllActive = sessionStorage.getItem('teacher_student_sel_all') === 'true';
+        const selectedIds = JSON.parse(sessionStorage.getItem('teacher_student_selected_ids') || '[]');
+        const deselectedIds = JSON.parse(sessionStorage.getItem('teacher_student_deselected_ids') || '[]');
+        
+        const checkboxes = document.querySelectorAll('.student-checkbox');
+        const selectAllCb = document.getElementById('select-all-checkbox');
+        const allPagesSelectedBanner = document.getElementById('all-pages-selected-banner');
+        
+        let checkedCount = 0;
+        checkboxes.forEach(cb => {
+            const id = cb.value;
+            if (selectAllActive) {
+                if (deselectedIds.includes(id)) {
+                    cb.checked = false;
+                } else {
+                    cb.checked = true;
+                    checkedCount++;
+                }
+            } else {
+                if (selectedIds.includes(id)) {
+                    cb.checked = true;
+                    checkedCount++;
+                } else {
+                    cb.checked = false;
+                }
+            }
+        });
+        
+        if (selectAllCb) {
+            if (selectAllActive) {
+                selectAllCb.checked = (checkedCount === checkboxes.length);
+            } else {
+                selectAllCb.checked = (checkedCount === checkboxes.length && checkboxes.length > 0);
+            }
+        }
+        
+        if (allPagesSelectedBanner) {
+            if (selectAllActive) {
+                allPagesSelectedBanner.style.display = 'flex';
+                const span = allPagesSelectedBanner.querySelector('span');
+                if (span) {
+                    const totalSelected = filteredCount - deselectedIds.length;
+                    span.innerText = `全 ${filteredCount} 名のうち ${totalSelected} 名の学生を選択しました。`;
+                }
+            } else {
+                allPagesSelectedBanner.style.display = 'none';
+            }
+        }
+    }
 
     // 全選択チェックボックス
     if (selectAllCheckbox) {
@@ -326,14 +388,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 checkbox.checked = this.checked;
             });
             
-            // ページネーションをまたぐ全選択バナーの制御 (強制的に全選択)
             if (this.checked) {
-                selectAllPages = true;
-                if (allPagesSelectedBanner) allPagesSelectedBanner.style.display = 'flex';
+                sessionStorage.setItem('teacher_student_sel_all', 'true');
+                sessionStorage.setItem('teacher_student_selected_ids', '[]');
+                sessionStorage.setItem('teacher_student_deselected_ids', '[]');
             } else {
-                selectAllPages = false;
-                if (allPagesSelectedBanner) allPagesSelectedBanner.style.display = 'none';
+                sessionStorage.setItem('teacher_student_sel_all', 'false');
+                sessionStorage.setItem('teacher_student_selected_ids', '[]');
+                sessionStorage.setItem('teacher_student_deselected_ids', '[]');
             }
+            restoreCheckboxes();
             updateBulkDeleteButton();
         });
     }
@@ -342,7 +406,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (clearAllPagesLink) {
         clearAllPagesLink.addEventListener('click', function(e) {
             e.preventDefault();
-            selectAllPages = false;
+            sessionStorage.setItem('teacher_student_sel_all', 'false');
+            sessionStorage.setItem('teacher_student_selected_ids', '[]');
+            sessionStorage.setItem('teacher_student_deselected_ids', '[]');
+            
             if (selectAllCheckbox) {
                 selectAllCheckbox.checked = false;
                 selectAllCheckbox.indeterminate = false;
@@ -350,7 +417,7 @@ document.addEventListener('DOMContentLoaded', function() {
             studentCheckboxes.forEach(checkbox => {
                 checkbox.checked = false;
             });
-            if (allPagesSelectedBanner) allPagesSelectedBanner.style.display = 'none';
+            restoreCheckboxes();
             updateBulkDeleteButton();
         });
     }
@@ -358,45 +425,84 @@ document.addEventListener('DOMContentLoaded', function() {
     // 個別チェックボックス
     studentCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
-            // 全選択チェックボックスの状態を更新
-            const allChecked = Array.from(studentCheckboxes).every(cb => cb.checked);
-            const someChecked = Array.from(studentCheckboxes).some(cb => cb.checked);
+            const selectAllActive = sessionStorage.getItem('teacher_student_sel_all') === 'true';
+            let selectedIds = JSON.parse(sessionStorage.getItem('teacher_student_selected_ids') || '[]');
+            let deselectedIds = JSON.parse(sessionStorage.getItem('teacher_student_deselected_ids') || '[]');
+            const id = this.value;
             
-            // 一部でも選択が解除されたら全ページ選択フラグは解除
-            if (!this.checked) {
-                selectAllPages = false;
-                if (allPagesSelectedBanner) allPagesSelectedBanner.style.display = 'none';
-            }
-
-            if (selectAllCheckbox) {
-                selectAllCheckbox.checked = allChecked;
-                selectAllCheckbox.indeterminate = someChecked && !allChecked;
-                
-                // 画面上の全チェックボックスを手動でチェックした場合も全選択扱いとする
-                if (allChecked) {
-                    selectAllPages = true;
-                    if (allPagesSelectedBanner) allPagesSelectedBanner.style.display = 'flex';
+            if (selectAllActive) {
+                if (this.checked) {
+                    deselectedIds = deselectedIds.filter(x => x !== id);
+                } else {
+                    if (!deselectedIds.includes(id)) {
+                        deselectedIds.push(id);
+                    }
+                }
+            } else {
+                if (this.checked) {
+                    if (!selectedIds.includes(id)) {
+                        selectedIds.push(id);
+                    }
+                } else {
+                    selectedIds = selectedIds.filter(x => x !== id);
                 }
             }
+            
+            sessionStorage.setItem('teacher_student_selected_ids', JSON.stringify(selectedIds));
+            sessionStorage.setItem('teacher_student_deselected_ids', JSON.stringify(deselectedIds));
+            
+            // 全選択チェックボックスの表示状態更新
+            const checkboxes = document.querySelectorAll('.student-checkbox');
+            let checkedCount = 0;
+            checkboxes.forEach(cb => {
+                if (cb.checked) checkedCount++;
+            });
+            
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = (checkedCount === checkboxes.length);
+                selectAllCheckbox.indeterminate = (checkedCount > 0 && checkedCount < checkboxes.length);
+            }
+            
+            restoreCheckboxes();
             updateBulkDeleteButton();
         });
     });
 
     // 一括操作ボタンの表示/非表示を切り替え
     function updateBulkDeleteButton() {
-        const checkedCount = Array.from(studentCheckboxes).filter(cb => cb.checked).length;
+        const selectAllActive = sessionStorage.getItem('teacher_student_sel_all') === 'true';
+        const selectedIds = JSON.parse(sessionStorage.getItem('teacher_student_selected_ids') || '[]');
+        const deselectedIds = JSON.parse(sessionStorage.getItem('teacher_student_deselected_ids') || '[]');
+        
+        let totalCount = 0;
+        if (selectAllActive) {
+            totalCount = filteredCount - deselectedIds.length;
+            if (totalCount < 0) totalCount = 0;
+        } else {
+            totalCount = selectedIds.length;
+        }
+        
         if (bulkDeleteBtn) {
-            bulkDeleteBtn.style.display = (checkedCount > 0 || selectAllPages) ? 'block' : 'none';
+            bulkDeleteBtn.style.display = (totalCount > 0) ? 'block' : 'none';
+            bulkDeleteBtn.innerHTML = `<i class="fas fa-cogs me-2"></i>削除・解除の選択画面へ (${totalCount}名)`;
         }
     }
 
-    // (CSRF cookie helper removed: not used)
-    
     // 一括削除ボタンクリック
     if (bulkDeleteBtn) {
         bulkDeleteBtn.addEventListener('click', function() {
-            const checkedStudents = Array.from(studentCheckboxes).filter(cb => cb.checked);
-            if (checkedStudents.length === 0 && !selectAllPages) {
+            const selectAllActive = sessionStorage.getItem('teacher_student_sel_all') === 'true';
+            const selectedIds = JSON.parse(sessionStorage.getItem('teacher_student_selected_ids') || '[]');
+            const deselectedIds = JSON.parse(sessionStorage.getItem('teacher_student_deselected_ids') || '[]');
+            
+            let count = 0;
+            if (selectAllActive) {
+                count = filteredCount - deselectedIds.length;
+            } else {
+                count = selectedIds.length;
+            }
+            
+            if (count === 0) {
                 alert('学生を選択してください。');
                 return;
             }
@@ -404,11 +510,18 @@ document.addEventListener('DOMContentLoaded', function() {
             // 隠しフォームに学生 ID を設定して提出
             const bulkDeleteForm = document.getElementById('bulk-delete-form');
             if (bulkDeleteForm) {
-                document.getElementById('select-all-pages-input').value = selectAllPages ? 'true' : 'false';
+                document.getElementById('select-all-pages-input').value = selectAllActive ? 'true' : 'false';
                 
-                // 選択された学生情報を集める
-                const studentIds = selectAllPages ? '' : checkedStudents.map(cb => cb.value).join(',');
-                document.getElementById('student-ids-input').value = studentIds;
+                if (selectAllActive) {
+                    document.getElementById('deselected-student-ids-input').value = deselectedIds.join(',');
+                    document.getElementById('student-ids-input').value = '';
+                } else {
+                    document.getElementById('deselected-student-ids-input').value = '';
+                    document.getElementById('student-ids-input').value = selectedIds.join(',');
+                }
+                
+                // 選択状態をリセット
+                clearSelectionState();
                 
                 bulkDeleteForm.submit();
             }

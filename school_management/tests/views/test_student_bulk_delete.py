@@ -77,3 +77,26 @@ class StudentBulkDeleteTest(TestCase):
         self.assertEqual(len(returned_ids), 9)
         expected_ids = [s.id for s in self.students[:9]]
         self.assertEqual(set(returned_ids), set(expected_ids))
+
+    def test_bulk_delete_confirm_select_all_pages_with_exclusions(self):
+        # Select all pages, but exclude student 1 and student 2 (first 2 students)
+        deselected_ids = [self.students[0].id, self.students[1].id]
+        deselected_ids_str = ','.join(map(str, deselected_ids))
+        
+        response = self.client.post(
+            reverse('school_management:student_bulk_delete_confirm'),
+            {
+                'student_ids': '',
+                'select_all_pages': 'true',
+                'search_query': '',
+                'deselected_student_ids': deselected_ids_str
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        # 35 total - 2 excluded = 33
+        self.assertEqual(response.context['total_count'], 33)
+        
+        returned_ids = [int(sid) for sid in response.context['student_ids'].split(',')]
+        self.assertEqual(len(returned_ids), 33)
+        self.assertNotIn(self.students[0].id, returned_ids)
+        self.assertNotIn(self.students[1].id, returned_ids)

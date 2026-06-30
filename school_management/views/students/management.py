@@ -18,7 +18,8 @@ def student_edit_view(request, student_number):
         messages.error(request, 'この機能にアクセスする権限がありません。')
         return redirect('school_management:dashboard')
 
-    student = get_object_or_404(CustomUser, student_number=student_number, role='student')
+    cleaned_student_number = Student.clean_student_number(student_number)
+    student = get_object_or_404(CustomUser, student_number=cleaned_student_number, role='student')
 
     csrf_token = get_token(request)
     
@@ -27,20 +28,27 @@ def student_edit_view(request, student_number):
         full_name = request.POST.get('full_name')
         furigana = request.POST.get('furigana')
         email = request.POST.get('email')
-        # points = request.POST.get('points')
         
         # バリデーション
         if not full_name or not furigana:
             messages.error(request, '氏名とふりがなは必須項目です。')
         else:
             try:
+                # メールアドレスの正規化と重複チェック
+                cleaned_email = Student.clean_email(email)
+                if cleaned_email:
+                    other_student = Student.objects.filter(role='student', email=cleaned_email).exclude(id=student.id).first()
+                    if other_student:
+                        messages.error(request, f'メールアドレス "{cleaned_email}" は、既に別の学生（学籍番号: {other_student.student_number}）に使用されています。')
+                        return render(request, 'school_management/student_edit.html', {
+                            'student': student,
+                            'csrf_token': csrf_token,
+                        })
+
                 # 学生情報を更新
                 student.full_name = full_name
                 student.furigana = furigana
-                student.email = email or ''
-                
-                # ポイントはクラス単位で管理するため、ここでは更新しない
-                # クラス詳細画面から各クラスのポイントを個別に更新する
+                student.email = cleaned_email
                 
                 student.save()
                 messages.success(request, f'{student.full_name}さんの情報を更新しました。')
@@ -104,7 +112,10 @@ def student_create_view(request):
                 full_name = parts[1]
                 furigana = parts[2]
                 email = parts[3] if len(parts) > 3 and parts[3].strip() else None
-                normalized_email = Student.objects.normalize_email(email) if email else None
+
+                # 正規化
+                student_number = Student.clean_student_number(student_number)
+                email = Student.clean_email(email)
 
                 if not student_number or not full_name or not furigana:
                     errors.append(f'行{line_num}: 学籍番号・氏名・ふりがなは必須です')
@@ -118,70 +129,65 @@ def student_create_view(request):
                     continue
                 seen_student_numbers[student_number] = line_num
 
-                if normalized_email:
-                    seen_email_data = seen_emails.get(normalized_email)
+                if email:
+                    seen_email_data = seen_emails.get(email)
                     if seen_email_data:
                         seen_student_number, seen_line_num = seen_email_data
                         if seen_student_number != student_number:
                             errors.append(
-                                f'行{line_num}: メールアドレス "{normalized_email}" が入力内で学籍番号の異なる学生（行{seen_line_num}）に使われています。'
+                                f'行{line_num}: メールアドレス "{email}" が入力内で学籍番号の異なる学生（行{seen_line_num}）に使われています。'
                             )
                             continue
-                    seen_emails[normalized_email] = (student_number, line_num)
+                    seen_emails[email] = (student_number, line_num)
 
                 pending_students.append({
                     'line_num': line_num,
                     'student_number': student_number,
                     'full_name': full_name,
                     'furigana': furigana,
-                    'email': normalized_email,
+                    'email': email,
                 })
 
             if pending_students:
-                student_numbers = [row['student_number'] for row in pending_students]
-                emails = [row['email'] for row in pending_students if row['email']]
-
-                # メールアドレスの重複と学籍番号の不一致をチェック
-                from collections import defaultdict
-                existing_email_to_numbers = defaultdict(list)
-                for s in Student.objects.filter(role='student', email__in=emails):
-                    existing_email_to_numbers[s.email].append(s.student_number)
-
-                if classroom:
-                    # クラス登録の場合：既にクラスに所属している学生のチェック
-                    existing_classroom_student_numbers = set(
-                        classroom.students.filter(student_number__in=student_numbers).values_list('student_number', flat=True)
-                    )
-                else:
-                    existing_classroom_student_numbers = set()
-                    # 通常登録の場合：既にこの教員の管理下にあるかチェック
-                    existing_student_numbers = set(
-                        Student.objects.filter(
-                            role='student',
-                            student_number__in=student_numbers,
-                            managed_by=request.user,
-                        ).values_list('student_number', flat=True)
-                    )
-
+                # DB全体での重複・不整合チェック
                 for row in pending_students:
-                    if classroom:
-                        if row['student_number'] in existing_classroom_student_numbers:
-                            errors.append(
-                                f'行{row["line_num"]}: 学籍番号 "{row["student_number"]}" は既にこのクラスに登録されています'
-                            )
-                    else:
-                        if row['student_number'] in existing_student_numbers:
-                            errors.append(
-                                f'行{row["line_num"]}: 学籍番号 "{row["student_number"]}" は既に登録されています'
-                            )
-                    
-                    email = row['email']
-                    student_number = row['student_number']
-                    # メールが既存で、かつ入力された学籍番号と紐づいていない場合はエラー
-                    if email and email in existing_email_to_numbers and student_number not in existing_email_to_numbers[email]:
+                    sn = row['student_number']
+                    em = row['email']
+                    line_num = row['line_num']
+
+                    student_by_number = Student.objects.filter(role='student', student_number=sn).first()
+                    student_by_email = Student.objects.filter(role='student', email=em).first() if em else None
+
+                    # パターンC: 不整合エラー
+                    if student_by_number and student_by_email and student_by_number.id != student_by_email.id:
                         errors.append(
-                            f'行{row["line_num"]}: メールアドレス "{email}" は別の学籍番号（例: "{existing_email_to_numbers[email][0]}"）のアカウントで既に使用されています。'
+                            f'行{line_num}: 学籍番号 "{sn}" とメールアドレス "{em}" は、それぞれ別の既存の学生に使用されています。'
                         )
+                    elif student_by_number and em and student_by_number.email != em:
+                        errors.append(
+                            f'行{line_num}: 学籍番号 "{sn}" は既に別のメールアドレス（例: "{student_by_number.email or "登録なし"}"）で登録されています。'
+                        )
+                    elif student_by_email and student_by_email.student_number != sn:
+                        errors.append(
+                            f'行{line_num}: メールアドレス "{em}" は既に別の学籍番号（例: "{student_by_email.student_number}"）で登録されています。'
+                        )
+                    else:
+                        # エラーがない場合、既存の紐付け重複をチェック
+                        existing_student = student_by_number or student_by_email
+                        if existing_student:
+                            if classroom:
+                                if classroom.students.filter(id=existing_student.id).exists():
+                                    errors.append(
+                                        f'行{line_num}: 学生 "{existing_student.full_name}"（学籍番号: {sn}）は既にこのクラスに登録されています'
+                                    )
+                            else:
+                                if existing_student.managed_by.filter(id=request.user.id).exists():
+                                    errors.append(
+                                        f'行{line_num}: 学籍番号 "{sn}" は既にあなたの管理下に登録されています'
+                                    )
+                            row['existing_student'] = existing_student
+                        else:
+                            row['existing_student'] = None
 
             if errors:
                 for error in errors[:10]:
@@ -203,19 +209,9 @@ def student_create_view(request):
                         student_number = row['student_number']
                         full_name = row['full_name']
                         furigana = row['furigana']
+                        existing_student = row.get('existing_student')
                         
-                        student = None
-                        if email:
-                            student = Student.objects.filter(
-                                email=email, student_number=student_number, role='student'
-                            ).first()
-                        else:
-                            student = Student.objects.filter(
-                                student_number=student_number, role='student'
-                            ).first()
-                        
-                        is_new = False
-                        if not student:
+                        if not existing_student:
                             default_password = f"student_{student_number}"
                             student = Student.objects.create_user(
                                 email=email,
@@ -226,18 +222,15 @@ def student_create_view(request):
                                 role='student'
                             )
                             created_count += 1
-                            is_new = True
                         else:
-                            # 既存学生でかつふりがながない場合は更新
+                            student = existing_student
                             if not student.furigana and furigana:
                                 student.furigana = furigana
                                 student.save(update_fields=['furigana'])
                             linked_count += 1
                             
-                        # ManyToMany のため、add で担当教員として紐づける
                         student.managed_by.add(request.user)
 
-                        # クラス登録の場合は、クラスにも紐づけてポイントレコードを作成
                         if classroom:
                             classroom.students.add(student)
                             from school_management.models import StudentClassPoints
@@ -276,50 +269,55 @@ def student_create_view(request):
             email = request.POST.get('email')
             
             if student_number and full_name and furigana:
-                # メールアドレスを空文字列の場合はNoneに変換
-                email = email.strip() if email and email.strip() else None
+                # 正規化
+                student_number = Student.clean_student_number(student_number)
+                email = Student.clean_email(email)
                 
                 try:
-                    # 重複チェックの分岐
-                    if classroom:
-                        # クラス登録の場合：既にそのクラスに登録されているかチェック
-                        if classroom.students.filter(student_number=student_number).exists():
-                            messages.error(request, f'学籍番号 "{student_number}" の学生は既にこのクラスに登録されています。')
-                            return render(request, 'school_management/student_create.html', {
-                                'csrf_token': csrf_token,
-                                'classroom': classroom
-                            })
-                    else:
-                        # 通常登録の場合：ログイン教員の管理下に既に登録されているかチェック
-                        if Student.objects.filter(student_number=student_number, managed_by=request.user).exists():
-                            messages.error(request, f'学籍番号 "{student_number}" は既にあなたの管理下に登録されています。')
-                            return render(request, 'school_management/student_create.html', {
-                                'csrf_token': csrf_token,
-                                'classroom': classroom
-                            })
+                    # DBから学籍番号およびメールで検索
+                    student_by_number = Student.objects.filter(role='student', student_number=student_number).first()
+                    student_by_email = Student.objects.filter(role='student', email=email).first() if email else None
                     
-                    student = None
-                    if email:
-                        # メールが一致する学生を検索
-                        same_email_qs = Student.objects.filter(email=email, role='student')
-                        # 学籍番号も一致する学生を探す (これが本来紐づくべき学生)
-                        student = same_email_qs.filter(student_number=student_number).first()
-
-                        # もし見つからず、かつ同じメールで学籍番号が異なる学生が存在する場合
-                        if student is None and same_email_qs.exclude(student_number=student_number).exists():
-                            # エラーとして処理
-                            existing_sn = same_email_qs.exclude(student_number=student_number).values_list('student_number', flat=True).first()
-                            messages.error(request, f'メールアドレス "{email}" は学籍番号 "{existing_sn}" のアカウントで既に使用されています。')
-                            return render(request, 'school_management/student_create.html', {
-                                'csrf_token': csrf_token,
-                                'classroom': classroom
-                            })
-                    else:
-                        # メールがない場合、学籍番号だけで既存学生を探す
-                        student = Student.objects.filter(student_number=student_number, role='student').first()
+                    # パターンC: 不整合エラー
+                    if student_by_number and student_by_email and student_by_number.id != student_by_email.id:
+                        messages.error(request, f'学籍番号 "{student_number}" とメールアドレス "{email}" は、それぞれ別の既存の学生に使用されています。')
+                        return render(request, 'school_management/student_create.html', {
+                            'csrf_token': csrf_token,
+                            'classroom': classroom
+                        })
+                    elif student_by_number and email and student_by_number.email != email:
+                        messages.error(request, f'学籍番号 "{student_number}" は既に別のメールアドレス（例: "{student_by_number.email or "登録なし"}"）で登録されています。')
+                        return render(request, 'school_management/student_create.html', {
+                            'csrf_token': csrf_token,
+                            'classroom': classroom
+                        })
+                    elif student_by_email and student_by_email.student_number != student_number:
+                        messages.error(request, f'メールアドレス "{email}" は既に別の学籍番号（例: "{student_by_email.student_number}"）で登録されています。')
+                        return render(request, 'school_management/student_create.html', {
+                            'csrf_token': csrf_token,
+                            'classroom': classroom
+                        })
+                    
+                    # 既存のアカウント重複チェック
+                    existing_student = student_by_number or student_by_email
+                    if existing_student:
+                        if classroom:
+                            if classroom.students.filter(id=existing_student.id).exists():
+                                messages.error(request, f'学生 "{existing_student.full_name}"（学籍番号: {student_number}）は既にこのクラスに登録されています。')
+                                return render(request, 'school_management/student_create.html', {
+                                    'csrf_token': csrf_token,
+                                    'classroom': classroom
+                                })
+                        else:
+                            if existing_student.managed_by.filter(id=request.user.id).exists():
+                                messages.error(request, f'学籍番号 "{student_number}" は既にあなたの管理下に登録されています。')
+                                return render(request, 'school_management/student_create.html', {
+                                    'csrf_token': csrf_token,
+                                    'classroom': classroom
+                                })
                     
                     is_new = False
-                    if not student:
+                    if not existing_student:
                         # 学生新規作成
                         default_password = f"student_{student_number}"
                         student = Student.objects.create_user(
@@ -332,7 +330,7 @@ def student_create_view(request):
                         )
                         is_new = True
                     else:
-                        # 既存の学生で、ふりがながなければ補完
+                        student = existing_student
                         if not student.furigana and furigana:
                             student.furigana = furigana
                             student.save(update_fields=['furigana'])

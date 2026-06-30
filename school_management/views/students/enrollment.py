@@ -174,10 +174,9 @@ def bulk_student_add_csv(request, class_id):
                 errors.append(f'行{line_num}: 形式が正しくありません - {line}')
                 continue
             
-            student_number = parts[0].strip()
+            student_number = CustomUser.clean_student_number(parts[0])
             full_name = parts[1].strip() if len(parts) > 1 else ""
-            email = parts[2].strip() if len(parts) > 2 and parts[2].strip() else None
-            normalized_email = Student.objects.normalize_email(email) if email else None
+            email = CustomUser.clean_email(parts[2]) if len(parts) > 2 else None
 
             if not student_number:
                 errors.append(f'行{line_num}: 学生番号が入力されていません')
@@ -196,41 +195,58 @@ def bulk_student_add_csv(request, class_id):
                 continue
             seen_student_numbers[student_number] = line_num
 
-            if normalized_email:
-                seen_email_data = seen_emails.get(normalized_email)
+            if email:
+                seen_email_data = seen_emails.get(email)
                 if seen_email_data:
                     seen_student_number, seen_line_num = seen_email_data
                     if seen_student_number != student_number:
                         errors.append(
-                            f'行{line_num}: メールアドレス "{normalized_email}" が入力内で学籍番号の異なる学生（行{seen_line_num}）に使われています。'
+                            f'行{line_num}: メールアドレス "{email}" が入力内で学籍番号の異なる学生（行{seen_line_num}）に使われています。'
                         )
                         continue
-                seen_emails[normalized_email] = (student_number, line_num)
+                seen_emails[email] = (student_number, line_num)
 
             pending_students.append({
                 'line_num': line_num,
                 'student_number': student_number,
                 'full_name': full_name,
-                'email': normalized_email,
+                'email': email,
             })
 
         if pending_students:
-            emails = [row['email'] for row in pending_students if row['email']]
-
-            # メールアドレスの重複と学籍番号の不一致をチェック
-            from collections import defaultdict
-            existing_email_to_numbers = defaultdict(list)
-            for s in Student.objects.filter(role='student', email__in=emails):
-                existing_email_to_numbers[s.email].append(s.student_number)
-
+            # DB全体での重複・不整合チェック
             for row in pending_students:
-                email = row['email']
-                student_number = row['student_number']
-                # メールが既存で、かつ入力された学籍番号と紐づいていない場合はエラー
-                if email and email in existing_email_to_numbers and student_number not in existing_email_to_numbers[email]:
+                sn = row['student_number']
+                em = row['email']
+                line_num = row['line_num']
+
+                student_by_number = Student.objects.filter(role='student', student_number=sn).first()
+                student_by_email = Student.objects.filter(role='student', email=em).first() if em else None
+
+                # パターンC: 不整合エラー
+                if student_by_number and student_by_email and student_by_number.id != student_by_email.id:
                     errors.append(
-                        f'行{row["line_num"]}: メールアドレス "{email}" は別の学籍番号（例: "{existing_email_to_numbers[email][0]}"）のアカウントで既に使用されています。'
+                        f'行{line_num}: 学籍番号 "{sn}" とメールアドレス "{em}" は、それぞれ別の既存の学生に使用されています。'
                     )
+                elif student_by_number and em and student_by_number.email != em:
+                    errors.append(
+                        f'行{line_num}: 学籍番号 "{sn}" は既に別のメールアドレス（例: "{student_by_number.email or "登録なし"}"）で登録されています。'
+                    )
+                elif student_by_email and student_by_email.student_number != sn:
+                    errors.append(
+                        f'行{line_num}: メールアドレス "{em}" は既に別の学籍番号（例: "{student_by_email.student_number}"）で登録されています。'
+                    )
+                else:
+                    # エラーがない場合、既存アカウントの重複チェック
+                    existing_student = student_by_number or student_by_email
+                    if existing_student:
+                        if classroom.students.filter(id=existing_student.id).exists():
+                            errors.append(
+                                f'行{line_num}: 学生 "{existing_student.full_name}"（学籍番号: {sn}）は既にこのクラスに登録されています'
+                            )
+                        row['existing_student'] = existing_student
+                    else:
+                        row['existing_student'] = None
 
         if errors:
             for error in errors[:5]:
@@ -247,18 +263,10 @@ def bulk_student_add_csv(request, class_id):
                     email = row['email']
                     student_number = row['student_number']
                     full_name = row['full_name']
+                    existing_student = row.get('existing_student')
 
-                    student = None
-                    if email:
-                        student = Student.objects.filter(
-                            email=email, student_number=student_number, role='student'
-                        ).first()
-                    else:
-                        student = Student.objects.filter(
-                            role='student', student_number=student_number, managed_by=request.user
-                        ).first()
                     is_new = False
-                    if not student:
+                    if not existing_student:
                         default_password = f"student_{student_number}"
                         student = Student.objects.create_user(
                             email=email,
@@ -268,6 +276,8 @@ def bulk_student_add_csv(request, class_id):
                             student_number=student_number
                         )
                         is_new = True
+                    else:
+                        student = existing_student
 
                     if student.id not in processed_students_map:
                         student.managed_by.add(request.user)

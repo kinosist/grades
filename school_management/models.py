@@ -12,8 +12,13 @@ from django.dispatch import receiver
 class CustomUserManager(BaseUserManager):
     """カスタムユーザーマネージャー"""
     def create_user(self, email, full_name, password=None, **extra_fields):
+        # 学籍番号があればクレンジング
+        student_number = extra_fields.get('student_number')
+        if student_number is not None:
+            extra_fields['student_number'] = self.model.clean_student_number(student_number)
+
         if email:
-            email = self.normalize_email(email)
+            email = self.model.clean_email(email)
         else:
             email = None
         
@@ -43,6 +48,21 @@ class CustomUser(AbstractUser):
         ('student', '学生'),
     ]
     
+    @staticmethod
+    def clean_student_number(val):
+        import re
+        if not val:
+            return ""
+        return re.sub(r'\s+', '', str(val)).upper()
+
+    @staticmethod
+    def clean_email(val):
+        import re
+        if not val:
+            return None
+        cleaned = re.sub(r'\s+', '', str(val)).lower()
+        return cleaned if cleaned else None
+
     username = None  # usernameフィールドを無効化
     email = models.EmailField(null=True, blank=True)
     full_name = models.CharField(max_length=100, verbose_name='氏名')

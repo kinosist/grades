@@ -1,12 +1,12 @@
 {% extends 'school_management/base.html' %}
 
-{% block title %}学生削除確認 - 学校管理システム{% endblock %}
-{% block page_title %}学生削除確認{% endblock %}
+{% block title %}学生担当解除確認 - 学校管理システム{% endblock %}
+{% block page_title %}学生担当解除確認{% endblock %}
 
 {% block breadcrumbs %}
 <li class="breadcrumb-item"><a href="{% url 'school_management:student_list' %}">学生管理</a></li>
 <li class="breadcrumb-item"><a href="{% url 'school_management:student_detail' student.student_number %}">学生詳細</a></li>
-<li class="breadcrumb-item active" aria-current="page">削除確認</li>
+<li class="breadcrumb-item active" aria-current="page">担当解除確認</li>
 {% endblock %}
 
 {% block extra_css %}
@@ -21,21 +21,21 @@
     }
 
     .warning-banner {
-        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-        border-left: 4px solid #dc2626;
+        background: linear-gradient(135deg, #fef3c7 0%, #ffeeba 100%);
+        border-left: 4px solid #d97706;
         border-radius: 8px;
         padding: 16px;
         margin-bottom: 24px;
     }
 
     .warning-banner i {
-        color: #dc2626;
+        color: #d97706;
         font-size: 24px;
         margin-right: 12px;
     }
 
     .warning-text {
-        color: #7f1d1d;
+        color: #92400e;
         font-weight: 600;
     }
 
@@ -98,27 +98,14 @@
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
+        text-decoration: none;
+        display: inline-block;
     }
 
     .btn-secondary-custom:hover {
         background-color: #cbd5e1;
         text-decoration: none;
         color: #1e293b;
-    }
-
-    .btn-danger-custom {
-        background-color: #dc2626;
-        color: #ffffff;
-        border: none;
-        padding: 10px 24px;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .btn-danger-custom:hover {
-        background-color: #b91c1c;
     }
 
     .btn-warning-custom {
@@ -130,10 +117,13 @@
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
+        display: inline-block;
     }
 
     .btn-warning-custom:hover {
         background-color: #d97706;
+        text-decoration: none;
+        color: #ffffff;
     }
 
     .section-title {
@@ -161,16 +151,7 @@
     .note-content {
         color: #0c4a6e;
         font-size: 0.875rem;
-        line-height: 1.5;
-    }
-
-    .note-content ul {
-        margin: 8px 0 0 0;
-        padding-left: 20px;
-    }
-
-    .note-content li {
-        margin: 4px 0;
+        line-height: 1.6;
     }
 </style>
 {% endblock %}
@@ -183,19 +164,19 @@
                 <!-- 警告バナー -->
                 <div class="warning-banner">
                     <div style="display: flex; align-items: flex-start;">
-                        <i class="fas fa-exclamation-triangle"></i>
+                        <i class="fas fa-exclamation-triangle" style="color: #d97706; font-size: 24px; margin-right: 12px;"></i>
                         <div>
-                            <div class="warning-text">重要な警告</div>
-                            <div style="color: #9a3412; font-size: 0.95rem; margin-top: 4px;">
-                                以下の学生を削除・解除しようとしています。完全削除の操作は<strong>取り消せません</strong>。
+                            <div class="warning-text">学生の担当解除確認</div>
+                            <div style="color: #92400e; font-size: 0.95rem; margin-top: 4px;">
+                                以下の学生を<strong>あなたの担当リストおよび担当クラスから解除</strong>しようとしています。
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 削除対象の学生リスト -->
+                <!-- 担当解除対象の学生リスト -->
                 <div>
-                    <h5 class="section-title"><i class="fas fa-user me-2 text-danger"></i>削除対象の学生</h5>
+                    <h5 class="section-title"><i class="fas fa-user me-2 text-warning"></i>対象の学生</h5>
                     <div class="student-item">
                         <div>
                             <span class="student-number">{{ student.student_number }}</span>
@@ -222,25 +203,14 @@
                     </div>
                 </div>
 
-                <!-- 削除による影響 -->
+                <!-- 担当解除の影響説明 -->
                 <div class="note-box">
-                    <div class="note-title"><i class="fas fa-info-circle me-2"></i>削除のオプションと影響</div>
+                    <div class="note-title"><i class="fas fa-info-circle me-2"></i>担当解除の影響</div>
                     <div class="note-content">
-                        <h6 class="fw-bold" style="color: #d97706;"><i class="fas fa-user-minus me-1"></i> 自分の担当から外す</h6>
-                        <p style="margin: 0 0 10px 0; font-size: 0.95rem;">
-                            あなたの担当リストおよび担当クラスから学生を外します。学生の基本情報や成績データはシステムに保持され、他の教員は引き続きその学生を管理できます。
+                        <p style="margin: 0;">
+                            この学生を、あなたの担当リストおよびあなたが担当するすべてのクラスから外します。<br>
+                            <strong>※影響:</strong> 学生のアカウント自体や成績データ、他教員のクラス登録はシステムに保持され、他の教員は引き続きその学生を管理できます。
                         </p>
-                        
-                        <hr style="border-color: #e2e8f0; margin: 15px 0;">
-
-                        <h6 class="fw-bold" style="color: #dc2626;"><i class="fas fa-trash-alt me-1"></i> システムから完全に削除</h6>
-                        <p style="margin: 0 0 10px 0; font-size: 0.95rem;">以下のデータが<strong>すべて削除されます</strong>:</p>
-                        <ul style="font-size: 0.95rem;">
-                            <li>学生の基本情報（学籍番号、氏名、メール等）</li>
-                            <li>すべてのクラス登録</li>
-                            <li>成績・ポイント・小テストなどの関連データすべて</li>
-                        </ul>
-                        <p style="margin-top: 10px; margin-bottom: 0; font-size: 0.95rem;"><strong>⚠ 他の教員のクラスに属する学生の場合、そのクラスの成績データも削除されます。</strong></p>
                     </div>
                 </div>
 
@@ -249,15 +219,11 @@
                     <a href="{% url 'school_management:student_detail' student.student_number %}" class="btn-secondary-custom">
                         <i class="fas fa-arrow-left me-2"></i>キャンセル
                     </a>
-                    <form method="POST" action="{% url 'school_management:student_delete_execute' student.student_number %}" style="margin-left: auto; display: flex; gap: 10px;">
+                    <form method="POST" action="{% url 'school_management:student_delete_execute' student.student_number %}" style="margin-left: auto;">
                         {% csrf_token %}
                         
                         <button type="submit" name="delete_type" value="unlink" class="btn-warning-custom" onclick="return confirm('{{ student.full_name }}さんを自分の担当から外します。よろしいですか？');">
                             <i class="fas fa-user-minus me-2"></i>自分の担当から外す
-                        </button>
-
-                        <button type="submit" name="delete_type" value="hard_delete" class="btn-danger-custom" onclick="return confirm('本当にシステムから完全に削除してよろしいですか？この操作は取り消せません。他の先生のクラスデータも削除されます。');">
-                            <i class="fas fa-trash-alt me-2"></i>システムから完全に削除
                         </button>
                     </form>
                 </div>

@@ -48,7 +48,8 @@ def bulk_student_add(request, class_id):
     available_students = CustomUser.objects.filter(
         role='student',
         student_number__isnull=False,
-        student_number__gt=''
+        student_number__gt='',
+        managed_by=request.user
     ).exclude(id__in=existing_student_ids).prefetch_related('classroom_set').order_by('student_number')
     
     # 検索機能

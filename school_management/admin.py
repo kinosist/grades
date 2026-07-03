@@ -1,11 +1,12 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import (
-    CustomUser, ClassRoom, LessonSession, 
-    Group, GroupMember, Quiz, QuizScore, 
+    CustomUser, ClassRoom, LessonSession,
+    Group, GroupMember, Quiz, QuizScore,
     PeerEvaluation, ContributionEvaluation,
     StudentQRCode, QRCodeScan, StudentLessonPoints,
-    StudentClassPoints, PeerEvaluationSettings
+    StudentClassPoints, PeerEvaluationSettings,
+    ClassRoomEnrollment, TeacherStudentAssignment,
 )
 
 @admin.register(CustomUser)
@@ -36,11 +37,29 @@ class ClassRoomAdmin(admin.ModelAdmin):
     list_display = ('class_name', 'year', 'semester', 'student_count')
     list_filter = ('year', 'semester')
     search_fields = ('class_name',)
-    filter_horizontal = ('students', 'teachers')
-    
+    filter_horizontal = ('teachers',)
+
     def student_count(self, obj):
         return obj.students.count()
     student_count.short_description = '学生数'
+
+
+@admin.register(ClassRoomEnrollment)
+class ClassRoomEnrollmentAdmin(admin.ModelAdmin):
+    """クラス在籍履歴管理画面"""
+    list_display = ('classroom', 'student', 'is_active', 'linked_at', 'unlinked_at')
+    list_filter = ('is_active', 'classroom')
+    search_fields = ('student__full_name', 'student__student_number', 'classroom__class_name')
+    readonly_fields = ('linked_at',)
+
+
+@admin.register(TeacherStudentAssignment)
+class TeacherStudentAssignmentAdmin(admin.ModelAdmin):
+    """担当教員割当履歴管理画面"""
+    list_display = ('teacher', 'student', 'is_active', 'linked_at', 'unlinked_at')
+    list_filter = ('is_active',)
+    search_fields = ('teacher__full_name', 'student__full_name', 'student__student_number')
+    readonly_fields = ('linked_at',)
 
 @admin.register(LessonSession)
 class LessonSessionAdmin(admin.ModelAdmin):

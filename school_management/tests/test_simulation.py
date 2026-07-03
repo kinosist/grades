@@ -1,7 +1,7 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from school_management.models import LessonSession, ClassRoom
+from school_management.models import LessonSession, ClassRoom, ClassRoomEnrollment
 from school_management.views.peer_eval.results import save_peer_evaluation_simulation
 
 User = get_user_model()
@@ -76,7 +76,7 @@ class SimulationLogicTests(TestCase):
             last_name='Test',
             full_name='Student Test'
         )
-        self.classroom.students.add(self.student)
+        ClassRoomEnrollment.enroll(self.classroom, self.student)
         
         from school_management.models import PeerEvaluationSettings
         PeerEvaluationSettings.objects.create(
@@ -132,7 +132,7 @@ class SimulationLogicTests(TestCase):
             last_name='Test',
             full_name='Student2 Test'
         )
-        self.classroom.students.add(self.student)
+        ClassRoomEnrollment.enroll(self.classroom, self.student)
         
         from school_management.models import PeerEvaluationSettings
         PeerEvaluationSettings.objects.create(

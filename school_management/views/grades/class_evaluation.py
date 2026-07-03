@@ -481,7 +481,8 @@ def update_custom_score(request, class_id):
         student = get_object_or_404(
             Student,
             id=student_id,
-            classroom=classroom
+            classroom_enrollments__classroom=classroom,
+            classroom_enrollments__is_active=True,
         )
 
         # クラスに属する評価項目かチェック

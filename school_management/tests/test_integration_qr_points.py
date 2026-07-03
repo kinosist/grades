@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from school_management.models import (
     ClassRoom, StudentQRCode, StudentClassPoints,
-    PointColumn, StudentColumnScore, QRCodeScan
+    PointColumn, StudentColumnScore, QRCodeScan, ClassRoomEnrollment
 )
 import uuid
 
@@ -32,7 +32,7 @@ class QRAndPointsIntegrationTests(TestCase):
             grading_system='custom'
         )
         self.classroom.teachers.add(self.teacher)
-        self.classroom.students.add(self.student)
+        ClassRoomEnrollment.enroll(self.classroom, self.student)
         
         self.scp = StudentClassPoints.objects.create(
             student=self.student,

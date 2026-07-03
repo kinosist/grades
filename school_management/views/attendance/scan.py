@@ -39,7 +39,11 @@ def qr_code_scan(request, qr_code_id):
             except ClassRoom.DoesNotExist:
                 pass
 
-        teacher_classrooms = ClassRoom.objects.filter(students=qr_code.student, teachers=request.user)
+        teacher_classrooms = ClassRoom.objects.filter(
+            enrollments__student=qr_code.student,
+            enrollments__is_active=True,
+            teachers=request.user,
+        )
 
         # 2. セッション・クラス指定がない場合、学生の所属クラスから探す（1つの場合のみ自動選択）
         if not target_classroom:

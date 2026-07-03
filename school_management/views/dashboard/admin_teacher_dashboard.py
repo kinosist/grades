@@ -1,10 +1,18 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Q, Exists, OuterRef
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.urls import reverse
-from ...models import CustomUser
+from ...models import CustomUser, TeacherStudentAssignment
+
+
+def _annotate_has_active_teacher(queryset):
+    """学生クエリセットに『有効な担当教員がいるか』を注釈する"""
+    active_assignment = TeacherStudentAssignment.objects.filter(
+        student=OuterRef('pk'), is_active=True
+    )
+    return queryset.annotate(has_active_teacher=Exists(active_assignment))
 
 @login_required
 def admin_teacher_management(request):
@@ -97,10 +105,13 @@ def admin_teacher_management(request):
                             Q(email__icontains=search_query)
                         )
                     if teacher_filter_id:
-                        student_qs = student_qs.filter(managed_by__id=teacher_filter_id)
+                        student_qs = student_qs.filter(
+                            teacher_assignments__teacher_id=teacher_filter_id,
+                            teacher_assignments__is_active=True,
+                        )
                     if orphan_only:
-                        student_qs = student_qs.filter(managed_by__isnull=True)
-                        
+                        student_qs = _annotate_has_active_teacher(student_qs).filter(has_active_teacher=False)
+
                     if deselected_ids:
                         student_qs = student_qs.exclude(id__in=deselected_ids)
                         
@@ -123,12 +134,12 @@ def admin_teacher_management(request):
     teacher_filter_id = request.GET.get('teacher_id', '').strip()
     orphan_only = request.GET.get('orphan_only', '') == 'on'
     
-    # 既存の学生一覧を取得（担当教員の情報を効率的にロード）
-    student_qs = CustomUser.objects.filter(role='student').prefetch_related('managed_by').order_by('student_number')
-    
+    # 既存の学生一覧を取得
+    student_qs = CustomUser.objects.filter(role='student').order_by('student_number')
+
     # フィルターが適用されているか
     has_filter = bool(search_query or teacher_filter_id or orphan_only)
-    
+
     # フリーワード検索フィルタ
     if search_query:
         student_qs = student_qs.filter(
@@ -137,21 +148,26 @@ def admin_teacher_management(request):
             Q(furigana__icontains=search_query) |
             Q(email__icontains=search_query)
         )
-    
+
     # 教員フィルタ
     if teacher_filter_id:
-        student_qs = student_qs.filter(managed_by__id=teacher_filter_id)
-        
+        student_qs = student_qs.filter(
+            teacher_assignments__teacher_id=teacher_filter_id,
+            teacher_assignments__is_active=True,
+        )
+
     # 孤立学生フィルタ
     if orphan_only:
-        student_qs = student_qs.filter(managed_by__isnull=True)
-        
+        student_qs = _annotate_has_active_teacher(student_qs).filter(has_active_teacher=False)
+
     # 絞り込み後の件数（ページネーション前）
     filtered_students_count = student_qs.count()
-    
+
     # 統計情報の取得
     total_students_count = CustomUser.objects.filter(role='student').count()
-    orphan_students_count = CustomUser.objects.filter(role='student', managed_by__isnull=True).count()
+    orphan_students_count = _annotate_has_active_teacher(
+        CustomUser.objects.filter(role='student')
+    ).filter(has_active_teacher=False).count()
     
     # ページネーション設定 (1ページ50件)
     paginator = Paginator(student_qs, 50)

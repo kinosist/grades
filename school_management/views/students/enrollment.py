@@ -8,7 +8,8 @@ from django.views.decorators.http import require_POST
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Count
 from django.urls import reverse
-from ...models import ClassRoom, CustomUser, Student, StudentClassPoints
+from django.utils import timezone
+from ...models import ClassRoom, CustomUser, Student, StudentClassPoints, ClassRoomEnrollment, TeacherStudentAssignment
 
 
 @login_required
@@ -26,7 +27,7 @@ def bulk_student_add(request, class_id):
                 try:
                     student = CustomUser.objects.get(id=student_id, role='student')
                     if not classroom.students.filter(id=student.id).exists():
-                        classroom.students.add(student)
+                        ClassRoomEnrollment.enroll(classroom, student)
                         # クラスポイントを0で初期化
                         StudentClassPoints.objects.get_or_create(
                             student=student,
@@ -49,9 +50,10 @@ def bulk_student_add(request, class_id):
         role='student',
         student_number__isnull=False,
         student_number__gt='',
-        managed_by=request.user
-    ).exclude(id__in=existing_student_ids).prefetch_related('classroom_set').order_by('student_number')
-    
+        teacher_assignments__teacher=request.user,
+        teacher_assignments__is_active=True,
+    ).exclude(id__in=existing_student_ids).order_by('student_number')
+
     # 検索機能
     search_query = request.GET.get('search', '')
     if search_query:
@@ -60,25 +62,32 @@ def bulk_student_add(request, class_id):
             Q(full_name__icontains=search_query) |
             Q(email__icontains=search_query)
         )
-    
+
     # ログイン教員の担当クラスIDセットを取得
     teacher_classroom_ids = set(request.user.classrooms.all().values_list('id', flat=True))
 
     # 各学生オブジェクトに、ログイン教員が担当するクラスのリストを追加
-    # prefetch_relatedされたデータを効率的に利用
+    # N+1対策: 学生ごとにクエリを発行せず、一括取得したマップから引く
+    available_students = list(available_students)
+    enrollment_map = {}
+    for enrollment in ClassRoomEnrollment.objects.filter(
+        student_id__in=[s.id for s in available_students],
+        classroom_id__in=teacher_classroom_ids,
+        is_active=True,
+    ).select_related('classroom'):
+        enrollment_map.setdefault(enrollment.student_id, []).append(enrollment.classroom)
+
     for student in available_students:
-        student.teacher_classrooms = [
-            c for c in student.classroom_set.all() if c.id in teacher_classroom_ids
-        ]
+        student.teacher_classrooms = enrollment_map.get(student.id, [])
 
     # 他のクラスから学生をコピーするためのクラスリストを取得
     other_classes = ClassRoom.objects.filter(
         teachers=request.user
     ).exclude(id=class_id).annotate(
-        student_count=Count('students')
+        student_count=Count('enrollments', filter=Q(enrollments__is_active=True))
     ).filter(
         student_count__gt=0
-    ).prefetch_related('students').order_by('-year', 'semester')
+    ).order_by('-year', 'semester')
 
     other_classes_with_student_ids = []
     for oc in other_classes:
@@ -121,12 +130,7 @@ def copy_students_from_class(request, class_id, source_class_id):
         # transaction.atomic() でまとめて実行
         try:
             with transaction.atomic():
-                # bulk_add to the through model
-                through_model = ClassRoom.students.through
-                through_model.objects.bulk_create([
-                    through_model(classroom_id=target_class.id, customuser_id=student.id)
-                    for student in students_to_add
-                ], ignore_conflicts=True)
+                ClassRoomEnrollment.bulk_enroll(target_class, students_to_add)
 
                 # bulk_create StudentClassPoints
                 StudentClassPoints.objects.bulk_create([
@@ -280,18 +284,14 @@ def bulk_student_add_csv(request, class_id):
                         student = existing_student
 
                     if student.id not in processed_students_map:
-                        student.managed_by.add(request.user)
+                        TeacherStudentAssignment.assign(request.user, student)
                         processed_students_map[student.id] = {'student': student, 'is_new': is_new}
 
                 created_students = [data['student'] for data in processed_students_map.values()]
                 created_count = sum(1 for data in processed_students_map.values() if data['is_new'])
                 linked_count = len(created_students) - created_count
 
-                through_model = ClassRoom.students.through
-                through_model.objects.bulk_create([
-                    through_model(classroom_id=classroom.id, customuser_id=student.id)
-                    for student in created_students
-                ], batch_size=500, ignore_conflicts=True)
+                ClassRoomEnrollment.bulk_enroll(classroom, created_students)
 
                 StudentClassPoints.objects.bulk_create([
                     StudentClassPoints(student=student, classroom=classroom, points=0)
@@ -332,7 +332,7 @@ def remove_student_from_class(request, student_id):
             classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
             
             # 学生をクラスから削除
-            classroom.students.remove(student)
+            ClassRoomEnrollment.unenroll(classroom, student)
             
             return JsonResponse({'success': True, 'message': f'{student.full_name}さんをクラスから除籍しました'})
         except Exception as e:

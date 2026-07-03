@@ -3,6 +3,7 @@ from django.db import IntegrityError
 from school_management.models import (
     CustomUser,
     ClassRoom,
+    ClassRoomEnrollment,
     LessonSession,
     StudentLessonPoints,
     Group,
@@ -36,7 +37,7 @@ class ModelsTestCase(TestCase):
             semester='first'
         )
         self.classroom.teachers.add(self.teacher)
-        self.classroom.students.add(self.student)
+        ClassRoomEnrollment.enroll(self.classroom, self.student)
         
         # Lesson Session
         self.session = LessonSession.objects.create(

@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from school_management.models import (
     ClassRoom, Student, LessonSession, PointColumn, StudentColumnScore,
-    StudentQRCode, QRCodeScan, StudentClassPoints, Quiz, QuizScore
+    StudentQRCode, QRCodeScan, StudentClassPoints, Quiz, QuizScore, ClassRoomEnrollment
 )
 
 User = get_user_model()
@@ -46,7 +46,7 @@ class CustomColumnLogicTests(TestCase):
             full_name="テスト学生",
             role="student"
         )
-        self.classroom.students.add(self.student)
+        ClassRoomEnrollment.enroll(self.classroom, self.student)
         
         # QRコードの作成
         self.qr_code = StudentQRCode.objects.create(student=self.student)

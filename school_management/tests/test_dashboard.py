@@ -1,6 +1,6 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from school_management.models import CustomUser, ClassRoom, StudentClassPoints
+from school_management.models import CustomUser, ClassRoom, StudentClassPoints, ClassRoomEnrollment
 
 class DashboardViewTest(TestCase):
     def setUp(self):
@@ -8,7 +8,7 @@ class DashboardViewTest(TestCase):
         self.student = CustomUser.objects.create_user(email='s@example.com', full_name='S', password='spass', role='student', student_number='S1')
         self.classroom = ClassRoom.objects.create(class_name='C1', year=2025, semester='first')
         self.classroom.teachers.add(self.teacher)
-        self.classroom.students.add(self.student)
+        ClassRoomEnrollment.enroll(self.classroom, self.student)
         # クラスポイントを0で初期化
         StudentClassPoints.objects.get_or_create(
             student=self.student,

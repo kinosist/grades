@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.urls import reverse
-from school_management.models import CustomUser
+from school_management.models import CustomUser, TeacherStudentAssignment
 
 class StudentBulkDeleteTest(TestCase):
     def setUp(self):
@@ -22,7 +22,7 @@ class StudentBulkDeleteTest(TestCase):
                 role='student',
                 student_number=f'S{i:03d}',
             )
-            student.managed_by.add(self.teacher)
+            TeacherStudentAssignment.assign(self.teacher, student)
             self.students.append(student)
             
         self.client.login(email='teacher@example.com', password='password123')

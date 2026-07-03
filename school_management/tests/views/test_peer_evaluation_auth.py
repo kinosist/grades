@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from school_management.models import (
     ClassRoom,
+    ClassRoomEnrollment,
     CustomUser,
     GoogleOAuthSession,
     Group,
@@ -49,7 +50,7 @@ class PeerEvaluationAuthTest(TestCase):
 
         self.classroom = ClassRoom.objects.create(class_name='Test Class', year=2026, semester='first')
         self.classroom.teachers.add(self.teacher)
-        self.classroom.students.add(self.student1, self.student2)
+        ClassRoomEnrollment.bulk_enroll(self.classroom, [self.student1, self.student2])
 
         self.lesson_session = LessonSession.objects.create(
             classroom=self.classroom,

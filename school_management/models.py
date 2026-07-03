@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models import Sum, Q
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 class CustomUserManager(BaseUserManager):
@@ -82,14 +83,6 @@ class CustomUser(AbstractUser):
     teacher_id = models.CharField(max_length=20, blank=True, verbose_name='教員ID')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='登録日時')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
-    managed_by = models.ManyToManyField(
-        'self',
-        symmetrical=False,
-        blank=True,
-        limit_choices_to=Q(role__in=['teacher', 'admin']),
-        verbose_name='担当教員',
-        related_name='managed_students'
-    )
 
     # AbstractUserのrelated_nameを設定
     groups = models.ManyToManyField(
@@ -134,10 +127,93 @@ class CustomUser(AbstractUser):
     @property
     def is_teacher(self):
         return self.role in ['teacher', 'admin']
-    
+
     @property
     def is_student(self):
         return self.role == 'student'
+
+    @property
+    def managed_by(self):
+        """この学生を担当している教員（有効な担当のみ）を返す（読み取り専用）"""
+        return CustomUser.objects.filter(
+            student_assignments__student=self,
+            student_assignments__is_active=True,
+        )
+
+    @property
+    def classroom_set(self):
+        """この学生が在籍しているクラス（有効な在籍のみ）を返す（読み取り専用）"""
+        return ClassRoom.objects.filter(
+            enrollments__student=self,
+            enrollments__is_active=True,
+        )
+
+
+class TeacherStudentAssignment(models.Model):
+    """教員と学生の担当関係。担当解除時も物理削除せず is_active=False で履歴を保持する"""
+    teacher = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='student_assignments',
+        limit_choices_to=Q(role__in=['teacher', 'admin']),
+        verbose_name='教員',
+    )
+    student = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='teacher_assignments',
+        limit_choices_to=Q(role='student'),
+        verbose_name='学生',
+    )
+    is_active = models.BooleanField(default=True, verbose_name='有効')
+    linked_at = models.DateTimeField(auto_now_add=True, verbose_name='紐づけ日時')
+    unlinked_at = models.DateTimeField(null=True, blank=True, verbose_name='解除日時')
+
+    class Meta:
+        verbose_name = '担当教員割当'
+        verbose_name_plural = '担当教員割当'
+        unique_together = ['teacher', 'student']
+
+    def __str__(self):
+        status = '有効' if self.is_active else '解除済み'
+        return f"{self.teacher.full_name} - {self.student.full_name} ({status})"
+
+    @classmethod
+    def assign(cls, teacher, student):
+        """教員を学生の担当にする（既存の解除済み関係があれば復元する）。
+
+        以前この教員が学生を在籍させていたクラスがあれば、担当教員としての
+        紐づけと同時にクラス在籍も自動的に復元する。単体登録・一括登録・
+        履歴画面からの再担当化のいずれの経路でも同じ結果になるよう、
+        このクラスメソッド1箇所に復元ロジックを集約する。
+        """
+        obj, created = cls.objects.get_or_create(
+            teacher=teacher, student=student, defaults={'is_active': True}
+        )
+        if not created and not obj.is_active:
+            obj.is_active = True
+            obj.unlinked_at = None
+            obj.save(update_fields=['is_active', 'unlinked_at'])
+
+        ClassRoomEnrollment.objects.filter(
+            student=student, classroom__teachers=teacher, is_active=False
+        ).update(is_active=True, unlinked_at=None)
+
+        return obj
+
+    @classmethod
+    def unassign(cls, teacher, student):
+        """教員をこの学生の担当から外す（履歴として is_active=False で保持）"""
+        cls.objects.filter(teacher=teacher, student=student, is_active=True).update(
+            is_active=False, unlinked_at=timezone.now()
+        )
+
+    @classmethod
+    def bulk_unassign(cls, teacher, students):
+        """複数学生をまとめて担当から外す"""
+        cls.objects.filter(teacher=teacher, student__in=students, is_active=True).update(
+            is_active=False, unlinked_at=timezone.now()
+        )
 
 
 # 後方互換性のためのエイリアス
@@ -177,7 +253,6 @@ class ClassRoom(models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(1000)]
     )
     teachers = models.ManyToManyField(Teacher, verbose_name='担当教員', related_name='classrooms')
-    students = models.ManyToManyField(Student, blank=True, verbose_name='学生')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -187,6 +262,14 @@ class ClassRoom(models.Model):
 
     def __str__(self):
         return f"{self.year}年 {self.get_semester_display()} {self.class_name}"
+
+    @property
+    def students(self):
+        """在籍中の学生（有効な在籍のみ）を返す（読み取り専用）"""
+        return Student.objects.filter(
+            classroom_enrollments__classroom=self,
+            classroom_enrollments__is_active=True,
+        )
 
     def get_average_points(self):
         """クラスの平均総合ポイントを計算"""
@@ -203,6 +286,78 @@ class ClassRoom(models.Model):
         # total_points は DB 計算では不可（@property のため）
         total_points = sum(sp.total_points for sp in points_list) / count
         return round(total_points, 1)
+
+
+class ClassRoomEnrollment(models.Model):
+    """クラスと学生の在籍関係。除籍時も物理削除せず is_active=False で履歴を保持する"""
+    classroom = models.ForeignKey(
+        ClassRoom, on_delete=models.CASCADE, related_name='enrollments', verbose_name='クラス'
+    )
+    student = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='classroom_enrollments',
+        limit_choices_to=Q(role='student'),
+        verbose_name='学生',
+    )
+    is_active = models.BooleanField(default=True, verbose_name='在籍中')
+    linked_at = models.DateTimeField(auto_now_add=True, verbose_name='在籍開始日時')
+    unlinked_at = models.DateTimeField(null=True, blank=True, verbose_name='除籍日時')
+
+    class Meta:
+        verbose_name = 'クラス在籍'
+        verbose_name_plural = 'クラス在籍'
+        unique_together = ['classroom', 'student']
+
+    def __str__(self):
+        status = '在籍中' if self.is_active else '除籍済み'
+        return f"{self.classroom} - {self.student.full_name} ({status})"
+
+    @classmethod
+    def enroll(cls, classroom, student):
+        """学生をクラスに在籍させる（既存の除籍済み記録があれば復元する）"""
+        obj, created = cls.objects.get_or_create(
+            classroom=classroom, student=student, defaults={'is_active': True}
+        )
+        if not created and not obj.is_active:
+            obj.is_active = True
+            obj.unlinked_at = None
+            obj.save(update_fields=['is_active', 'unlinked_at'])
+        return obj
+
+    @classmethod
+    def unenroll(cls, classroom, student):
+        """学生をクラスから除籍する（履歴として is_active=False で保持）"""
+        cls.objects.filter(classroom=classroom, student=student, is_active=True).update(
+            is_active=False, unlinked_at=timezone.now()
+        )
+
+    @classmethod
+    def bulk_enroll(cls, classroom, students):
+        """複数学生をまとめてクラスに在籍させる（既存の除籍済み記録は復元する）"""
+        students = list(students)
+        if not students:
+            return
+        existing = {
+            e.student_id: e
+            for e in cls.objects.filter(classroom=classroom, student__in=students)
+        }
+        to_reactivate_ids = [e.id for e in existing.values() if not e.is_active]
+        to_create = [
+            cls(classroom=classroom, student=s, is_active=True)
+            for s in students if s.id not in existing
+        ]
+        if to_reactivate_ids:
+            cls.objects.filter(id__in=to_reactivate_ids).update(is_active=True, unlinked_at=None)
+        if to_create:
+            cls.objects.bulk_create(to_create, ignore_conflicts=True)
+
+    @classmethod
+    def bulk_unenroll(cls, classrooms, students):
+        """複数学生をまとめて複数クラスから除籍する"""
+        cls.objects.filter(
+            classroom__in=classrooms, student__in=students, is_active=True
+        ).update(is_active=False, unlinked_at=timezone.now())
 
 
 class PointColumn(models.Model):

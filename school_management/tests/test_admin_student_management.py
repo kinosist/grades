@@ -1,6 +1,7 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from school_management.models import TeacherStudentAssignment
 
 User = get_user_model()
 
@@ -32,7 +33,7 @@ class AdminStudentManagementTests(TestCase):
             student_number='MGR001',
             role='student'
         )
-        self.student.managed_by.add(self.teacher)
+        TeacherStudentAssignment.assign(self.teacher, self.student)
 
     def test_unauthorized_access_denied(self):
         # 1. ログインなしでアクセス -> ログイン画面へリダイレクト

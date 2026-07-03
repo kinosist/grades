@@ -2,7 +2,7 @@ import json
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from school_management.models import ClassRoom, StudentClassPoints
+from school_management.models import ClassRoom, StudentClassPoints, ClassRoomEnrollment
 
 User = get_user_model()
 
@@ -34,7 +34,7 @@ class AuthAndDashboardIntegrationTests(TestCase):
             semester='first'
         )
         self.classroom.teachers.add(self.teacher)
-        self.classroom.students.add(self.student)
+        ClassRoomEnrollment.enroll(self.classroom, self.student)
         
         # 学生のクラスポイントレコード初期化
         StudentClassPoints.objects.create(

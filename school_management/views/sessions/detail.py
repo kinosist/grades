@@ -1,7 +1,8 @@
+from django.db.models import Prefetch
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from ...models import LessonSession, Quiz, StudentGoal, LessonReport
+from ...models import LessonSession, Quiz, StudentGoal, LessonReport, Group, GroupMember
 
 @login_required
 def lesson_session_detail(request, session_id):
@@ -11,6 +12,11 @@ def lesson_session_detail(request, session_id):
 
     classroom = session.classroom
     students = classroom.students.filter(role='student').order_by('student_number')
+
+    # 担当から外れた学生は非表示にする（データ自体は保持し、再度担当になれば表示が戻る）
+    groups = Group.objects.filter(lesson_session=session).prefetch_related(
+        Prefetch('groupmember_set', queryset=GroupMember.objects.filter(student__in=classroom.students).select_related('student'))
+    ).order_by('group_number')
 
     if request.method == 'POST' and request.POST.get('action') == 'save_reports':
         saved_count = 0
@@ -50,5 +56,6 @@ def lesson_session_detail(request, session_id):
         'session': session,
         'quizzes': quizzes,
         'student_report_data': student_report_data,
+        'groups': groups,
     }
     return render(request, 'school_management/session_detail.html', context)

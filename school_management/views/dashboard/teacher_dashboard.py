@@ -29,7 +29,10 @@ def teacher_dashboard(request):
     total_classes = user_classes.count()
     
     # 担当クラスの学生数
-    total_students = Student.objects.filter(classroom__teachers=request.user).distinct().count()
+    total_students = Student.objects.filter(
+        classroom_enrollments__classroom__teachers=request.user,
+        classroom_enrollments__is_active=True,
+    ).distinct().count()
     
     # 今週の授業回数（統計用）
     today = datetime.now().date()

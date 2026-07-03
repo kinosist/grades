@@ -40,7 +40,8 @@ def _safe_int(value):
         return None
 
 
-def _build_submission_detail(evaluation, group_name_map, student_name_map):
+def _build_submission_detail(evaluation, group_name_map, student_name_map, active_student_ids=None):
+    active_student_ids = active_student_ids or set()
     response = evaluation.response_json or {}
     group_evaluations_list = [] # Initialize as a list
     for entry in response.get('other_group_eval', []):
@@ -63,17 +64,21 @@ def _build_submission_detail(evaluation, group_name_map, student_name_map):
         member_id = _safe_int(entry.get('member_id'))
         target_name = student_name_map.get(member_id)
         is_deleted = False
+        is_unlinked = False
         if not target_name:
             if member_id:
                 target_name = '削除済みの学生'
                 is_deleted = True
             else:
                 target_name = '不明'
+        elif member_id not in active_student_ids:
+            is_unlinked = True
         member_evaluations_list.append({ # Append to the list
             'rank': rank,
             'target_name': target_name,
             'reason': (entry.get('reason') or '').strip(),
             'is_deleted': is_deleted,
+            'is_unlinked': is_unlinked,
         })
     member_evaluations_list.sort(key=lambda x: x['rank']) # Sort by rank for consistent display
 
@@ -922,7 +927,23 @@ def peer_evaluation_results(request, session_id):
     
     sorted_groups = sorted(group_stats.values(), key=lambda x: x['score'], reverse=True)
 
-    enrolled_students = lesson_session.classroom.students.filter(role='student').order_by('full_name')
+    # 現在担当している（在籍中の）学生のIDセット
+    active_student_ids = set(
+        lesson_session.classroom.students.filter(role='student').values_list('id', flat=True)
+    )
+
+    # 担当から外れていても、このグループ・この授業回に関わっていた学生は
+    # 「担当から外れた学生」として一覧から消さずに表示する
+    former_participant_ids = set(
+        GroupMember.objects.filter(group__lesson_session=lesson_session).values_list('student_id', flat=True)
+    ) | set(
+        evaluations.exclude(student__isnull=True).values_list('student_id', flat=True)
+    )
+    all_participant_ids = active_student_ids | former_participant_ids
+
+    enrolled_students = Student.objects.filter(
+        id__in=all_participant_ids, role='student'
+    ).order_by('full_name')
     group_name_map = {group.id: group.display_name for group in groups}
     student_name_map = {student.id: student.full_name for student in enrolled_students}
 
@@ -962,10 +983,10 @@ def peer_evaluation_results(request, session_id):
     for enrolled_student in enrolled_students:
         submission = submission_map.get(enrolled_student.id)
         is_submitted = submission is not None
-        if is_submitted:
+        if is_submitted and enrolled_student.id in active_student_ids:
             submitted_count += 1
 
-        submission_detail = _build_submission_detail(submission, group_name_map, student_name_map) if submission else None
+        submission_detail = _build_submission_detail(submission, group_name_map, student_name_map, active_student_ids) if submission else None
 
         member_eval_by_rank = []
         if submission_detail and pe_settings and pe_settings.enable_member_evaluation:
@@ -1027,6 +1048,7 @@ def peer_evaluation_results(request, session_id):
             'sim_contrib': sim_contrib,
             'sim_group_manual': sim_group_manual,
             'student_group': student_group_map.get(enrolled_student.id),
+            'is_unlinked': enrolled_student.id not in active_student_ids,
         })
 
     # テンプレートのregroupのために、グループ順、そして学籍番号順にソートする
@@ -1036,7 +1058,7 @@ def peer_evaluation_results(request, session_id):
         
     student_rows.sort(key=get_sort_key)
 
-    total_students = enrolled_students.count()
+    total_students = len(active_student_ids)
     submission_rate = round((submitted_count / total_students) * 100, 1) if total_students else 0
 
     # --- 評価コメントセクション用のデータ準備 ---
@@ -1049,7 +1071,7 @@ def peer_evaluation_results(request, session_id):
     ).order_by('created_at')
 
     for evaluation in evaluations_to_process_for_comments:
-        detail = _build_submission_detail(evaluation, group_name_map, student_name_map)
+        detail = _build_submission_detail(evaluation, group_name_map, student_name_map, active_student_ids)
         
         # Convert dictionaries to sorted lists for template iteration
         # detail['group_evaluations'] and detail['member_evaluations'] are already sorted lists

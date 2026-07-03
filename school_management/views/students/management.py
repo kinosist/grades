@@ -9,7 +9,7 @@ from django.middleware.csrf import get_token
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.urls import reverse
-from ...models import CustomUser, Student, ClassRoom, StudentClassPoints
+from ...models import CustomUser, Student, ClassRoom, StudentClassPoints, ClassRoomEnrollment, TeacherStudentAssignment
 
 @login_required
 def student_edit_view(request, student_number):
@@ -229,10 +229,10 @@ def student_create_view(request):
                                 student.save(update_fields=['furigana'])
                             linked_count += 1
                             
-                        student.managed_by.add(request.user)
+                        TeacherStudentAssignment.assign(request.user, student)
 
                         if classroom:
-                            classroom.students.add(student)
+                            ClassRoomEnrollment.enroll(classroom, student)
                             from school_management.models import StudentClassPoints
                             StudentClassPoints.objects.get_or_create(student=student, classroom=classroom, defaults={'points': 0})
             except IntegrityError as e:
@@ -336,11 +336,11 @@ def student_create_view(request):
                             student.save(update_fields=['furigana'])
                     
                     # 担当教員として紐づけ
-                    student.managed_by.add(request.user)
+                    TeacherStudentAssignment.assign(request.user, student)
 
                     # クラス登録の場合：クラスにも紐づけ、ポイント初期化
                     if classroom:
-                        classroom.students.add(student)
+                        ClassRoomEnrollment.enroll(classroom, student)
                         from school_management.models import StudentClassPoints
                         StudentClassPoints.objects.get_or_create(student=student, classroom=classroom, defaults={'points': 0})
                     

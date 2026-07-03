@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.utils.http import url_has_allowed_host_and_scheme
-from ...models import LessonSession, PeerEvaluationSettings
+from ...models import LessonSession, PeerEvaluationSettings, GroupMember, Student
 
 def _safe_int(value):
     try:
@@ -11,7 +11,8 @@ def _safe_int(value):
     except (TypeError, ValueError):
         return None
 
-def _build_submission_detail(evaluation, group_name_map, student_name_map):
+def _build_submission_detail(evaluation, group_name_map, student_name_map, active_student_ids=None):
+    active_student_ids = active_student_ids or set()
     response = evaluation.response_json or {}
     group_evaluations = []
     for entry in response.get('other_group_eval', []):
@@ -25,10 +26,23 @@ def _build_submission_detail(evaluation, group_name_map, student_name_map):
     member_evaluations = []
     for entry in response.get('group_members_eval', []):
         member_id = _safe_int(entry.get('member_id'))
+        target_name = student_name_map.get(member_id)
+        is_deleted = False
+        is_unlinked = False
+        if not target_name:
+            if member_id:
+                target_name = '削除済みの学生'
+                is_deleted = True
+            else:
+                target_name = '不明'
+        elif member_id not in active_student_ids:
+            is_unlinked = True
         member_evaluations.append({
             'rank': entry.get('rank'),
-            'target_name': student_name_map.get(member_id, f'学生ID:{member_id}' if member_id else '不明'),
+            'target_name': target_name,
             'reason': (entry.get('reason') or '').strip(),
+            'is_deleted': is_deleted,
+            'is_unlinked': is_unlinked,
         })
 
     general_comment = (evaluation.general_comment or '').strip()
@@ -262,7 +276,20 @@ def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpR
         if submission.student_id not in submission_map:
             submission_map[submission.student_id] = submission
 
-    enrolled_students = list(session.classroom.students.filter(role='student').order_by('full_name'))
+    # 現在担当している（在籍中の）学生のIDセット
+    active_student_ids = set(
+        session.classroom.students.filter(role='student').values_list('id', flat=True)
+    )
+    # 担当から外れていても、このグループ・この授業回に関わっていた学生は
+    # 「担当から外れた学生」として一覧から消さずに表示する
+    former_participant_ids = set(
+        GroupMember.objects.filter(group__lesson_session=session).values_list('student_id', flat=True)
+    ) | set(
+        evaluations.exclude(student__isnull=True).values_list('student_id', flat=True)
+    )
+    all_participant_ids = active_student_ids | former_participant_ids
+
+    enrolled_students = list(Student.objects.filter(id__in=all_participant_ids, role='student').order_by('full_name'))
     group_name_map = {group.id: group.display_name for group in groups}
     student_name_map = {student.id: student.full_name for student in enrolled_students}
     submission_rows = []
@@ -270,7 +297,7 @@ def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpR
     for enrolled_student in enrolled_students:
         submission = submission_map.get(enrolled_student.id)
         submitted = submission is not None
-        if submitted:
+        if submitted and enrolled_student.id in active_student_ids:
             submitted_count += 1
             
         # シミュレーション用の値を取得（辞書形式を想定）
@@ -308,14 +335,15 @@ def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpR
             'email': enrolled_student.email,
             'submitted': submitted,
             'submitted_at': submission.created_at if submission else None,
-            'submission_detail': _build_submission_detail(submission, group_name_map, student_name_map) if submission else None,
+            'submission_detail': _build_submission_detail(submission, group_name_map, student_name_map, active_student_ids) if submission else None,
             'sim_data': student_sim_data,
             'member_sim_inputs': member_sim_inputs,
             'group_sim_inputs': group_sim_inputs,
             'sim_contrib': sim_contrib,
+            'is_unlinked': enrolled_student.id not in active_student_ids,
         })
 
-    total_students = len(enrolled_students)
+    total_students = len(active_student_ids)
     submission_rate = round((submitted_count / total_students) * 100, 1) if total_students else 0
     
     # 現在のセッションのシミュレーション状態

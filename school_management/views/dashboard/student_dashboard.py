@@ -5,7 +5,10 @@ from ...models import StudentLessonPoints, StudentClassPoints, ClassRoom, Lesson
 @login_required
 def student_dashboard(request):
     # 学生が所属するクラスを取得
-    student_classrooms = ClassRoom.objects.filter(students=request.user)
+    student_classrooms = ClassRoom.objects.filter(
+        enrollments__student=request.user,
+        enrollments__is_active=True,
+    )
     
     # 最近の授業回
     recent_sessions = LessonSession.objects.filter(

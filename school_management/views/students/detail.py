@@ -3,10 +3,11 @@ from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from django.contrib import messages
 from django.db.models import Avg
+from django.utils import timezone
 from ...models import (
-    CustomUser, ClassRoom, LessonSession, QuizScore, 
+    CustomUser, ClassRoom, LessonSession, QuizScore,
     Attendance, GroupMember, PeerEvaluation, StudentClassPoints,
-    StudentGoal, SelfEvaluation, LessonReport
+    StudentGoal, SelfEvaluation, LessonReport, ClassRoomEnrollment, TeacherStudentAssignment
 )
 
 @login_required
@@ -17,7 +18,13 @@ def student_detail_view(request, student_number):
         return redirect('school_management:dashboard')
 
     # 担当学生に限定
-    student = get_object_or_404(CustomUser, student_number=student_number, role='student', managed_by=request.user)
+    student = get_object_or_404(
+        CustomUser,
+        student_number=student_number,
+        role='student',
+        teacher_assignments__teacher=request.user,
+        teacher_assignments__is_active=True,
+    )
 
     # 削除・解除処理は別ビュー(student_delete_execute_view)に移動しました
     
@@ -266,7 +273,8 @@ def student_delete_confirm_view(request, student_number):
     student = CustomUser.objects.filter(
         student_number=student_number,
         role='student',
-        managed_by=request.user,
+        teacher_assignments__teacher=request.user,
+        teacher_assignments__is_active=True,
     ).first()
     if not student:
         messages.error(request, '担当外の学生の削除はできません。')
@@ -293,18 +301,23 @@ def student_delete_execute_view(request, student_number):
     if request.method != 'POST':
         return redirect('school_management:student_detail', student_number=student_number)
 
-    student = get_object_or_404(CustomUser, student_number=student_number, role='student', managed_by=request.user)
+    student = get_object_or_404(
+        CustomUser,
+        student_number=student_number,
+        role='student',
+        teacher_assignments__teacher=request.user,
+        teacher_assignments__is_active=True,
+    )
     delete_type = request.POST.get('delete_type')
 
     if delete_type == 'unlink':
         try:
             student_name = student.full_name
-            student.managed_by.remove(request.user)
-            
+            TeacherStudentAssignment.unassign(request.user, student)
+
             teacher_classrooms = request.user.classrooms.all()
-            for classroom in teacher_classrooms:
-                classroom.students.remove(student)
-                
+            ClassRoomEnrollment.bulk_unenroll(teacher_classrooms, [student])
+
             messages.success(request, f'{student_name}さんを担当から外しました。')
             return redirect('school_management:student_list')
         except Exception as e:

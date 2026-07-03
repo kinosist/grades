@@ -7,7 +7,7 @@ from school_management.models import (
     ClassRoom, LessonSession, Quiz, QuizScore, StudentClassPoints,
     StudentColumnScore, PointColumn, StudentLessonPoints, Group,
     GroupMember, PeerEvaluation, PeerEvaluationSettings, StudentGoal,
-    SelfEvaluation
+    SelfEvaluation, ClassRoomEnrollment, TeacherStudentAssignment
 )
 from datetime import date
 
@@ -38,8 +38,8 @@ class EvaluationCalculationTests(TestCase):
             grading_system='default'
         )
         self.classroom.teachers.add(self.teacher)
-        self.classroom.students.add(self.student)
-        self.student.managed_by.add(self.teacher)
+        ClassRoomEnrollment.enroll(self.classroom, self.student)
+        TeacherStudentAssignment.assign(self.teacher, self.student)
         
         
         # Create session

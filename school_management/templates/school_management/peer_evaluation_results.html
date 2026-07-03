@@ -461,6 +461,9 @@
                                         {% else %}
                                             {{ row.student.full_name }}
                                         {% endif %}
+                                        {% if row.is_unlinked %}
+                                            <span class="badge bg-secondary ms-1">担当から外れた学生</span>
+                                        {% endif %}
                                     </td>
                                     <td class="email-col">{{ row.email|default:'-' }}</td>
                                     <td class="submission-time-col">
@@ -483,6 +486,9 @@
                                                 <td class="detail-col">
                                                     {% if eval_data.is_deleted %}
                                                         <span class="text-danger">{{ eval_data.target_name|default:"-" }}</span>
+                                                    {% elif eval_data.is_unlinked %}
+                                                        {{ eval_data.target_name|default:"-" }}
+                                                        <span class="badge bg-secondary">担当外</span>
                                                     {% else %}
                                                         {{ eval_data.target_name|default:"-" }}
                                                     {% endif %}
@@ -649,6 +655,8 @@
                                 <strong class="text-success">{{ item.rank }}位メンバー理由 (対象:
                                     {% if item.is_deleted %}
                                         <span class="text-danger">{{ item.target_name }}</span>
+                                    {% elif item.is_unlinked %}
+                                        {{ item.target_name }}<span class="badge bg-secondary">担当外</span>
                                     {% else %}
                                         {{ item.target_name }}
                                     {% endif %}

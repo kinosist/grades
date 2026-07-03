@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from school_management.models import (
     ClassRoom, LessonSession, Group, GroupMember,
-    PeerEvaluationSettings, PeerEvaluation
+    PeerEvaluationSettings, PeerEvaluation, ClassRoomEnrollment
 )
 
 User = get_user_model()
@@ -46,7 +46,7 @@ class PeerEvaluationIntegrationTests(TestCase):
             semester='first'
         )
         self.classroom.teachers.add(self.teacher)
-        self.classroom.students.add(self.student1, self.student2, self.student3)
+        ClassRoomEnrollment.bulk_enroll(self.classroom, [self.student1, self.student2, self.student3])
         
         self.session = LessonSession.objects.create(
             classroom=self.classroom,

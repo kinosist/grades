@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from school_management.models import (
     ClassRoom,
+    ClassRoomEnrollment,
     ContributionEvaluation,
     CustomUser,
     Group,
@@ -55,7 +56,7 @@ class PeerEvaluationAggregateFlowTest(TestCase):
 
         self.classroom = ClassRoom.objects.create(class_name='Aggregate Test', year=2026, semester='first')
         self.classroom.teachers.add(self.teacher)
-        self.classroom.students.add(self.s1, self.s2, self.s3, self.s4)
+        ClassRoomEnrollment.bulk_enroll(self.classroom, [self.s1, self.s2, self.s3, self.s4])
 
         self.session = LessonSession.objects.create(
             classroom=self.classroom,

@@ -31,7 +31,7 @@ class StudentNormalizationTests(TestCase):
         # 1. 学籍番号の正規化テスト
         self.assertEqual(User.clean_student_number("s 123 45"), "S12345")
         self.assertEqual(User.clean_student_number("  S12345  "), "S12345")
-        self.assertEqual(User.clean_student_number("ｓ１２３　４５"), "Ｓ１２３４５") # 全角英字は大文字になり、全角スペースは除去される
+        self.assertEqual(User.clean_student_number("ｓ１２３　４５"), "S12345") # 全角英数字は半角に変換され、大文字になり、全角スペースは除去される
         self.assertEqual(User.clean_student_number("s　123　45"), "S12345") # 全角スペース除去テスト
         self.assertEqual(User.clean_student_number(""), "")
         self.assertEqual(User.clean_student_number(None), "")

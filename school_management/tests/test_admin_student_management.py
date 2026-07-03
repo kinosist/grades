@@ -24,7 +24,7 @@ class AdminStudentManagementTests(TestCase):
             role='teacher'
         )
         
-        # 生徒ユーザー作成
+        # 学生ユーザー作成
         self.student = User.objects.create_user(
             email='student_mgr@example.com',
             password='password123',
@@ -46,7 +46,7 @@ class AdminStudentManagementTests(TestCase):
         self.assertRedirects(response, reverse('school_management:dashboard'))
         self.client.logout()
 
-        # 3. 生徒でログインしてアクセス -> ダッシュボードへリダイレクト
+        # 3. 学生でログインしてアクセス -> ダッシュボードへリダイレクト
         self.client.login(email='student_mgr@example.com', password='password123')
         response = self.client.get(url)
         self.assertRedirects(response, reverse('school_management:dashboard'))
@@ -58,11 +58,11 @@ class AdminStudentManagementTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         
-        # コンテキストに含まれる教師と生徒のチェック
+        # コンテキストに含まれる教師と学生のチェック
         self.assertIn('teachers', response.context)
         self.assertIn('students_page', response.context)
         
-        # 作成した教師と生徒がリスト内に存在することを確認
+        # 作成した教師と学生がリスト内に存在することを確認
         teachers_list = response.context['teachers']
         students_page = response.context['students_page']
         self.assertTrue(any(t.id == self.teacher.id for t in teachers_list))
@@ -73,7 +73,7 @@ class AdminStudentManagementTests(TestCase):
         self.client.login(email='admin_mgr@example.com', password='password123')
         url = reverse('school_management:admin_teacher_management')
         
-        # 生徒の完全削除をPOSTリクエストで実行
+        # 学生の完全削除をPOSTリクエストで実行
         response = self.client.post(url, {
             'action': 'delete_student',
             'student_id': self.student.id
@@ -89,7 +89,7 @@ class AdminStudentManagementTests(TestCase):
         self.client.login(email='teacher_mgr@example.com', password='password123')
         url = reverse('school_management:admin_teacher_management')
         
-        # 生徒の完全削除をPOSTリクエストで実行
+        # 学生の完全削除をPOSTリクエストで実行
         response = self.client.post(url, {
             'action': 'delete_student',
             'student_id': self.student.id
@@ -97,7 +97,7 @@ class AdminStudentManagementTests(TestCase):
         # アクセス権限がないため、ダッシュボードへリダイレクトされること
         self.assertRedirects(response, reverse('school_management:dashboard'))
         
-        # DB上で生徒が削除されていない（生存している）ことを確認
+        # DB上で学生が削除されていない（生存している）ことを確認
         self.assertTrue(User.objects.filter(id=self.student.id).exists())
 
     def test_filtering_and_search(self):
@@ -105,7 +105,7 @@ class AdminStudentManagementTests(TestCase):
         self.client.login(email='admin_mgr@example.com', password='password123')
         url = reverse('school_management:admin_teacher_management')
 
-        # 孤立した（担当教員がいない）生徒を作成
+        # 孤立した（担当教員がいない）学生を作成
         orphan_student = User.objects.create_user(
             email='orphan@example.com',
             password='password123',
@@ -132,7 +132,7 @@ class AdminStudentManagementTests(TestCase):
         self.assertEqual(response.context['filtered_students_count'], 1)
         self.assertTrue(response.context['has_filter'])
 
-        # 3. 孤立生徒フィルタテスト (orphan_only='on')
+        # 3. 孤立学生フィルタテスト (orphan_only='on')
         response = self.client.get(url, {'orphan_only': 'on', 'tab': 'students'})
         self.assertEqual(response.status_code, 200)
         students = response.context['students_page'].object_list
@@ -146,7 +146,7 @@ class AdminStudentManagementTests(TestCase):
         self.client.login(email='admin_mgr@example.com', password='password123')
         url = reverse('school_management:admin_teacher_management')
 
-        # さらに51名の生徒を登録（合計52名）
+        # さらに51名の学生を登録（合計52名）
         for i in range(51):
             User.objects.create_user(
                 email=f'pagestudent_{i}@example.com',
@@ -175,7 +175,7 @@ class AdminStudentManagementTests(TestCase):
         self.client.login(email='admin_mgr@example.com', password='password123')
         url = reverse('school_management:admin_teacher_management')
 
-        # さらに2名生徒を作成
+        # さらに2名学生を作成
         student2 = User.objects.create_user(
             email='student2@example.com',
             password='password123',
@@ -201,7 +201,7 @@ class AdminStudentManagementTests(TestCase):
         # 削除されたことを確認
         self.assertFalse(User.objects.filter(id=self.student.id).exists())
         self.assertFalse(User.objects.filter(id=student2.id).exists())
-        # 選択しなかった生徒は存在することを確認
+        # 選択しなかった学生は存在することを確認
         self.assertTrue(User.objects.filter(id=student3.id).exists())
 
     def test_bulk_delete_students_denied_for_non_admin(self):
@@ -224,7 +224,7 @@ class AdminStudentManagementTests(TestCase):
         })
         self.assertRedirects(response, reverse('school_management:dashboard'))
 
-        # 生徒が削除されていないことを確認
+        # 学生が削除されていないことを確認
         self.assertTrue(User.objects.filter(id=self.student.id).exists())
         self.assertTrue(User.objects.filter(id=student2.id).exists())
 
@@ -232,7 +232,7 @@ class AdminStudentManagementTests(TestCase):
         self.client.login(email='admin_mgr@example.com', password='password123')
         url = reverse('school_management:admin_teacher_management')
 
-        # さらに3名の生徒を作成（合計4名）
+        # さらに3名の学生を作成（合計4名）
         for i in range(3):
             User.objects.create_user(
                 email=f'bulk_stu_{i}@example.com',
@@ -242,21 +242,21 @@ class AdminStudentManagementTests(TestCase):
                 role='student'
             )
 
-        # 全生徒を一括削除（フィルタなし、除外なし）
+        # 全学生を一括削除（フィルタなし、除外なし）
         response = self.client.post(url, {
             'action': 'bulk_delete_students',
             'select_all': 'true'
         })
         self.assertRedirects(response, f"{url}?tab=students")
 
-        # すべての生徒が削除されていることを確認
+        # すべての学生が削除されていることを確認
         self.assertEqual(User.objects.filter(role='student').count(), 0)
 
     def test_bulk_delete_select_all_with_exclusions(self):
         self.client.login(email='admin_mgr@example.com', password='password123')
         url = reverse('school_management:admin_teacher_management')
 
-        # さらに3名の生徒を作成（合計4名）
+        # さらに3名の学生を作成（合計4名）
         students = []
         for i in range(3):
             s = User.objects.create_user(
@@ -268,7 +268,7 @@ class AdminStudentManagementTests(TestCase):
             )
             students.append(s)
 
-        # self.student と students[1] を除外して、全生徒を一括削除
+        # self.student と students[1] を除外して、全学生を一括削除
         response = self.client.post(url, {
             'action': 'bulk_delete_students',
             'select_all': 'true',
@@ -276,7 +276,7 @@ class AdminStudentManagementTests(TestCase):
         })
         self.assertRedirects(response, f"{url}?tab=students")
 
-        # 除外した生徒のみが存在することを確認
+        # 除外した学生のみが存在することを確認
         remaining_students = User.objects.filter(role='student')
         self.assertEqual(remaining_students.count(), 2)
         remaining_ids = [s.id for s in remaining_students]

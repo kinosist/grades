@@ -288,7 +288,7 @@
             display: block;
         }
 
-        /* 生徒管理テーブルおよび絞り込み用のスタイル */
+        /* 学生管理テーブルおよび絞り込み用のスタイル */
         .filter-form {
             background: white;
             padding: 20px;
@@ -621,7 +621,7 @@
         
         <div class="admin-info">
             <h2>管理者機能</h2>
-            <p>このページでは教員の追加・削除、およびシステム全体の生徒の確認・完全削除ができます。</p>
+            <p>このページでは教員の追加・削除、およびシステム全体の学生の確認・完全削除ができます。</p>
         </div>
         
         {% if messages %}
@@ -637,7 +637,7 @@
         <!-- タブボタン -->
         <div class="tabs">
             <button id="btn-tab-teachers" class="tab-btn {% if active_tab == 'teachers' %}active{% endif %}" onclick="switchTab('teachers')">教員管理</button>
-            <button id="btn-tab-students" class="tab-btn {% if active_tab == 'students' %}active{% endif %}" onclick="switchTab('students')">生徒管理</button>
+            <button id="btn-tab-students" class="tab-btn {% if active_tab == 'students' %}active{% endif %}" onclick="switchTab('students')">学生管理</button>
         </div>
         
         <!-- 教員管理コンテンツ -->
@@ -716,7 +716,7 @@
             </div>
         </div>
 
-        <!-- 生徒管理コンテンツ -->
+        <!-- 学生管理コンテンツ -->
         <div id="students-content" class="tab-content {% if active_tab == 'students' %}active{% endif %}">
             <!-- 検索 ＆ 絞り込みフォーム -->
             <form method="get" class="filter-form" id="studentFilterForm">
@@ -749,8 +749,8 @@
                 <!-- テーブルヘッダー（タイトル、統計バッジ、アクションを集約） -->
                 <div class="table-header">
                     <div class="table-title-group">
-                        <h2>登録済み生徒一覧</h2>
-                        <div class="stats-badge">全生徒数: {{ total_students_count }}名</div>
+                        <h2>登録済み学生一覧</h2>
+                        <div class="stats-badge">全学生数: {{ total_students_count }}名</div>
                         {% if has_filter %}
                             <div class="stats-badge" style="background-color: #e2e8f0; color: #2d3748;">絞り込み結果: {{ filtered_students_count }}名</div>
                         {% endif %}
@@ -760,7 +760,7 @@
                     </div>
                     <div class="table-actions">
                         <button type="button" id="toggleDeleteModeBtn" class="btn btn-small" style="background: #4a5568;" onclick="toggleDeleteMode()">削除モード</button>
-                        <button type="button" id="bulkDeleteBtn" class="btn btn-danger btn-small delete-mode-btn-only" style="display: none;" disabled onclick="submitBulkDelete()">選択した生徒を削除</button>
+                        <button type="button" id="bulkDeleteBtn" class="btn btn-danger btn-small delete-mode-btn-only" style="display: none;" disabled onclick="submitBulkDelete()">選択した学生を削除</button>
                     </div>
                 </div>
 
@@ -805,8 +805,8 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="6" class="empty-cell delete-mode-only">該当する生徒はいません</td>
-                                <td colspan="5" class="empty-cell" id="emptyCellNormal">該当する生徒はいません</td>
+                                <td colspan="6" class="empty-cell delete-mode-only">該当する学生はいません</td>
+                                <td colspan="5" class="empty-cell" id="emptyCellNormal">該当する学生はいません</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -926,9 +926,9 @@
 
         function confirmDelete(name, number, teachers) {
             return confirm(
-                `生徒「${name}（学籍番号: ${number}）」を削除しますか？\n` +
+                `学生「${name}（学籍番号: ${number}）」を削除しますか？\n` +
                 `【現在の担当教員】: ${teachers}\n\n` +
-                `※警告: この生徒アカウントおよび紐づく成績・評価ポイント・提出レポート等のすべてのデータが完全に削除され、復元することはできません。`
+                `※警告: この学生アカウントおよび紐づく成績・評価ポイント・提出レポート等のすべてのデータが完全に削除され、復元することはできません。`
             );
         }
 
@@ -1041,12 +1041,12 @@
                     btn.disabled = false;
                     btn.style.opacity = '1';
                     btn.style.cursor = 'pointer';
-                    btn.innerText = `選択した生徒を削除 (${totalCount}名)`;
+                    btn.innerText = `選択した学生を削除 (${totalCount}名)`;
                 } else {
                     btn.disabled = true;
                     btn.style.opacity = '0.5';
                     btn.style.cursor = 'not-allowed';
-                    btn.innerText = '選択した生徒を削除';
+                    btn.innerText = '選択した学生を削除';
                 }
             }
         }
@@ -1065,7 +1065,7 @@
             
             if (count <= 0) return;
             
-            const confirmMsg = `選択した ${count} 名の生徒を削除しますか？\n\n※警告: 選択した生徒アカウントおよび紐づくすべてのデータが完全に削除され、復元することはできません。`;
+            const confirmMsg = `選択した ${count} 名の学生を削除しますか？\n\n※警告: 選択した学生アカウントおよび紐づくすべてのデータが完全に削除され、復元することはできません。`;
             if (!confirm(confirmMsg)) return;
             
             const form = document.getElementById('hiddenBulkDeleteForm');
@@ -1108,7 +1108,7 @@
                 orphanInput.className = 'dynamic-input';
                 form.appendChild(orphanInput);
                 
-                // 除外する生徒IDを追加
+                // 除外する学生IDを追加
                 const deselectedIds = JSON.parse(sessionStorage.getItem('admin_student_deselected_ids') || '[]');
                 deselectedIds.forEach(id => {
                     const input = document.createElement('input');
@@ -1119,7 +1119,7 @@
                     form.appendChild(input);
                 });
             } else {
-                // 選択された生徒IDを追加
+                // 選択された学生IDを追加
                 const selectedIds = JSON.parse(sessionStorage.getItem('admin_student_selected_ids') || '[]');
                 selectedIds.forEach(id => {
                     const input = document.createElement('input');

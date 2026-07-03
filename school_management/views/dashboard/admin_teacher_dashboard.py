@@ -16,7 +16,7 @@ def admin_teacher_management(request):
     # 既存の教員一覧を取得
     teachers = CustomUser.objects.filter(role='teacher').order_by('created_at')
     
-    # 教員追加・削除・生徒削除処理
+    # 教員追加・削除・学生削除処理
     if request.method == 'POST':
         action = request.POST.get('action')
         
@@ -71,10 +71,10 @@ def admin_teacher_management(request):
                     student_name = student.full_name
                     student_number = student.student_number
                     student.delete()
-                    messages.success(request, f'生徒 {student_name}さん（学籍番号: {student_number}）を削除しました。')
+                    messages.success(request, f'学生 {student_name}さん（学籍番号: {student_number}）を削除しました。')
                     return redirect(f"{reverse('school_management:admin_teacher_management')}?tab=students")
                 except CustomUser.DoesNotExist:
-                    messages.error(request, '生徒が見つかりません。')
+                    messages.error(request, '学生が見つかりません。')
                 except Exception as e:
                     messages.error(request, f'削除中にエラーが発生しました: {str(e)}')
         
@@ -105,14 +105,14 @@ def admin_teacher_management(request):
                         student_qs = student_qs.exclude(id__in=deselected_ids)
                         
                     deleted_count, _ = student_qs.delete()
-                    messages.success(request, f'選択した {deleted_count}名の生徒を削除しました。')
+                    messages.success(request, f'選択した {deleted_count}名の学生を削除しました。')
                 else:
                     student_ids = request.POST.getlist('selected_student_ids')
                     if student_ids:
                         deleted_count, _ = CustomUser.objects.filter(id__in=student_ids, role='student').delete()
-                        messages.success(request, f'選択した {deleted_count}名の生徒を削除しました。')
+                        messages.success(request, f'選択した {deleted_count}名の学生を削除しました。')
                     else:
-                        messages.error(request, '削除する生徒が選択されていません。')
+                        messages.error(request, '削除する学生が選択されていません。')
                 return redirect(f"{reverse('school_management:admin_teacher_management')}?tab=students")
             except Exception as e:
                 messages.error(request, f'一括削除中にエラーが発生しました: {str(e)}')
@@ -123,7 +123,7 @@ def admin_teacher_management(request):
     teacher_filter_id = request.GET.get('teacher_id', '').strip()
     orphan_only = request.GET.get('orphan_only', '') == 'on'
     
-    # 既存の生徒一覧を取得（担当教員の情報を効率的にロード）
+    # 既存の学生一覧を取得（担当教員の情報を効率的にロード）
     student_qs = CustomUser.objects.filter(role='student').prefetch_related('managed_by').order_by('student_number')
     
     # フィルターが適用されているか
@@ -142,7 +142,7 @@ def admin_teacher_management(request):
     if teacher_filter_id:
         student_qs = student_qs.filter(managed_by__id=teacher_filter_id)
         
-    # 孤立生徒フィルタ
+    # 孤立学生フィルタ
     if orphan_only:
         student_qs = student_qs.filter(managed_by__isnull=True)
         

@@ -65,7 +65,7 @@ def _build_submission_detail(evaluation, group_name_map, student_name_map):
         is_deleted = False
         if not target_name:
             if member_id:
-                target_name = '削除済みの生徒'
+                target_name = '削除済みの学生'
                 is_deleted = True
             else:
                 target_name = '不明'

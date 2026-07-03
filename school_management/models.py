@@ -51,16 +51,20 @@ class CustomUser(AbstractUser):
     @staticmethod
     def clean_student_number(val):
         import re
+        import unicodedata
         if not val:
             return ""
-        return re.sub(r'\s+', '', str(val)).upper()
+        val = unicodedata.normalize('NFKC', str(val))
+        return re.sub(r'\s+', '', val).upper()
 
     @staticmethod
     def clean_email(val):
         import re
+        import unicodedata
         if not val:
             return None
-        cleaned = re.sub(r'\s+', '', str(val)).lower()
+        val = unicodedata.normalize('NFKC', str(val))
+        cleaned = re.sub(r'\s+', '', val).lower()
         return cleaned if cleaned else None
 
     username = None  # usernameフィールドを無効化

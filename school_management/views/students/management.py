@@ -28,7 +28,8 @@ def student_edit_view(request, student_number):
         full_name = request.POST.get('full_name')
         furigana = request.POST.get('furigana')
         email = request.POST.get('email')
-        
+        memo = request.POST.get('memo', '')
+
         # バリデーション
         if not full_name or not furigana:
             messages.error(request, '氏名とふりがなは必須項目です。')
@@ -49,7 +50,8 @@ def student_edit_view(request, student_number):
                 student.full_name = full_name
                 student.furigana = furigana
                 student.email = cleaned_email
-                
+                student.memo = memo
+
                 student.save()
                 messages.success(request, f'{student.full_name}さんの情報を更新しました。')
                 return redirect('school_management:student_detail', student_number=student.student_number)
@@ -104,21 +106,21 @@ def student_create_view(request):
                     continue
 
                 parts = [part.strip() for part in line.split(',')]
-                if len(parts) < 3:
-                    errors.append(f'行{line_num}: 必要な項目が不足しています（学籍番号,氏名,ふりがな） - {line}')
+                if len(parts) < 4:
+                    errors.append(f'行{line_num}: 必要な項目が不足しています（学籍番号,氏名,ふりがな,メールアドレス） - {line}')
                     continue
 
                 student_number = parts[0]
                 full_name = parts[1]
                 furigana = parts[2]
-                email = parts[3] if len(parts) > 3 and parts[3].strip() else None
+                email = parts[3] if parts[3].strip() else None
 
                 # 正規化
                 student_number = Student.clean_student_number(student_number)
                 email = Student.clean_email(email)
 
-                if not student_number or not full_name or not furigana:
-                    errors.append(f'行{line_num}: 学籍番号・氏名・ふりがなは必須です')
+                if not student_number or not full_name or not furigana or not email:
+                    errors.append(f'行{line_num}: 学籍番号・氏名・ふりがな・メールアドレスは必須です')
                     continue
 
                 duplicate_student_line = seen_student_numbers.get(student_number)
@@ -267,8 +269,9 @@ def student_create_view(request):
             full_name = request.POST.get('full_name')
             furigana = request.POST.get('furigana')
             email = request.POST.get('email')
-            
-            if student_number and full_name and furigana:
+            memo = request.POST.get('memo', '')
+
+            if student_number and full_name and furigana and email:
                 # 正規化
                 student_number = Student.clean_student_number(student_number)
                 email = Student.clean_email(email)
@@ -326,14 +329,21 @@ def student_create_view(request):
                             password=default_password,
                             student_number=student_number,
                             furigana=furigana,
+                            memo=memo,
                             role='student'
                         )
                         is_new = True
                     else:
                         student = existing_student
+                        update_fields = []
                         if not student.furigana and furigana:
                             student.furigana = furigana
-                            student.save(update_fields=['furigana'])
+                            update_fields.append('furigana')
+                        if memo and not student.memo:
+                            student.memo = memo
+                            update_fields.append('memo')
+                        if update_fields:
+                            student.save(update_fields=update_fields)
                     
                     # 担当教員として紐づけ
                     TeacherStudentAssignment.assign(request.user, student)

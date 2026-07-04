@@ -81,6 +81,7 @@ class CustomUser(AbstractUser):
     )
     student_number = models.CharField(max_length=20, blank=True, verbose_name='学籍番号')
     teacher_id = models.CharField(max_length=20, blank=True, verbose_name='教員ID')
+    memo = models.TextField(blank=True, default='', verbose_name='備考')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='登録日時')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
 

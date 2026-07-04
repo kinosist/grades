@@ -65,6 +65,11 @@
                             </div>
 
                             <div class="mb-3">
+                                <label for="memo" class="form-label">備考</label>
+                                <textarea class="form-control" id="memo" name="memo" rows="3">{{ student.memo }}</textarea>
+                            </div>
+
+                            <div class="mb-3">
                                 <label class="form-label">登録日時</label>
                                 <p class="form-control-plaintext">{{ student.created_at|date:'Y年m月d日 H:i' }}</p>
                             </div>

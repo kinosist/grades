@@ -35,7 +35,7 @@ def student_detail_view(request, student_number):
     for classroom in classes:
         try:
             class_points_obj = StudentClassPoints.objects.get(student=student, classroom=classroom)
-            class_points = class_points_obj.points
+            class_points = class_points_obj.class_points
         except StudentClassPoints.DoesNotExist:
             class_points = 0
         

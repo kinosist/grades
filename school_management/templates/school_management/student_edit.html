@@ -45,9 +45,9 @@
                             </div>
 
                             <div class="mb-3">
-                                <label for="email" class="form-label">メールアドレス（任意）</label>
-                                <input type="email" class="form-control" id="email" name="email" 
-                                       value="{{ student.email }}">
+                                <label for="email" class="form-label">メールアドレス <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="email" name="email"
+                                       value="{{ student.email }}" required>
                             </div>
                         </div>
 

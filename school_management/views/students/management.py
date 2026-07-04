@@ -31,20 +31,19 @@ def student_edit_view(request, student_number):
         memo = request.POST.get('memo', '')
 
         # バリデーション
-        if not full_name or not furigana:
-            messages.error(request, '氏名とふりがなは必須項目です。')
+        cleaned_email = Student.clean_email(email)
+        if not full_name or not furigana or not cleaned_email:
+            messages.error(request, '氏名・ふりがな・メールアドレスは必須項目です。')
         else:
             try:
-                # メールアドレスの正規化と重複チェック
-                cleaned_email = Student.clean_email(email)
-                if cleaned_email:
-                    other_student = Student.objects.filter(role='student', email=cleaned_email).exclude(id=student.id).first()
-                    if other_student:
-                        messages.error(request, f'メールアドレス "{cleaned_email}" は、既に別の学生（学籍番号: {other_student.student_number}）に使用されています。')
-                        return render(request, 'school_management/student_edit.html', {
-                            'student': student,
-                            'csrf_token': csrf_token,
-                        })
+                # メールアドレスの重複チェック（正規化は上で実施済み）
+                other_student = Student.objects.filter(role='student', email=cleaned_email).exclude(id=student.id).first()
+                if other_student:
+                    messages.error(request, f'メールアドレス "{cleaned_email}" は、既に別の学生（学籍番号: {other_student.student_number}）に使用されています。')
+                    return render(request, 'school_management/student_edit.html', {
+                        'student': student,
+                        'csrf_token': csrf_token,
+                    })
 
                 # 学生情報を更新
                 student.full_name = full_name

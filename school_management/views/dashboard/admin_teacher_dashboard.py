@@ -115,13 +115,16 @@ def admin_teacher_management(request):
                     if deselected_ids:
                         student_qs = student_qs.exclude(id__in=deselected_ids)
                         
-                    deleted_count, _ = student_qs.delete()
-                    messages.success(request, f'選択した {deleted_count}名の学生を削除しました。')
+                    target_count = student_qs.count()
+                    student_qs.delete()
+                    messages.success(request, f'選択した {target_count}名の学生を削除しました。')
                 else:
                     student_ids = request.POST.getlist('selected_student_ids')
                     if student_ids:
-                        deleted_count, _ = CustomUser.objects.filter(id__in=student_ids, role='student').delete()
-                        messages.success(request, f'選択した {deleted_count}名の学生を削除しました。')
+                        qs = CustomUser.objects.filter(id__in=student_ids, role='student')
+                        target_count = qs.count()
+                        qs.delete()
+                        messages.success(request, f'選択した {target_count}名の学生を削除しました。')
                     else:
                         messages.error(request, '削除する学生が選択されていません。')
                 return redirect(f"{reverse('school_management:admin_teacher_management')}?tab=students")

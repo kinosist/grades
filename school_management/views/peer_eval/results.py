@@ -1,8 +1,9 @@
 from collections import defaultdict
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 from ...models import LessonSession, PeerEvaluationSettings, GroupMember, Student
 
 def _safe_int(value):
@@ -175,14 +176,19 @@ def clear_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> H
     return HttpResponseRedirect(next_url)
 
 @login_required
+@require_POST
 def toggle_test_mode(request: HttpRequest) -> HttpResponse:
     """テストモードのON/OFFを切り替える"""
-    if request.method == 'POST':
-        current_mode = request.session.get('test_mode', False)
-        request.session['test_mode'] = not current_mode
+    if not request.user.is_teacher:
         from django.contrib import messages
-        mode_str = 'ON' if not current_mode else 'OFF'
-        messages.success(request, f'テストモードを {mode_str} にしました。')
+        messages.error(request, 'この機能にアクセスする権限がありません。')
+        return redirect('school_management:dashboard')
+
+    current_mode = request.session.get('test_mode', False)
+    request.session['test_mode'] = not current_mode
+    from django.contrib import messages
+    mode_str = 'ON' if not current_mode else 'OFF'
+    messages.success(request, f'テストモードを {mode_str} にしました。')
     next_url = request.POST.get('next') or request.META.get('HTTP_REFERER')
     if not next_url or not url_has_allowed_host_and_scheme(
         next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()

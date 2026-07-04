@@ -5,9 +5,8 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.db import transaction
 from django.db.utils import OperationalError
-from django.utils import timezone
 from django.views.decorators.http import require_http_methods
-from ...models import Student, ClassRoom, ClassRoomEnrollment, TeacherStudentAssignment
+from ...models import Student, ClassRoomEnrollment, TeacherStudentAssignment
 
 # 学生管理ビュー
 @login_required
@@ -31,8 +30,10 @@ def student_list_view(request):
                         teacher_assignments__is_active=True,
                     )
                     student_name = student.full_name
-                    student.delete()
-                    messages.success(request, f'{student_name}さんを削除しました。')
+                    TeacherStudentAssignment.unassign(request.user, student)
+                    teacher_classrooms = request.user.classrooms.all()
+                    ClassRoomEnrollment.bulk_unenroll(teacher_classrooms, [student])
+                    messages.success(request, f'{student_name}さんを担当から外しました。')
                     return redirect('school_management:student_list')
                 except Student.DoesNotExist:
                     messages.error(request, '学生が見つかりません。')
@@ -155,6 +156,7 @@ def student_bulk_delete_confirm(request):
         enrollment_map = {}
         for enrollment in ClassRoomEnrollment.objects.filter(
             student_id__in=[s.id for s in students_to_delete],
+            classroom__teachers=request.user,
             is_active=True,
         ).select_related('classroom'):
             enrollment_map.setdefault(enrollment.student_id, []).append(enrollment.classroom)
@@ -198,6 +200,10 @@ def student_bulk_delete_execute(request):
 
     if delete_type not in ['unlink', 'hard_delete']:
         messages.error(request, '無効な操作です。')
+        return redirect('school_management:student_list')
+
+    if delete_type == 'hard_delete' and request.user.role != 'admin':
+        messages.error(request, '完全削除は管理者のみ実行できます。')
         return redirect('school_management:student_list')
 
     try:

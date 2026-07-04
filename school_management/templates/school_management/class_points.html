@@ -360,13 +360,8 @@
                                         <tr class="{% if detail.is_simulated %}table-warning{% endif %}">
                                             <td>第{{ detail.session.session_number }}回</td>
                                             <td>{{ detail.session.date|date:"m/d" }}</td>
-                                            {% if detail.is_simulated %}
-                                            <td>{{ detail.contrib }}pt <small class="text-muted text-decoration-line-through d-block">本番</small></td>
-                                            <td>{{ detail.vote }}pt <small class="text-muted text-decoration-line-through d-block">本番</small></td>
-                                            {% else %}
                                             <td>{{ detail.contrib }}pt</td>
                                             <td>{{ detail.vote }}pt</td>
-                                            {% endif %}
                                             <td class="fw-bold {% if detail.is_simulated %}text-danger{% else %}text-success{% endif %}">
                                                 {{ detail.total }}pt
                                                 {% if detail.is_simulated %}<span class="badge bg-warning text-dark ms-1">テスト</span>{% endif %}

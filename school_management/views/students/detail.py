@@ -280,7 +280,7 @@ def student_delete_confirm_view(request, student_number):
         messages.error(request, '担当外の学生の削除はできません。')
         return redirect('school_management:student_list')
 
-    classrooms = student.classroom_set.all()
+    classrooms = student.classroom_set.filter(teachers=request.user)
     classroom_names = [f"{c.get_semester_display()} {c.class_name} ({c.year})" for c in classrooms]
     
     context = {
@@ -309,6 +309,10 @@ def student_delete_execute_view(request, student_number):
         teacher_assignments__is_active=True,
     )
     delete_type = request.POST.get('delete_type')
+
+    if delete_type == 'hard_delete' and request.user.role != 'admin':
+        messages.error(request, '完全削除は管理者のみ実行できます。')
+        return redirect('school_management:student_list')
 
     if delete_type == 'unlink':
         try:

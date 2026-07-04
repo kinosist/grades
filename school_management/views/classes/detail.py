@@ -51,7 +51,7 @@ def add_point_column(request, class_id):
     
     if classroom.grading_system == 'default':
         messages.error(request, '通常評価（デフォルト）では独自の評価項目を追加できません。')
-        return redirect(f"{reverse('school_management:class_detail', args=[classroom.id])}?tab=settings")
+        return redirect(f"{reverse('school_management:class_detail', args=[classroom.id])}?active_tab=settings")
         
     column_title = request.POST.get('column_title', '').strip()
     

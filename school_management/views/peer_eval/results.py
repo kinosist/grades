@@ -58,94 +58,94 @@ def _build_submission_detail(evaluation, group_name_map, student_name_map, activ
     }
 
 @login_required
+@require_POST
 def save_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> HttpResponse:
     """ピア評価のシミュレーション（テスト用）点数をセッションに保存する"""
-    if request.method == 'POST':
-        session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
-        class_id = str(session.classroom.id)
-        
-        sim_data = request.session.get('peer_sim_points', {})
-        if class_id not in sim_data:
-            sim_data[class_id] = {}
-        
-        session_sim = {}
-        session_sim['point_mode'] = request.POST.get('sim_point_mode', 'settings')
-        
-        for key, value in request.POST.items():
-            if value.strip():
-                # 詳細な順位・獲得票の入力形式
-                # 例: sim_member_rank_1_123, sim_group_rank_2_123
-                if key.startswith('sim_member_rank_'):
-                    # parts: ['sim', 'member', 'rank', '1', '123']
-                    parts = key.split('_')
-                    if len(parts) >= 5:
-                        rank = parts[3]
-                        student_id = parts[4]
-                        if student_id not in session_sim:
-                            session_sim[student_id] = {}
-                        try:
-                            session_sim[student_id][f'member_rank_{rank}'] = float(value)
-                        except ValueError:
-                            pass
-                elif key.startswith('sim_group_rank_'):
-                    parts = key.split('_')
-                    if len(parts) >= 5:
-                        rank = parts[3]
-                        student_id = parts[4]
-                        if student_id not in session_sim:
-                            session_sim[student_id] = {}
-                        try:
-                            session_sim[student_id][f'group_rank_{rank}'] = float(value)
-                        except ValueError:
-                            pass
-                elif key.startswith('sim_contrib_'):
-                    student_id = key.replace('sim_contrib_', '')
+    session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
+    class_id = str(session.classroom.id)
+
+    sim_data = request.session.get('peer_sim_points', {})
+    if class_id not in sim_data:
+        sim_data[class_id] = {}
+
+    session_sim = {}
+    session_sim['point_mode'] = request.POST.get('sim_point_mode', 'settings')
+
+    for key, value in request.POST.items():
+        if value.strip():
+            # 詳細な順位・獲得票の入力形式
+            # 例: sim_member_rank_1_123, sim_group_rank_2_123
+            if key.startswith('sim_member_rank_'):
+                # parts: ['sim', 'member', 'rank', '1', '123']
+                parts = key.split('_')
+                if len(parts) >= 5:
+                    rank = parts[3]
+                    student_id = parts[4]
                     if student_id not in session_sim:
                         session_sim[student_id] = {}
                     try:
-                        session_sim[student_id]['contrib'] = float(value)
+                        session_sim[student_id][f'member_rank_{rank}'] = float(value)
                     except ValueError:
                         pass
-                elif key.startswith('sim_group_manual_'):
-                    student_id = key.replace('sim_group_manual_', '')
+            elif key.startswith('sim_group_rank_'):
+                parts = key.split('_')
+                if len(parts) >= 5:
+                    rank = parts[3]
+                    student_id = parts[4]
                     if student_id not in session_sim:
                         session_sim[student_id] = {}
                     try:
-                        session_sim[student_id]['group_manual'] = float(value)
+                        session_sim[student_id][f'group_rank_{rank}'] = float(value)
                     except ValueError:
                         pass
-                # 古い形式との互換性用
-                elif key.startswith('sim_member_score_'):
-                    student_id = key.replace('sim_member_score_', '')
-                    if student_id not in session_sim:
-                        session_sim[student_id] = {}
-                    try:
-                        session_sim[student_id]['member'] = float(value)
-                    except ValueError:
-                        pass
-                elif key.startswith('sim_group_score_'):
-                    student_id = key.replace('sim_group_score_', '')
-                    if student_id not in session_sim:
-                        session_sim[student_id] = {}
-                    try:
-                        session_sim[student_id]['group'] = float(value)
-                    except ValueError:
-                        pass
-                elif key.startswith('sim_score_'):
-                    student_id = key.replace('sim_score_', '')
-                    if student_id not in session_sim:
-                        session_sim[student_id] = {}
-                    try:
-                        session_sim[student_id]['member'] = float(value)
-                    except ValueError:
-                        pass
-        
-        sim_data[class_id][str(session_id)] = session_sim
-        request.session['peer_sim_points'] = sim_data
-        
-        from django.contrib import messages
-        messages.success(request, 'シミュレーション用のテスト点数を保存しました。')
-        
+            elif key.startswith('sim_contrib_'):
+                student_id = key.replace('sim_contrib_', '')
+                if student_id not in session_sim:
+                    session_sim[student_id] = {}
+                try:
+                    session_sim[student_id]['contrib'] = float(value)
+                except ValueError:
+                    pass
+            elif key.startswith('sim_group_manual_'):
+                student_id = key.replace('sim_group_manual_', '')
+                if student_id not in session_sim:
+                    session_sim[student_id] = {}
+                try:
+                    session_sim[student_id]['group_manual'] = float(value)
+                except ValueError:
+                    pass
+            # 古い形式との互換性用
+            elif key.startswith('sim_member_score_'):
+                student_id = key.replace('sim_member_score_', '')
+                if student_id not in session_sim:
+                    session_sim[student_id] = {}
+                try:
+                    session_sim[student_id]['member'] = float(value)
+                except ValueError:
+                    pass
+            elif key.startswith('sim_group_score_'):
+                student_id = key.replace('sim_group_score_', '')
+                if student_id not in session_sim:
+                    session_sim[student_id] = {}
+                try:
+                    session_sim[student_id]['group'] = float(value)
+                except ValueError:
+                    pass
+            elif key.startswith('sim_score_'):
+                student_id = key.replace('sim_score_', '')
+                if student_id not in session_sim:
+                    session_sim[student_id] = {}
+                try:
+                    session_sim[student_id]['member'] = float(value)
+                except ValueError:
+                    pass
+
+    sim_data[class_id][str(session_id)] = session_sim
+    request.session['peer_sim_points'] = sim_data
+
+    from django.contrib import messages
+    messages.success(request, 'シミュレーション用のテスト点数を保存しました。')
+
     next_url = request.META.get('HTTP_REFERER')
     if not next_url or not url_has_allowed_host_and_scheme(
         next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
@@ -154,20 +154,20 @@ def save_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> Ht
     return HttpResponseRedirect(next_url)
 
 @login_required
+@require_POST
 def clear_peer_evaluation_simulation(request: HttpRequest, session_id: int) -> HttpResponse:
     """特定のセッションのシミュレーションデータをクリアする"""
-    if request.method == 'POST':
-        session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
-        class_id = str(session.classroom.id)
-        
-        sim_data = request.session.get('peer_sim_points', {})
-        if class_id in sim_data and str(session_id) in sim_data[class_id]:
-            del sim_data[class_id][str(session_id)]
-            request.session['peer_sim_points'] = sim_data
-            
-        from django.contrib import messages
-        messages.success(request, 'この授業回のシミュレーションデータをクリアしました。')
-        
+    session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
+    class_id = str(session.classroom.id)
+
+    sim_data = request.session.get('peer_sim_points', {})
+    if class_id in sim_data and str(session_id) in sim_data[class_id]:
+        del sim_data[class_id][str(session_id)]
+        request.session['peer_sim_points'] = sim_data
+
+    from django.contrib import messages
+    messages.success(request, 'この授業回のシミュレーションデータをクリアしました。')
+
     next_url = request.META.get('HTTP_REFERER')
     if not next_url or not url_has_allowed_host_and_scheme(
         next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()

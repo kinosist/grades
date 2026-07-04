@@ -3,11 +3,11 @@ from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from django.contrib import messages
 from django.db.models import Avg
-from django.utils import timezone
 from ...models import (
     CustomUser, ClassRoom, LessonSession, QuizScore,
     Attendance, GroupMember, PeerEvaluation, StudentClassPoints,
-    StudentGoal, SelfEvaluation, LessonReport, ClassRoomEnrollment, TeacherStudentAssignment
+    StudentGoal, SelfEvaluation, LessonReport, ClassRoomEnrollment, TeacherStudentAssignment,
+    PeerEvaluationSettings
 )
 
 @login_required
@@ -195,6 +195,11 @@ def class_student_detail_view(request, class_id, student_number):
         # テストモード（シミュレーション）の場合はセッションからデータを取得して上書き
         sim_data_class = request.session.get('peer_sim_points', {}).get(str(classroom.id), {})
         if request.session.get('test_mode') and sim_data_class:
+            sim_session_ids = [sid for sid in sim_data_class.keys() if str(sid).isdigit()]
+            sim_sessions = {
+                s.id: s for s in LessonSession.objects.filter(id__in=sim_session_ids, classroom=classroom)
+            }
+
             sim_total = 0
             sim_count = 0
             for session_id, session_sim in sim_data_class.items():
@@ -205,9 +210,50 @@ def class_student_detail_view(request, class_id, student_number):
                     continue
 
                 if isinstance(data, dict):
-                    # For advanced point modes (manual入力時)
-                    contrib = float(data.get('contrib', data.get('member', 0)) or 0)
-                    group = float(data.get('group_manual', data.get('group', 0)) or 0)
+                    sess = sim_sessions.get(int(session_id)) if str(session_id).isdigit() else None
+                    try:
+                        pe_settings = sess.peer_evaluation_settings if sess else None
+                    except PeerEvaluationSettings.DoesNotExist:
+                        pe_settings = None
+                    point_mode = session_sim.get('point_mode', 'settings')
+
+                    contrib = 0.0
+                    if pe_settings and pe_settings.enable_member_evaluation:
+                        if point_mode == 'settings':
+                            if pe_settings.member_scores:
+                                for i, points in enumerate(pe_settings.member_scores):
+                                    rank = i + 1
+                                    count = data.get(f'member_rank_{rank}')
+                                    if count:
+                                        contrib += float(count) * points
+                        elif point_mode == 'manual':
+                            contrib_val = data.get('contrib')
+                            if contrib_val:
+                                contrib += float(contrib_val)
+                    elif not pe_settings or not pe_settings.enable_group_evaluation:
+                        contrib_val = data.get('contrib', data.get('member'))
+                        if contrib_val:
+                            contrib += float(contrib_val)
+
+                    group = 0.0
+                    if pe_settings and pe_settings.enable_group_evaluation:
+                        if point_mode == 'settings':
+                            if pe_settings.group_scores:
+                                for i, points in enumerate(pe_settings.group_scores):
+                                    rank = i + 1
+                                    count = data.get(f'group_rank_{rank}')
+                                    if count:
+                                        group += float(count) * points
+                        elif point_mode == 'manual':
+                            group_manual = data.get('group_manual')
+                            if group_manual:
+                                group += float(group_manual)
+
+                    # 互換性フォールバック (member, group)
+                    if contrib == 0 and group == 0 and ('member' in data or 'group' in data):
+                        contrib = float(data.get('member', 0) or 0)
+                        group = float(data.get('group', 0) or 0)
+
                     sim_total += (contrib + group)
                 else:
                     # Legacy fallback
@@ -221,7 +267,8 @@ def class_student_detail_view(request, class_id, student_number):
                 peer_count = sim_count
             
         total_count = total_quizzes + peer_count
-        total_score = quiz_stats.get('total', quiz_stats.get('average', 0) * total_quizzes) + peer_total
+        quiz_total = sum({qs.quiz_id: qs.score for qs in all_quiz_scores}.values())
+        total_score = quiz_total + peer_total
         avg_score = round(total_score / total_count, 1) if total_count > 0 else 0
         
     except StudentClassPoints.DoesNotExist:

@@ -81,7 +81,7 @@ def student_list_view(request):
             student.teacher_classrooms = enrollment_map.get(student.id, [])
     except OperationalError:
         messages.error(request, 'データベースの構造が最新ではありません。マイグレーションを実行してください。')
-        students_page = []
+        students_page = Paginator([], 30).get_page(1)
         search_query = request.GET.get('search', '')
 
     context = {
@@ -119,7 +119,11 @@ def student_bulk_delete_confirm(request):
                     Q(full_name__icontains=search_query)
                 )
             if deselected_ids_str:
-                deselected_ids = [int(x.strip()) for x in deselected_ids_str.split(',') if x.strip()]
+                try:
+                    deselected_ids = [int(x.strip()) for x in deselected_ids_str.split(',') if x.strip()]
+                except ValueError:
+                    messages.error(request, '無効な学生IDです。')
+                    return redirect('school_management:student_list')
                 students_qs = students_qs.exclude(id__in=deselected_ids)
             student_ids = list(students_qs.values_list('id', flat=True))
             student_ids_str = ','.join(map(str, student_ids))

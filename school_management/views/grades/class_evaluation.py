@@ -11,9 +11,10 @@ import statistics
 
 # 必要なモデルをインポート
 from ...models import (
-    ClassRoom, LessonSession, Student, StudentLessonPoints, QuizScore, Group, 
-    GroupMember, StudentClassPoints, PeerEvaluation, ContributionEvaluation, 
-    SelfEvaluation, PointColumn, StudentColumnScore, PeerEvaluationSettings
+    ClassRoom, LessonSession, Student, StudentLessonPoints, QuizScore, Group,
+    GroupMember, StudentClassPoints, PeerEvaluation, ContributionEvaluation,
+    SelfEvaluation, PointColumn, StudentColumnScore, PeerEvaluationSettings,
+    QRCodeScan, StudentQRCode
 )
 
 logger = logging.getLogger(__name__)
@@ -181,9 +182,29 @@ def class_evaluation_view(request, class_id):
                 peer_status=session.peer_evaluation_status,
             )
 
+    # 独自評価項目の授業回別の内訳を一括取得（N+1対策）
+    # QRコードスキャン（カメラを使わない手動加点も含む）は授業回に紐づいているため、
+    # ここから「どの授業回で何点」を集計できる
+    custom_scan_rows = QRCodeScan.objects.filter(
+        lesson_session_id__in=session_ids,
+        point_column__isnull=False
+    ).values('lesson_session_id', 'qr_code__student_id', 'point_column_id').annotate(
+        total=Sum('points_awarded')
+    )
+    # { session_id: { student_id: { column_id: points } } }
+    session_student_custom_map = defaultdict(lambda: defaultdict(dict))
+    for row in custom_scan_rows:
+        session_student_custom_map[row['lesson_session_id']][row['qr_code__student_id']][row['point_column_id']] = row['total']
+
+    # 独自評価項目の学生ごとの合計点を一括取得（N+1対策）
+    student_column_scores_map = defaultdict(dict)
+    if point_columns:
+        for scs in StudentColumnScore.objects.filter(column__classroom=classroom):
+            student_column_scores_map[scs.student_id][scs.column_id] = scs.score
+
     # 各学生の評価データを格納するリスト
     student_evaluations = []
-    
+
     for student in students:
         # 各授業回のデータ（ポイント + ピア評価スコア）を格納する辞書
         session_data = {}
@@ -327,6 +348,7 @@ def class_evaluation_view(request, class_id):
                     pass
 
             # セッションごとのデータを辞書に保存
+            # 独自評価項目は、内訳（QR/ピア/他）とは孤立させ、独自項目の列側にのみ表示する
             session_data[session_key] = {
                 'manual_points': manual_points,
                 'quiz_score': quiz_score,
@@ -341,14 +363,13 @@ def class_evaluation_view(request, class_id):
                 'session': session
             }
 
-        # 4. 独自の評価項目（列）ごとの点数を取得
-        custom_column_scores = {}
-        custom_columns_total = 0
-        for col in point_columns:
-            score_obj = StudentColumnScore.objects.filter(student=student, column=col).first()
-            score_val = score_obj.score if score_obj else 0
-            custom_column_scores[col.id] = score_val
-            custom_columns_total += score_val
+        # 4. 独自の評価項目（列）ごとの点数を取得（授業回別の内訳は別モーダルで表示するため保持）
+        student_custom_scores = student_column_scores_map.get(student.id, {})
+        custom_column_details = [
+            {'column': col, 'score': student_custom_scores.get(col.id, 0)}
+            for col in point_columns
+        ]
+        custom_columns_total = sum(item['score'] for item in custom_column_details)
         
         # 5. データベースから保存された出席率、出席点を取得
         attendance_rate = 0
@@ -389,7 +410,7 @@ def class_evaluation_view(request, class_id):
             'total_peer_score': total_peer_score,
             'total_quiz_score': total_quiz_score,
             'custom_columns_total': custom_columns_total,
-            'custom_column_scores': custom_column_scores,
+            'custom_column_details': custom_column_details,
             'attendance_points': saved_attendance_points,
             'attendance_rate': attendance_rate,
             'session_scores': ordered_session_scores,
@@ -444,12 +465,35 @@ def class_evaluation_view(request, class_id):
     base_colspan = (total_sessions * 2 + 7) if view_mode == 'detail' else 7
     table_colspan = base_colspan + point_columns.count()
 
+    # 独自評価項目：列ごとに「全学生 × 授業回」のマトリクスを1つにまとめて作成
+    # （1人ずつ開かず、項目ボタン1つでクラス全員分をまとめて確認できるようにする）
+    ordered_sessions = list(sessions)
+    column_detail_matrices = []
+    for col in point_columns:
+        rows = []
+        for student in students:
+            cells = [
+                session_student_custom_map.get(session.id, {}).get(student.id, {}).get(col.id, 0)
+                for session in ordered_sessions
+            ]
+            rows.append({
+                'student': student,
+                'cells': cells,
+                'total': student_column_scores_map.get(student.id, {}).get(col.id, 0),
+            })
+        column_detail_matrices.append({
+            'column': col,
+            'sessions': ordered_sessions,
+            'rows': rows,
+        })
+
     # テンプレートに渡すコンテキストデータ
     context = {
         'classroom': classroom,
         'student_evaluations': student_evaluations,
         'sessions': sessions,
         'point_columns': point_columns,
+        'column_detail_matrices': column_detail_matrices,
         'total_sessions': total_sessions,
         'grading_system': grading_system,
         'view_mode': view_mode,
@@ -463,43 +507,57 @@ def class_evaluation_view(request, class_id):
 
 @login_required
 @require_POST
-def update_custom_score(request, class_id):
+def add_custom_column_points(request, class_id):
+    """独自評価項目に、QRコードを使わず授業回を指定して手動で加点する
+
+    合計を直接上書きする方式（旧: update_custom_score）は、どの授業回の得点か
+    分からなくなり授業回別の内訳と矛盾するため廃止し、この加点方式に一本化した。
+    実体はQRスキャンと同じ QRCodeScan レコードとして保存するため、
+    評価一覧の授業回別の内訳や、QRコード管理のスキャン履歴にもそのまま反映され、
+    スキャン履歴の削除機能でそのまま取り消すこともできる。
+    """
     try:
         data = json.loads(request.body)
         student_id = data.get('student_id')
         column_id = data.get('column_id')
-        score = data.get('score', 0)
+        session_id = data.get('session_id')
+        points = data.get('points')
 
-        # クラス取得（担当教員かチェック）
-        classroom = get_object_or_404(
-            ClassRoom,
-            id=class_id,
-            teachers=request.user
-        )
-
-        # クラスに属する学生かチェック
+        classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
         student = get_object_or_404(
             Student,
             id=student_id,
             classroom_enrollments__classroom=classroom,
             classroom_enrollments__is_active=True,
         )
+        column = get_object_or_404(PointColumn, id=column_id, classroom=classroom)
+        session = get_object_or_404(LessonSession, id=session_id, classroom=classroom)
 
-        # クラスに属する評価項目かチェック
-        column = get_object_or_404(
-            PointColumn,
-            id=column_id,
-            classroom=classroom
+        try:
+            points = int(points)
+        except (TypeError, ValueError):
+            return JsonResponse({'success': False, 'message': '点数は数値で入力してください。'}, status=400)
+
+        # 加点を間違えた場合は、QRコード管理のスキャン履歴からその加点を削除して取り消す。
+        if not (1 <= points <= 100):
+            return JsonResponse({'success': False, 'message': '点数は1〜100の範囲で入力してください。'}, status=400)
+
+        qr_code, _ = StudentQRCode.objects.get_or_create(student=student, defaults={'is_active': True})
+        QRCodeScan.objects.create(
+            qr_code=qr_code,
+            scanned_by=request.user,
+            lesson_session=session,
+            point_column=column,
+            points_awarded=points,
         )
 
-        # 更新 or 作成
-        StudentColumnScore.objects.update_or_create(
-            student=student,
-            column=column,
-            defaults={'score': score}
+        score_obj, _ = StudentColumnScore.objects.get_or_create(
+            student=student, column=column, defaults={'score': 0}
         )
+        score_obj.score += points
+        score_obj.save()
 
-        return JsonResponse({'success': True})
+        return JsonResponse({'success': True, 'new_total': score_obj.score})
 
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+        return JsonResponse({'success': False, 'message': str(e)}, status=400)

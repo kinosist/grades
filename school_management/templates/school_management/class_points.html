@@ -243,7 +243,7 @@
                     </thead>
                     <tbody>
                         {% for grade in student_grades|dictsortreversed:"class_points" %}
-                        <tr>
+                        <tr class="clickable-row" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#detailModal-{{ grade.student.id }}">
                             <td class="col-rank text-center">
                                 <span class="rank-badge rank-{{ forloop.counter }}">
                                     {{ forloop.counter }}

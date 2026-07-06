@@ -1,3 +1,4 @@
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
@@ -6,6 +7,8 @@ from django.contrib import messages
 from ...models import ClassRoom
 from django.urls import reverse
 import datetime
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def class_create_view(request):
@@ -139,6 +142,7 @@ def class_delete_view(request, class_id):
         classroom.delete()
         messages.success(request, f'クラス「{class_name}」を削除しました。')
     except Exception as e:
+        logger.error(f"クラス削除エラー (class_id={class_id}): {e}", exc_info=True)
         messages.error(request, f'削除中にエラーが発生しました: {str(e)}')
         
     return redirect('school_management:class_list')

@@ -58,13 +58,14 @@ class CustomColumnLogicTests(TestCase):
         # ログイン
         self.client.login(email="teacher@example.com", password="password")
 
-    def test_update_custom_score_api_success(self):
-        """API経由でのスコア更新（正常系）"""
-        url = reverse('school_management:update_custom_score', args=[self.classroom.id])
+    def test_add_custom_column_points_api_success(self):
+        """API経由での授業回指定加点（正常系）"""
+        url = reverse('school_management:add_custom_column_points', args=[self.classroom.id])
         data = {
             'student_id': self.student.id,
             'column_id': self.column1.id,
-            'score': 15
+            'session_id': self.session.id,
+            'points': 15
         }
         response = self.client.post(url, data=json.dumps(data), content_type='application/json')
         if response.status_code == 400:
@@ -75,25 +76,40 @@ class CustomColumnLogicTests(TestCase):
         score_obj = StudentColumnScore.objects.get(student=self.student, column=self.column1)
         self.assertEqual(score_obj.score, 15)
 
-        # 上書きテスト
-        data['score'] = 20
+        # 追加加点は累計されること（合計を上書きするのではなく積み上げる）
+        data['points'] = 20
         response = self.client.post(url, data=json.dumps(data), content_type='application/json')
         score_obj.refresh_from_db()
-        self.assertEqual(score_obj.score, 20)
+        self.assertEqual(score_obj.score, 35)
 
-    def test_update_custom_score_api_unauthorized(self):
-        """API経由でのスコア更新（権限なしエラー）"""
+    def test_add_custom_column_points_api_unauthorized(self):
+        """API経由での加点（権限なしエラー）"""
         # 他の教員でログイン
         self.client.login(email="other@example.com", password="password")
-        url = reverse('school_management:update_custom_score', args=[self.classroom.id])
+        url = reverse('school_management:add_custom_column_points', args=[self.classroom.id])
         data = {
             'student_id': self.student.id,
             'column_id': self.column1.id,
-            'score': 15
+            'session_id': self.session.id,
+            'points': 15
         }
         # この教員はclassroomの担当ではないため例外が発生し400エラーになる想定
         response = self.client.post(url, data=json.dumps(data), content_type='application/json')
         self.assertEqual(response.status_code, 400)
+
+    def test_add_custom_column_points_rejects_out_of_range(self):
+        """加点は1〜100の範囲外だとエラーになること"""
+        url = reverse('school_management:add_custom_column_points', args=[self.classroom.id])
+
+        for invalid_points in [-5, 0, 101]:
+            response = self.client.post(url, data=json.dumps({
+                'student_id': self.student.id,
+                'column_id': self.column1.id,
+                'session_id': self.session.id,
+                'points': invalid_points,
+            }), content_type='application/json')
+            self.assertEqual(response.status_code, 400, f"points={invalid_points} は拒否されるべき")
+            self.assertFalse(response.json().get('success', False))
 
     def test_qr_scan_custom_column_addition(self):
         """QRスキャンによるスコア加算"""

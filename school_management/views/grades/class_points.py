@@ -127,7 +127,7 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
     grading_system = classroom.grading_system
     students = classroom.students.all().order_by('student_number')
-    
+
     # テストモードか判定
     test_mode = request.session.get('test_mode', False)
     

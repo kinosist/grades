@@ -52,6 +52,13 @@ else:
         # Add Railway wildcard domains
         ALLOWED_HOSTS.extend(['.railway.app', '.up.railway.app'])
 
+# Railway（および多くのPaaS）はプロキシでSSLを終端し、アプリにはhttpで転送する。
+# これを設定しないと request.is_secure() が常にFalseになり、
+# build_absolute_uri() が https:// ではなく http:// のURLを生成してしまう
+# （Google OAuthのredirect_uri_mismatchの原因になる）。
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
 # CSRF trusted origins for Railway
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',

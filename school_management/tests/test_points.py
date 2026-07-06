@@ -4,6 +4,7 @@ from datetime import date
 from school_management.models import (
     CustomUser,
     ClassRoom,
+    ClassRoomEnrollment,
     StudentClassPoints,
     LessonSession,
     Group,
@@ -20,7 +21,7 @@ class PointsAPITest(TestCase):
         self.student = CustomUser.objects.create_user(email='student@example.com', full_name='Student One', password='pass123', role='student', student_number='S001')
         self.classroom = ClassRoom.objects.create(class_name='Test Class', year=2025, semester='first')
         self.classroom.teachers.add(self.teacher)
-        self.classroom.students.add(self.student)
+        ClassRoomEnrollment.enroll(self.classroom, self.student)
         # クラスポイントを0で初期化
         StudentClassPoints.objects.get_or_create(
             student=self.student,
@@ -103,7 +104,7 @@ class ClassPointsGroupVoteConsistencyTest(TestCase):
         )
         self.classroom = ClassRoom.objects.create(class_name='Vote Test Class', year=2025, semester='first')
         self.classroom.teachers.add(self.teacher)
-        self.classroom.students.add(self.student1, self.student2, self.student3)
+        ClassRoomEnrollment.bulk_enroll(self.classroom, [self.student1, self.student2, self.student3])
 
         self.session = LessonSession.objects.create(
             classroom=self.classroom,

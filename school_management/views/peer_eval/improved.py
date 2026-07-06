@@ -40,7 +40,8 @@ def _safe_int(value):
         return None
 
 
-def _build_submission_detail(evaluation, group_name_map, student_name_map):
+def _build_submission_detail(evaluation, group_name_map, student_name_map, active_student_ids=None):
+    active_student_ids = active_student_ids or set()
     response = evaluation.response_json or {}
     group_evaluations_list = [] # Initialize as a list
     for entry in response.get('other_group_eval', []):
@@ -63,17 +64,21 @@ def _build_submission_detail(evaluation, group_name_map, student_name_map):
         member_id = _safe_int(entry.get('member_id'))
         target_name = student_name_map.get(member_id)
         is_deleted = False
+        is_unlinked = False
         if not target_name:
             if member_id:
-                target_name = '削除済みの生徒'
+                target_name = '削除済みの学生'
                 is_deleted = True
             else:
                 target_name = '不明'
+        elif member_id not in active_student_ids:
+            is_unlinked = True
         member_evaluations_list.append({ # Append to the list
             'rank': rank,
             'target_name': target_name,
             'reason': (entry.get('reason') or '').strip(),
             'is_deleted': is_deleted,
+            'is_unlinked': is_unlinked,
         })
     member_evaluations_list.sort(key=lambda x: x['rank']) # Sort by rank for consistent display
 
@@ -922,7 +927,23 @@ def peer_evaluation_results(request, session_id):
     
     sorted_groups = sorted(group_stats.values(), key=lambda x: x['score'], reverse=True)
 
-    enrolled_students = lesson_session.classroom.students.filter(role='student').order_by('full_name')
+    # 現在担当している（在籍中の）学生のIDセット
+    active_student_ids = set(
+        lesson_session.classroom.students.filter(role='student').values_list('id', flat=True)
+    )
+
+    # 担当から外れていても、このグループ・この授業回に関わっていた学生は
+    # 「担当から外れた学生」として一覧から消さずに表示する
+    former_participant_ids = set(
+        GroupMember.objects.filter(group__lesson_session=lesson_session).values_list('student_id', flat=True)
+    ) | set(
+        evaluations.exclude(student__isnull=True).values_list('student_id', flat=True)
+    )
+    all_participant_ids = active_student_ids | former_participant_ids
+
+    enrolled_students = Student.objects.filter(
+        id__in=all_participant_ids, role='student'
+    ).order_by('full_name')
     group_name_map = {group.id: group.display_name for group in groups}
     student_name_map = {student.id: student.full_name for student in enrolled_students}
 
@@ -949,13 +970,23 @@ def peer_evaluation_results(request, session_id):
 
     student_rows = []
     submitted_count = 0
+    
+    sim_data = request.session.get('peer_sim_points', {}).get(str(lesson_session.classroom.id), {}).get(str(lesson_session.id), {})
+    sim_point_mode = sim_data.get('point_mode', 'settings')
+
+    # グループマッピングの作成
+    student_group_map = {}
+    for group in groups:
+        for gm in group.groupmember_set.all():
+            student_group_map[gm.student_id] = group
+
     for enrolled_student in enrolled_students:
         submission = submission_map.get(enrolled_student.id)
         is_submitted = submission is not None
-        if is_submitted:
+        if is_submitted and enrolled_student.id in active_student_ids:
             submitted_count += 1
 
-        submission_detail = _build_submission_detail(submission, group_name_map, student_name_map) if submission else None
+        submission_detail = _build_submission_detail(submission, group_name_map, student_name_map, active_student_ids) if submission else None
 
         member_eval_by_rank = []
         if submission_detail and pe_settings and pe_settings.enable_member_evaluation:
@@ -969,6 +1000,40 @@ def peer_evaluation_results(request, session_id):
             for rank_item in group_ranking_list:
                 group_eval_by_rank.append(group_eval_dict.get(rank_item['rank']))
 
+        student_sim_data = {}
+        if sim_data and str(enrolled_student.id) in sim_data:
+            data = sim_data[str(enrolled_student.id)]
+            if isinstance(data, dict):
+                student_sim_data = data
+            else:
+                student_sim_data = {'member': float(data), 'group': 0}
+
+        member_sim_inputs = []
+        if pe_settings and pe_settings.enable_member_evaluation:
+            for i, point in enumerate(pe_settings.member_scores or []):
+                rank = i + 1
+                val = student_sim_data.get(f'member_rank_{rank}', '')
+                member_sim_inputs.append({'rank': rank, 'point': point, 'val': val})
+                
+        group_sim_inputs = []
+        if pe_settings and pe_settings.enable_group_evaluation:
+            for i, point in enumerate(pe_settings.group_scores or []):
+                rank = i + 1
+                val = student_sim_data.get(f'group_rank_{rank}', '')
+                group_sim_inputs.append({'rank': rank, 'point': point, 'val': val})
+                
+        sim_contrib = student_sim_data.get('contrib', '')
+        if not sim_contrib and 'member' in student_sim_data:
+            sim_contrib = student_sim_data['member']
+        if isinstance(sim_contrib, float) and sim_contrib.is_integer():
+            sim_contrib = int(sim_contrib)
+
+        sim_group_manual = student_sim_data.get('group_manual', '')
+        if not sim_group_manual and 'group' in student_sim_data:
+            sim_group_manual = student_sim_data['group']
+        if isinstance(sim_group_manual, float) and sim_group_manual.is_integer():
+            sim_group_manual = int(sim_group_manual)
+
         student_rows.append({
             'student': enrolled_student,
             'email': enrolled_student.email,
@@ -977,9 +1042,23 @@ def peer_evaluation_results(request, session_id):
             'submission_detail': submission_detail, # Use the already built detail
             'member_eval_by_rank': member_eval_by_rank,
             'group_eval_by_rank': group_eval_by_rank,
+            'sim_data': student_sim_data,
+            'member_sim_inputs': member_sim_inputs,
+            'group_sim_inputs': group_sim_inputs,
+            'sim_contrib': sim_contrib,
+            'sim_group_manual': sim_group_manual,
+            'student_group': student_group_map.get(enrolled_student.id),
+            'is_unlinked': enrolled_student.id not in active_student_ids,
         })
 
-    total_students = enrolled_students.count()
+    # テンプレートのregroupのために、グループ順、そして学籍番号順にソートする
+    def get_sort_key(row):
+        group_num = row['student_group'].group_number if row['student_group'] else 9999
+        return (group_num, row['student'].student_number)
+        
+    student_rows.sort(key=get_sort_key)
+
+    total_students = len(active_student_ids)
     submission_rate = round((submitted_count / total_students) * 100, 1) if total_students else 0
 
     # --- 評価コメントセクション用のデータ準備 ---
@@ -992,7 +1071,7 @@ def peer_evaluation_results(request, session_id):
     ).order_by('created_at')
 
     for evaluation in evaluations_to_process_for_comments:
-        detail = _build_submission_detail(evaluation, group_name_map, student_name_map)
+        detail = _build_submission_detail(evaluation, group_name_map, student_name_map, active_student_ids)
         
         # Convert dictionaries to sorted lists for template iteration
         # detail['group_evaluations'] and detail['member_evaluations'] are already sorted lists
@@ -1009,6 +1088,9 @@ def peer_evaluation_results(request, session_id):
                 'class_comment': detail['class_comment'],
             })
 
+    test_mode = request.session.get('test_mode', False)
+    has_simulation = str(lesson_session.id) in request.session.get('peer_sim_points', {}).get(str(lesson_session.classroom.id), {})
+
     context = {
         'lesson_session': lesson_session,
         'evaluations': evaluations,
@@ -1021,11 +1103,13 @@ def peer_evaluation_results(request, session_id):
         'submission_rows': student_rows,
         'submitted_count': submitted_count,
         'total_students': total_students,
-        'view_mode': request.GET.get('mode', 'simple'), # 'mode'クエリパラメータからビューモードを取得、デフォルトは'simple'
-        # 'view_mode': request.GET.get('view_mode', 'simple'), # 以前のview_modeを使用する場合はこちら
+        'view_mode': request.GET.get('mode', 'simple'),
         'submission_rate': submission_rate,
         'pe_settings': pe_settings,
-        'comment_rows': comment_rows, # Pass comment_rows to the template
+        'comment_rows': comment_rows,
+        'test_mode': test_mode,
+        'has_simulation': has_simulation,
+        'sim_point_mode': sim_point_mode,
     }
     
     return render(request, 'school_management/peer_evaluation_results.html', context)

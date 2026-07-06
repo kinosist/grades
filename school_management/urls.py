@@ -74,13 +74,18 @@ urlpatterns = [
     path('quizzes/<int:quiz_id>/', quizzes.quiz_results_view, name='quiz_detail'),
     path('quizzes/<int:quiz_id>/grading/', quizzes.quiz_grading_view, name='quiz_grading'),
     path('quizzes/<int:quiz_id>/results/', quizzes.quiz_results_view, name='quiz_results'),
-    path('quizzes/<int:quiz_id>/questions/', quizzes.question_manage_view, name='question_manage'),
-    path('quizzes/<int:quiz_id>/questions/create/', quizzes.question_create_view, name='question_create'),
+
 
     # --- 学生管理（Students） ---
     path('students/', students.student_list_view, name='student_list'),
     path('students/create/', students.student_create_view, name='student_create'),
+    path('students/bulk-delete/confirm/', students.student_bulk_delete_confirm, name='student_bulk_delete_confirm'),
+    path('students/bulk-delete/execute/', students.student_bulk_delete_execute, name='student_bulk_delete_execute'),
+    path('students/history/', students.student_link_history_view, name='student_link_history'),
+    path('students/history/<int:student_id>/relink/', students.student_relink_view, name='student_relink'),
     path('students/<str:student_number>/', students.student_detail_view, name='student_detail'),
+    path('students/<str:student_number>/delete/confirm/', students.student_delete_confirm_view, name='student_delete_confirm'),
+    path('students/<str:student_number>/delete/execute/', students.student_delete_execute_view, name='student_delete_execute'),
     path('students/<str:student_number>/edit/', students.student_edit_view, name='student_edit'),
     path('student/<int:student_id>/update-points/', students.update_student_points, name='update_student_points'),
     path('student/<int:student_id>/remove-from-class/', students.remove_student_from_class, name='remove_student_from_class'),
@@ -110,6 +115,9 @@ urlpatterns = [
     path('lesson-sessions/<int:session_id>/peer-evaluation/reopen/', peer_eval.reopen_peer_evaluation, name='reopen_peer_evaluation'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results, name='peer_evaluation_results'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/delete-all/', peer_eval.delete_all_peer_evaluations, name='delete_all_peer_evaluations'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/simulation/save/', peer_eval.save_peer_evaluation_simulation, name='save_peer_evaluation_simulation'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/simulation/clear/', peer_eval.clear_peer_evaluation_simulation, name='clear_peer_evaluation_simulation'),
+    path('peer-evaluation/test-mode/toggle/', peer_eval.toggle_test_mode, name='toggle_test_mode'),
     
     # 従来版（Original）
     path('sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results_view, name='peer_evaluation_results_legacy'),

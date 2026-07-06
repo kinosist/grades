@@ -188,13 +188,30 @@
     <div class="row">
         <div class="col-12">
             <div class="header-info">
+                {% if test_mode %}
+                <div class="alert alert-warning shadow-sm border-warning">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="alert-heading mb-1"><i class="fas fa-flask me-2"></i>テストモード（シミュレーション）中</h5>
+                            <p class="mb-0">現在、ピア評価のテスト用点数を用いて成績を再計算して表示しています。本番データには影響ありません。</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
                     <div class="class-title mb-0">
                         <i class="fas fa-trophy me-2 text-warning"></i>{{ classroom.class_name }}
                         <span class="text-muted fs-5 ms-2 fw-normal">- ポイント一覧
                         </span>
                     </div>
-                    <div class="action-buttons">
+                    <div class="action-buttons d-flex gap-3 align-items-center">
+                        <form action="{% url 'school_management:toggle_test_mode' %}" method="post" class="m-0">
+                            {% csrf_token %}
+                            <div class="form-check form-switch fs-5 mb-0">
+                                <input class="form-check-input" type="checkbox" id="testModeSwitch" onchange="this.form.submit()" {% if test_mode %}checked{% endif %}>
+                                <label class="form-check-label fs-6 mt-1" for="testModeSwitch">テストモード</label>
+                            </div>
+                        </form>
                         <a href="{% url 'school_management:class_detail' classroom.id %}" class="btn btn-outline-secondary">
                             <i class="fas fa-arrow-left me-1"></i>クラス詳細に戻る
                         </a>
@@ -219,7 +236,7 @@
                         <tr>
                             <th class="col-rank text-center" style="width: 80px;">順位</th>
                             <th class="col-name">氏名 / 学籍番号</th>
-                            <th class="text-center">総ポイント</th>
+                            <th class="text-center">総ポイント{% if test_mode %}<br><small>(テスト)</small>{% endif %}</th>
                             <th class="text-center">評価</th>
                             <th class="text-center" style="width: 100px;">操作</th>
                         </tr>
@@ -237,9 +254,18 @@
                                 <div class="text-muted small">{{ grade.student.student_number }}</div>
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-success rounded-pill px-4 py-2 fs-6">
-                                    {{ grade.total_points }}pt
-                                </span>
+                                {% if test_mode %}
+                                    <div class="d-flex flex-column align-items-center">
+                                        <span class="badge bg-warning text-dark border border-dark rounded-pill px-4 py-2 fs-6 mb-1">
+                                            {{ grade.total_points }}pt
+                                        </span>
+                                        <small class="text-muted" style="font-size: 0.75rem;">本番: {{ grade.raw_total_points }}pt</small>
+                                    </div>
+                                {% else %}
+                                    <span class="badge bg-success rounded-pill px-4 py-2 fs-6">
+                                        {{ grade.raw_total_points }}pt
+                                    </span>
+                                {% endif %}
                             </td>
                             <td class="text-center">
                                 <span class="badge bg-{{ grade.grade_color }} px-3">{{ grade.grade_level }}</span>
@@ -331,12 +357,15 @@
                                 </thead>
                                 <tbody>
                                     {% for detail in grade.peer_details %}
-                                        <tr>
+                                        <tr class="{% if detail.is_simulated %}table-warning{% endif %}">
                                             <td>第{{ detail.session.session_number }}回</td>
                                             <td>{{ detail.session.date|date:"m/d" }}</td>
                                             <td>{{ detail.contrib }}pt</td>
                                             <td>{{ detail.vote }}pt</td>
-                                            <td class="fw-bold text-success">{{ detail.total }}pt</td>
+                                            <td class="fw-bold {% if detail.is_simulated %}text-danger{% else %}text-success{% endif %}">
+                                                {{ detail.total }}pt
+                                                {% if detail.is_simulated %}<span class="badge bg-warning text-dark ms-1">テスト</span>{% endif %}
+                                            </td>
                                         </tr>
                                     {% empty %}
                                         <tr><td colspan="5" class="text-center text-muted py-3">履歴がありません</td></tr>

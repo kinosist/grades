@@ -38,11 +38,8 @@ body {
                     <a href="{% url 'school_management:group_master_copy' lesson_session.id %}" class="btn btn-info btn-sm">
                         <i class="fas fa-copy me-1"></i>マスタからコピー
                     </a>
-                    <button type="button" class="btn btn-outline-info btn-sm" onclick="shuffleMembers()">
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="if(confirm('グループをランダムに再配置しますか？')) shuffleMembers()">
                         <i class="fas fa-random me-1"></i>ランダム配置
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="balanceGroups()">
-                        <i class="fas fa-balance-scale me-1"></i>人数均等配置
                     </button>
                     <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearAll()">
                         <i class="fas fa-eraser me-1"></i>全クリア
@@ -107,8 +104,12 @@ body {
     <div class="col-lg-4">
         <!-- 学生一覧 -->
         <div class="card mb-3">
-            <div class="card-header">
-                <h6><i class="fas fa-user-graduate me-2"></i>学生一覧</h6>
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                <h6 class="m-0"><i class="fas fa-user-graduate me-2"></i>学生一覧</h6>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.75rem;" onclick="selectAllPool()">全選択</button>
+                    <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.75rem;" onclick="deselectAllPool()">解除</button>
+                </div>
             </div>
             <div class="card-body" id="studentPool">
                 {% for student in students %}
@@ -116,7 +117,8 @@ body {
                      data-student-id="{{ student.student_number }}" 
                      data-student-name="{{ student.full_name }}"
                      draggable="true"
-                     ondragstart="drag(event)">
+                     ondragstart="drag(event)"
+                     onclick="toggleStudentSelect(this)">
                     <div class="d-flex align-items-center p-2 border rounded mb-2 bg-light">
                         <i class="fas fa-grip-vertical me-2 text-muted"></i>
                         <div>
@@ -135,16 +137,20 @@ body {
                 <h6><i class="fas fa-lightbulb me-2"></i>使い方</h6>
             </div>
             <div class="card-body">
-                <ol class="small">
+                <ol class="small mb-2">
                     <li>グループ数を選択</li>
-                    <li>学生をドラッグ＆ドロップでグループに配置</li>
+                    <li>以下のいずれかの方法で学生をグループに配置:
+                        <ul class="ps-3 mt-1">
+                            <li>学生カードをクリックして選択（複数可）し、対象グループの「選択中を追加」ボタンをクリック</li>
+                            <li>学生カードをドラッグ＆ドロップでグループへ直接移動</li>
+                        </ul>
+                    </li>
                     <li>必要に応じて役割を設定</li>
                     <li>「グループ編成を更新」または「保存」をクリック</li>
                 </ol>
                 <hr>
-                <p class="small text-muted">
-                    <strong>ランダム配置:</strong> 全学生をランダムにグループ分けします。<br>
-                    <strong>人数均等配置:</strong> 全学生をグループに均等な人数で配置します。
+                <p class="small text-muted mb-0">
+                    <strong>ランダム配置:</strong> 全学生をランダムにグループ分けします。
                 </p>
             </div>
         </div>
@@ -162,6 +168,68 @@ const students = [
     },
     {% endfor %}
 ];
+
+function toggleStudentSelect(element) {
+    element.classList.toggle('selected');
+}
+
+function selectAllPool() {
+    document.querySelectorAll('#studentPool .student-item').forEach(item => {
+        item.classList.add('selected');
+    });
+}
+
+function deselectAllPool() {
+    document.querySelectorAll('#studentPool .student-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+}
+
+function addSelectedToGroup(groupNum) {
+    const selectedItems = document.querySelectorAll('#studentPool .student-item.selected');
+    if (selectedItems.length === 0) {
+        alert('配置する学生を選択してください。');
+        return;
+    }
+    
+    selectedItems.forEach(item => {
+        const studentId = item.dataset.studentId;
+        const studentName = item.dataset.studentName;
+        
+        let sourceGroupNum = null;
+        const groupCount = parseInt(document.getElementById('group_count').value) || 20;
+        for (let i = 1; i <= groupCount; i++) {
+            const membersDiv = document.getElementById(`group_${i}_members`);
+            if (membersDiv) {
+                membersDiv.querySelectorAll('.member-item').forEach(mItem => {
+                    const hiddenInput = mItem.querySelector('input[type="hidden"]');
+                    if (hiddenInput && hiddenInput.value === studentId) {
+                        mItem.remove();
+                        sourceGroupNum = i;
+                        
+                        const placeholder = document.getElementById(`group_${i}_placeholder`);
+                        if (membersDiv.children.length === 0 && placeholder) {
+                            placeholder.style.display = 'block';
+                        }
+                    }
+                });
+            }
+        }
+        
+        if (sourceGroupNum) {
+            reindexGroupMembers(sourceGroupNum);
+        }
+        
+        const originalElement = document.querySelector(`[data-student-id="${studentId}"]`);
+        if (originalElement) {
+            originalElement.remove();
+        }
+        
+        addMemberToGroup(groupNum, studentId, studentName);
+    });
+    
+    markAsDirty();
+}
 
 function markAsDirty() {
     if (!isDirty) {
@@ -245,11 +313,14 @@ function updateGroups() {
         const groupDiv = document.createElement('div');
         groupDiv.className = 'card mb-3';
         groupDiv.innerHTML = `
-            <div class="card-header bg-primary text-white d-flex align-items-center">
+            <div class="card-header bg-primary text-white d-flex align-items-center py-2">
                 <div class="flex-grow-1">
                     <h6 class="mb-0"><i class="fas fa-users me-2"></i>グループ ${i}</h6>
                 </div>
-                <div class="ms-3" style="width: 200px;">
+                <button type="button" class="btn btn-light btn-sm me-2 add-selected-btn" onclick="addSelectedToGroup(${i})" style="font-size: 0.8rem;">
+                    <i class="fas fa-user-plus me-1"></i>選択中を追加
+                </button>
+                <div style="width: 180px;">
                     <input type="text" class="form-control form-control-sm text-white bg-transparent border-light" 
                            name="group_${i}_name" 
                            placeholder="グループ名（任意）"
@@ -401,6 +472,7 @@ function restoreStudentToPool(studentId, studentName) {
     studentDiv.dataset.studentName = studentName;
     studentDiv.draggable = true;
     studentDiv.ondragstart = drag;
+    studentDiv.onclick = function() { toggleStudentSelect(this); };
     studentDiv.innerHTML = `
         <div class="d-flex align-items-center p-2 border rounded mb-2 bg-light">
             <i class="fas fa-grip-vertical me-2 text-muted"></i>
@@ -463,7 +535,9 @@ function updateStudentPool() {
 }
 
 function shuffleMembers() {
-    // 全てのグループをクリア（確認ダイアログなし）
+    if (!confirm('現在のグループ編成をクリアして、ランダムに配置し直しますか？')) return;
+    
+    // 全てのグループをクリア
     const groupCount = parseInt(document.getElementById('group_count').value);
     for (let i = 1; i <= groupCount; i++) {
         const membersDiv = document.getElementById(`group_${i}_members`);
@@ -523,26 +597,6 @@ function clearAll() {
     }
 }
 
-function balanceGroups() {
-    if (confirm('人数を均等に配置しますか？現在の編成はクリアされます。')) {
-        clearAll();
-        
-        const groupCount = parseInt(document.getElementById('group_count').value);
-        const studentsPerGroup = Math.ceil(students.length / groupCount);
-        
-        students.forEach((student, index) => {
-            const groupNum = Math.floor(index / studentsPerGroup) + 1;
-            if (groupNum <= groupCount) {
-                addMemberToGroup(groupNum, student.id, student.name);
-            }
-        });
-        
-        // 学生プールをクリア
-        document.getElementById('studentPool').innerHTML = '';
-        markAsDirty();
-    }
-}
-
 function addNewGroup() {
     const container = document.getElementById('groupsContainer');
     const existingGroups = container.querySelectorAll('.card').length;
@@ -551,11 +605,14 @@ function addNewGroup() {
     const groupDiv = document.createElement('div');
     groupDiv.className = 'card mb-3';
     groupDiv.innerHTML = `
-        <div class="card-header bg-primary text-white d-flex align-items-center">
+        <div class="card-header bg-primary text-white d-flex align-items-center py-2">
             <div class="flex-grow-1">
                 <h6 class="mb-0"><i class="fas fa-users me-2"></i>グループ ${newGroupNumber}</h6>
             </div>
-            <div class="ms-3" style="width: 200px;">
+            <button type="button" class="btn btn-light btn-sm me-2 add-selected-btn" onclick="addSelectedToGroup(${newGroupNumber})" style="font-size: 0.8rem;">
+                <i class="fas fa-user-plus me-1"></i>選択中を追加
+            </button>
+            <div style="width: 180px;">
                 <input type="text" class="form-control form-control-sm text-white bg-transparent border-light" 
                        name="group_${newGroupNumber}_name" 
                        placeholder="グループ名（任意）"
@@ -658,11 +715,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'card mb-3';
                 groupDiv.innerHTML = `
-                    <div class="card-header bg-primary text-white d-flex align-items-center">
+                    <div class="card-header bg-primary text-white d-flex align-items-center py-2">
                         <div class="flex-grow-1">
                             <h6 class="mb-0"><i class="fas fa-users me-2"></i>グループ ${groupNum}</h6>
                         </div>
-                        <div class="ms-3" style="width: 200px;">
+                        <button type="button" class="btn btn-light btn-sm me-2 add-selected-btn" onclick="addSelectedToGroup(${groupNum})" style="font-size: 0.8rem;">
+                            <i class="fas fa-user-plus me-1"></i>選択中を追加
+                        </button>
+                        <div style="width: 180px;">
                             <input type="text" class="form-control form-control-sm text-white bg-transparent border-light" 
                                    name="group_${groupNum}_name" 
                                    placeholder="グループ名（任意）"
@@ -738,13 +798,19 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .student-item {
-    cursor: move;
+    cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .student-item:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.student-item.selected > div {
+    border-color: #0d6efd !important;
+    background-color: #e7f1ff !important;
+    box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.25);
 }
 
 .member-item {

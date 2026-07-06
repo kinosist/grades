@@ -1,53 +1,65 @@
+from collections import defaultdict
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Max
+from django.db.models import Max, Prefetch
 from ...models import LessonSession, Group, GroupMember, CustomUser, PeerEvaluation
 
 @login_required
 def group_management(request, session_id):
     """グループ編成"""
     lesson_session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
-    students = lesson_session.classroom.students.all()
-    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student').order_by('group_number')
-    
+    classroom = lesson_session.classroom
+    students = classroom.students.all()
+    # 担当から外れた学生は非表示にする（データ自体は保持し、再度担当になれば表示が戻る）
+    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related(
+        Prefetch('groupmember_set', queryset=GroupMember.objects.filter(student__in=classroom.students).select_related('student'))
+    ).order_by('group_number')
+
     # 最大グループ番号を計算
     max_group_number = 0
     if groups.exists():
         max_group_number = groups.aggregate(Max('group_number'))['group_number__max'] or 0
-    
+
     if request.method == 'POST':
+        # 担当から外れている（非表示の）メンバーは画面には出ないため、
+        # グループ番号ごとに退避しておき、保存後に同じグループ番号へ再度紐づけて保持する
+        inactive_members_by_group_number = defaultdict(list)
+        for group in Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set'):
+            for member in group.groupmember_set.exclude(student__in=classroom.students):
+                inactive_members_by_group_number[group.group_number].append(member)
+
         # ✅ グループ削除前に、そのグループを参照している PeerEvaluation も削除
         groups_to_delete = Group.objects.filter(lesson_session=lesson_session)
         PeerEvaluation.objects.filter(
             lesson_session=lesson_session,
             evaluator_group__in=groups_to_delete
         ).delete()
-        
+
         # 既存のグループを削除
         Group.objects.filter(lesson_session=lesson_session).delete()
-        
+
         # グループ数を取得
         group_count = int(request.POST.get('group_count', 0))
-        
+
         for group_num in range(1, group_count + 1):
             # グループ名を取得
             group_name = request.POST.get(f'group_{group_num}_name', '').strip()
-            
+
             group = Group.objects.create(
                 lesson_session=lesson_session,
                 group_number=group_num,
                 group_name=group_name if group_name else f'グループ{group_num}'
             )
-            
+
             # グループメンバーを追加
             member_keys = [key for key in request.POST.keys() if key.startswith(f'group_{group_num}_member_')]
-            
+
             for key in member_keys:
                 student_id = request.POST.get(key)
                 if student_id:
                     try:
-                        student = CustomUser.objects.get(student_number=student_id, role='student')
+                        student = classroom.students.get(student_number=student_id)
                         role = request.POST.get(f'group_{group_num}_role_{key.split("_")[-1]}', '')
                         GroupMember.objects.create(
                             group=group,
@@ -56,10 +68,14 @@ def group_management(request, session_id):
                         )
                     except CustomUser.DoesNotExist:
                         messages.warning(request, f'学籍番号 {student_id} の学生が見つかりません。')
-        
+
+            # 退避しておいた、担当から外れているメンバーを同じグループ番号に復元する
+            for old_member in inactive_members_by_group_number.get(group_num, []):
+                GroupMember.objects.create(group=group, student=old_member.student, role=old_member.role)
+
         messages.success(request, 'グループ編成を保存しました。')
         return redirect('school_management:group_management', session_id=session_id)
-    
+
     context = {
         'lesson_session': lesson_session,
         'students': students,
@@ -72,9 +88,11 @@ def group_management(request, session_id):
 def group_edit_view(request, session_id, group_id):
     """グループ編集"""
     lesson_session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
+    classroom = lesson_session.classroom
     group = get_object_or_404(Group, id=group_id, lesson_session=lesson_session)
-    members = group.groupmember_set.all().select_related('student')
-    available_students = lesson_session.classroom.students.exclude(
+    # 担当から外れた学生は非表示にする（データ自体は保持し、再度担当になれば表示が戻る）
+    members = group.groupmember_set.filter(student__in=classroom.students).select_related('student')
+    available_students = classroom.students.exclude(
         id__in=members.values_list('student_id', flat=True)
     )
     
@@ -101,7 +119,7 @@ def group_edit_view(request, session_id, group_id):
                 role = request.POST.get('role', '')
                 if student_id:
                     try:
-                        student = CustomUser.objects.get(id=student_id, role='student')
+                        student = lesson_session.classroom.students.get(id=student_id)
                         GroupMember.objects.create(
                             group=group,
                             student=student,
@@ -119,7 +137,7 @@ def group_edit_view(request, session_id, group_id):
                     added_count = 0
                     for student_id in selected_student_ids:
                         try:
-                            student = CustomUser.objects.get(id=student_id, role='student')
+                            student = lesson_session.classroom.students.get(id=student_id)
                             # 既にメンバーに含まれていないかチェック
                             if not GroupMember.objects.filter(group=group, student=student).exists():
                                 GroupMember.objects.create(

@@ -127,6 +127,14 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
     grading_system = classroom.grading_system
     students = classroom.students.all().order_by('student_number')
+    
+    # テストモードか判定
+    test_mode = request.session.get('test_mode', False)
+    
+    # セッションからシミュレーション用点数を取得
+    # 辞書構造: { class_id: { session_id: { student_id: points } } }
+    sim_data_class = request.session.get('peer_sim_points', {}).get(str(classroom.id), {})
+    has_simulation = len(sim_data_class) > 0
 
     # ===== N+1問題対策: クラス全体の投票データを一度に取得して事前集計 =====
     from ...models import Group
@@ -266,9 +274,9 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
                 continue
 
             sess_id = sess.id
-            contrib_score = 0
-            vote_score = 0
-
+            real_contrib_score = 0
+            real_vote_score = 0
+            
             try:
                 pe_settings = all_sessions_settings.get(sess_id)
 
@@ -276,9 +284,9 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
                 if pe_settings and pe_settings.enable_member_evaluation:
                     if pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
                         # DIRECTモード: 事前集計したデータを利用
-                        contrib_score = direct_mode_contrib_scores.get(sess_id, {}).get(student.id, 0)
+                        real_contrib_score = direct_mode_contrib_scores.get(sess_id, {}).get(student.id, 0)
                     else:  # AGGREGATE
-                        contrib_score = student_session_contrib_map.get(student.id, {}).get(sess_id, 0)
+                        real_contrib_score = student_session_contrib_map.get(student.id, {}).get(sess_id, 0)
                 
                 # 投票ポイント
                 student_group_in_session = next((g for g in student_groups if g.group.lesson_session_id == sess_id), None)
@@ -286,36 +294,110 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
                     group_id = student_group_in_session.group_id
                     if sess_id in session_rankings_cache:
                         ranking_info = session_rankings_cache[sess_id]
-                        vote_score = ranking_info['group_scores'].get(group_id, 0)
+                        real_vote_score = ranking_info['group_scores'].get(group_id, 0)
+                
+                simulated_contrib_score = real_contrib_score
+                simulated_vote_score = real_vote_score
+                
+                # シミュレーションによるテスト用スコア計算
+                is_simulated = False
+                if test_mode and has_simulation:
+                    sim_data = sim_data_class.get(str(sess_id), {}).get(str(student.id))
+                    if sim_data is not None:
+                        if isinstance(sim_data, dict):
+                            sess_sim_data = sim_data_class.get(str(sess_id), {})
+                            point_mode = sess_sim_data.get('point_mode', 'settings')
+                            
+                            sim_contrib_score = 0
+                            if pe_settings and pe_settings.enable_member_evaluation:
+                                if point_mode == 'settings':
+                                    if pe_settings.member_scores:
+                                        for i, points in enumerate(pe_settings.member_scores):
+                                            rank = i + 1
+                                            count = sim_data.get(f'member_rank_{rank}')
+                                            if count:
+                                                sim_contrib_score += float(count) * points
+                                elif point_mode == 'manual':
+                                    contrib_val = sim_data.get('contrib')
+                                    if contrib_val:
+                                        sim_contrib_score += float(contrib_val)
+                            elif not pe_settings or not pe_settings.enable_group_evaluation:
+                                # When both are disabled, use contrib
+                                contrib_val = sim_data.get('contrib', sim_data.get('member'))
+                                if contrib_val:
+                                    sim_contrib_score += float(contrib_val)
 
-                if contrib_score > 0 or vote_score > 0:
-                    session_peer_map[sess_id] = {'session': sess, 'contrib': contrib_score, 'vote': vote_score, 'total': contrib_score + vote_score}
+                            sim_vote_score = 0
+                            if pe_settings and pe_settings.enable_group_evaluation:
+                                if point_mode == 'settings':
+                                    if pe_settings.group_scores:
+                                        for i, points in enumerate(pe_settings.group_scores):
+                                            rank = i + 1
+                                            count = sim_data.get(f'group_rank_{rank}')
+                                            if count:
+                                                sim_vote_score += float(count) * points
+                                elif point_mode == 'manual':
+                                    group_manual = sim_data.get('group_manual')
+                                    if group_manual:
+                                        sim_vote_score += float(group_manual)
+
+                            simulated_contrib_score = sim_contrib_score
+                            simulated_vote_score = sim_vote_score
+                            
+                            # 互換性フォールバック (member, group)
+                            if sim_contrib_score == 0 and sim_vote_score == 0 and ('member' in sim_data or 'group' in sim_data):
+                                simulated_contrib_score = sim_data.get('member', 0)
+                                simulated_vote_score = sim_data.get('group', 0)
+                        else:
+                            simulated_contrib_score = float(sim_data)
+                            simulated_vote_score = 0
+                        is_simulated = True
+
+                if real_contrib_score > 0 or real_vote_score > 0 or simulated_contrib_score > 0 or simulated_vote_score > 0 or is_simulated:
+                    session_peer_map[sess_id] = {
+                        'session': sess, 
+                        'real_contrib': real_contrib_score, 
+                        'real_vote': real_vote_score, 
+                        'simulated_contrib': simulated_contrib_score,
+                        'simulated_vote': simulated_vote_score,
+                        'is_simulated': is_simulated
+                    }
             except (AttributeError, IndexError, TypeError, ValueError) as e:
                 logger.error(f"ピア評価ポイントの計算中にエラーが発生しました (student: {student.id}, session: {sess_id}): {e}", exc_info=True)
                 # エラーが発生した場合、エラー情報を持ったエントリをマップに追加
                 session_peer_map[sess_id] = {
                     'session': sess,
-                    'contrib': 0,
-                    'vote': 0,
-                    'total': 0,
+                    'real_contrib': 0,
+                    'real_vote': 0,
+                    'simulated_contrib': 0,
+                    'simulated_vote': 0,
                     'error': f"計算エラー: {e}"
                 }
 
+        real_peer_total = 0
+        simulated_peer_total = 0
+
         for data in session_peer_map.values():
             # エラーがある場合は、このセッションのピア評価ポイントを0として扱う
-            p_sum = 0 if data.get('error') else data.get('contrib', 0) + data.get('vote', 0)
-            peer_total += p_sum
+            real_p_sum = 0 if data.get('error') else data.get('real_contrib', 0) + data.get('real_vote', 0)
+            sim_p_sum = 0 if data.get('error') else data.get('simulated_contrib', 0) + data.get('simulated_vote', 0)
+            
+            real_peer_total += real_p_sum
+            simulated_peer_total += sim_p_sum
+            
             peer_details.append({
                 'session': data['session'],
-                'contrib': data.get('contrib', 0),
-                'vote': data.get('vote', 0),
-                'total': p_sum,
-                'error': data.get('error')  # テンプレートでエラー表示に利用
+                'contrib': data.get('simulated_contrib', 0) if test_mode else data.get('real_contrib', 0),
+                'vote': data.get('simulated_vote', 0) if test_mode else data.get('real_vote', 0),
+                'total': sim_p_sum if test_mode else real_p_sum,
+                'error': data.get('error'),  # テンプレートでエラー表示に利用
+                'is_simulated': data.get('is_simulated', False)
             })
         peer_details.sort(key=lambda x: x['session'].session_number)
 
-        # 純粋な合計ポイント (QR + ピア + その他)
-        raw_total_points = lesson_total + quiz_total + peer_total
+        # 純粋な合計ポイント (QR + ピア + その他) - 本番用と表示用（テストモード用）を分ける
+        real_raw_total_points = lesson_total + quiz_total + real_peer_total
+        simulated_raw_total_points = lesson_total + quiz_total + simulated_peer_total
 
         # DB保存値（目標管理モード用）
         try:
@@ -327,8 +409,8 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
             attendance_points = 0
 
         # ポイント一覧では、モードに関わらず純粋な獲得ポイント（積み上げ）を表示する
-        # これにより、目標管理モードでも日々の活動量（QRやピア評価）を確認できる
-        display_points = raw_total_points
+        # テストモードの場合は、シミュレーション用ポイントを表示
+        display_points = simulated_raw_total_points if test_mode else real_raw_total_points
 
         # 評価レベル判定（仮: 授業回あたりの平均などで判定していたロジックを維持）
         session_count = lesson_points_qs.count()
@@ -349,10 +431,10 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
 
         student_grades.append({
             'student': student,
-            'total_points': display_points,  # 一覧の「総ポイント」列に使用
-            'raw_total_points': raw_total_points,
+            'total_points': display_points,  # 一覧の「総ポイント」列に使用（テスト時はテスト用）
+            'raw_total_points': real_raw_total_points, # 常に本番の合計を保持
             'quiz_total': quiz_total,
-            'peer_total': peer_total,
+            'peer_total': simulated_peer_total if test_mode else real_peer_total,
             'lesson_total': lesson_total,
             'attendance_points': attendance_points,
             'average_points': lesson_average,
@@ -389,8 +471,11 @@ def class_points_view(request: HttpRequest, class_id: int) -> HttpResponse:
             'class_average': class_average,
             'max_average': max_average,
             'min_average': min_average,
-        }
+        },
+        'has_simulation': has_simulation,
+        'test_mode': test_mode,
     }
+
     return render(request, 'school_management/class_points.html', context)
 
 

@@ -1,11 +1,13 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from django.contrib import messages
 from django.db.models import Avg
 from ...models import (
-    CustomUser, ClassRoom, LessonSession, QuizScore, 
+    CustomUser, ClassRoom, LessonSession, QuizScore,
     Attendance, GroupMember, PeerEvaluation, StudentClassPoints,
-    StudentGoal, SelfEvaluation, LessonReport
+    StudentGoal, SelfEvaluation, LessonReport, ClassRoomEnrollment, TeacherStudentAssignment,
+    PeerEvaluationSettings
 )
 
 @login_required
@@ -15,22 +17,18 @@ def student_detail_view(request, student_number):
         messages.error(request, 'この機能にアクセスする権限がありません。')
         return redirect('school_management:dashboard')
 
-    student = get_object_or_404(CustomUser, student_number=student_number, role='student')
+    # 担当学生に限定
+    student = get_object_or_404(
+        CustomUser,
+        student_number=student_number,
+        role='student',
+        teacher_assignments__teacher=request.user,
+        teacher_assignments__is_active=True,
+    )
 
-    # 削除処理
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        if action == 'delete_student':
-            try:
-                student_name = student.full_name
-                student.delete()
-                messages.success(request, f'{student_name}さんを削除しました。')
-                return redirect('school_management:student_list')
-            except Exception as e:
-                messages.error(request, f'削除中にエラーが発生しました: {str(e)}')
-                return redirect('school_management:student_detail', student_number=student_number)
+    # 削除・解除処理は別ビュー(student_delete_execute_view)に移動しました
     
-    # 所属クラス一覧とそれぞれのクラスポイントを取得
+    # ログイン教員が担当するクラス一覧とそれぞれのクラスポイントを取得
     classes = student.classroom_set.filter(teachers=request.user).prefetch_related('teachers')
     
     class_data = []
@@ -46,27 +44,87 @@ def student_detail_view(request, student_number):
             'points': class_points
         })
     
-    # 統計情報を計算 (全クラス合計)
+    # 統計情報を計算 (担当クラスの合計)
     # 1. 小テスト統計 (重複除外)
     all_quiz_scores = QuizScore.objects.filter(
         student=student,
+        quiz__lesson_session__classroom__in=classes, # 担当クラスに限定
         is_cancelled=False
     ).order_by('graded_at')
     
     unique_scores = {qs.quiz_id: qs.score for qs in all_quiz_scores}
     total_quizzes = len(unique_scores)
-    avg_score = round(sum(unique_scores.values()) / total_quizzes, 1) if total_quizzes > 0 else 0
+    quiz_total_score = sum(unique_scores.values())
+
+    # 担当クラスのピア評価ポイントを取得
+    scp_list = StudentClassPoints.objects.filter(student=student, classroom__in=classes)
+    peer_total_score = 0
+    peer_total_count = 0
+    for scp in scp_list:
+        peer_stats = scp.peer_eval_stats
+        peer_total_score += peer_stats.get('total', 0)
+        peer_total_count += peer_stats.get('count', 0)
+        
+    combined_count = total_quizzes + peer_total_count
+    combined_score = quiz_total_score + peer_total_score
+    avg_score = round(combined_score / combined_count, 1) if combined_count > 0 else 0
     
-    # 2. ピア評価回数 (評価した回数)
-    student_groups = GroupMember.objects.filter(student=student).values_list('group', flat=True)
+    # 2. ピア評価回数 (評価した回数) - 担当クラスに限定
+    student_groups = GroupMember.objects.filter(
+        student=student,
+        group__lesson_session__classroom__in=classes # 担当クラスに限定
+    ).values_list('group', flat=True)
     peer_eval_count = PeerEvaluation.objects.filter(
         evaluator_group__in=student_groups
     ).count()
+    
+    # 3. 最近の活動 (小テストとピア評価を合わせた最新5件) - 担当クラスに限定
+    recent_quizzes = []
+    seen_quiz_ids = set()
+    # 担当クラスの小テストに限定
+    desc_quiz_scores = QuizScore.objects.filter(
+        student=student,
+        quiz__lesson_session__classroom__in=classes, # 担当クラスに限定
+        is_cancelled=False
+    ).select_related('quiz', 'quiz__lesson_session', 'quiz__lesson_session__classroom').order_by('-graded_at')
+    
+    for qs in desc_quiz_scores:
+        if qs.quiz_id not in seen_quiz_ids:
+            recent_quizzes.append({
+                'type': 'quiz',
+                'date': qs.graded_at,
+                'title': f"小テスト: {qs.quiz.quiz_name} ({qs.quiz.lesson_session.classroom.class_name})",
+                'score': f"{qs.score}点",
+                'icon': 'fa-pen-alt',
+                'color': 'text-primary'
+            })
+            seen_quiz_ids.add(qs.quiz_id)
+            if len(recent_quizzes) >= 5:
+                break
+                
+    recent_peers = []
+    # 担当クラスのピア評価に限定
+    peer_evaluations = PeerEvaluation.objects.filter(
+        evaluator_group__in=student_groups
+    ).select_related('lesson_session', 'lesson_session__classroom').order_by('-created_at')[:5]
+    
+    for pe in peer_evaluations:
+        recent_peers.append({
+            'type': 'peer',
+            'date': pe.created_at,
+            'title': f"ピア評価提出 ({pe.lesson_session.classroom.class_name} 第{pe.lesson_session.session_number}回)",
+            'score': "提出済",
+            'icon': 'fa-users',
+            'color': 'text-success'
+        })
+        
+    recent_activities = sorted(recent_quizzes + recent_peers, key=lambda x: x['date'], reverse=True)[:5]
     
     context = {
         'student': student,
         'classes': classes,
         'class_data': class_data,
+        'recent_activities': recent_activities,
         'stats': {
             'total_quizzes': total_quizzes,
             'avg_score': avg_score,
@@ -85,7 +143,7 @@ def class_student_detail_view(request, class_id, student_number):
     # 学生がこのクラスに所属しているかチェック
     if not classroom.students.filter(student_number=student_number).exists():
         messages.error(request, 'この学生は指定されたクラスに所属していません。')
-        return redirect('school_management:class_detail', class_id=class_id)
+        return redirect(f"{reverse('school_management:class_detail', args=[class_id])}?active_tab=students")
     
     # クラス内での学生の成績やアクティビティを取得
     class_sessions = LessonSession.objects.filter(classroom=classroom).order_by('-date')
@@ -129,7 +187,90 @@ def class_student_detail_view(request, class_id, student_number):
         scp = StudentClassPoints.objects.get(student=student, classroom=classroom)
         quiz_stats = scp.quiz_stats
         total_quizzes = quiz_stats['count']
-        avg_score = quiz_stats['average']
+        
+        peer_stats = scp.peer_eval_stats
+        peer_count = peer_stats['count']
+        peer_total = peer_stats['total']
+        
+        # テストモード（シミュレーション）の場合はセッションからデータを取得して上書き
+        sim_data_class = request.session.get('peer_sim_points', {}).get(str(classroom.id), {})
+        if request.session.get('test_mode') and sim_data_class:
+            sim_session_ids = [sid for sid in sim_data_class.keys() if str(sid).isdigit()]
+            sim_sessions = {
+                s.id: s for s in LessonSession.objects.filter(id__in=sim_session_ids, classroom=classroom)
+            }
+
+            sim_total = 0
+            sim_count = 0
+            for session_id, session_sim in sim_data_class.items():
+                if not isinstance(session_sim, dict):
+                    continue
+                data = session_sim.get(str(student.id))
+                if data is None:
+                    continue
+
+                if isinstance(data, dict):
+                    sess = sim_sessions.get(int(session_id)) if str(session_id).isdigit() else None
+                    try:
+                        pe_settings = sess.peer_evaluation_settings if sess else None
+                    except PeerEvaluationSettings.DoesNotExist:
+                        pe_settings = None
+                    point_mode = session_sim.get('point_mode', 'settings')
+
+                    contrib = 0.0
+                    if pe_settings and pe_settings.enable_member_evaluation:
+                        if point_mode == 'settings':
+                            if pe_settings.member_scores:
+                                for i, points in enumerate(pe_settings.member_scores):
+                                    rank = i + 1
+                                    count = data.get(f'member_rank_{rank}')
+                                    if count:
+                                        contrib += float(count) * points
+                        elif point_mode == 'manual':
+                            contrib_val = data.get('contrib')
+                            if contrib_val:
+                                contrib += float(contrib_val)
+                    elif not pe_settings or not pe_settings.enable_group_evaluation:
+                        contrib_val = data.get('contrib', data.get('member'))
+                        if contrib_val:
+                            contrib += float(contrib_val)
+
+                    group = 0.0
+                    if pe_settings and pe_settings.enable_group_evaluation:
+                        if point_mode == 'settings':
+                            if pe_settings.group_scores:
+                                for i, points in enumerate(pe_settings.group_scores):
+                                    rank = i + 1
+                                    count = data.get(f'group_rank_{rank}')
+                                    if count:
+                                        group += float(count) * points
+                        elif point_mode == 'manual':
+                            group_manual = data.get('group_manual')
+                            if group_manual:
+                                group += float(group_manual)
+
+                    # 互換性フォールバック (member, group)
+                    if contrib == 0 and group == 0 and ('member' in data or 'group' in data):
+                        contrib = float(data.get('member', 0) or 0)
+                        group = float(data.get('group', 0) or 0)
+
+                    sim_total += (contrib + group)
+                else:
+                    # Legacy fallback
+                    sim_total += float(data)
+                sim_count += 1
+
+            if sim_count > 0:
+                # If we have simulation data, we completely replace the DB peer points with the simulated points for those sessions
+                # Note: For simplicity, if test mode is on, we'll just use the simulated total
+                peer_total = sim_total
+                peer_count = sim_count
+            
+        total_count = total_quizzes + peer_count
+        quiz_total = sum({qs.quiz_id: qs.score for qs in all_quiz_scores}.values())
+        total_score = quiz_total + peer_total
+        avg_score = round(total_score / total_count, 1) if total_count > 0 else 0
+        
     except StudentClassPoints.DoesNotExist:
         total_quizzes = 0
         avg_score = 0
@@ -167,3 +308,83 @@ def class_student_detail_view(request, class_id, student_number):
         }
     }
     return render(request, 'school_management/class_student_detail.html', context)
+
+
+@login_required
+def student_delete_confirm_view(request, student_number):
+    """学生削除確認画面"""
+    if not request.user.is_teacher:
+        messages.error(request, 'この機能にアクセスする権限がありません。')
+        return redirect('school_management:dashboard')
+
+    student = CustomUser.objects.filter(
+        student_number=student_number,
+        role='student',
+        teacher_assignments__teacher=request.user,
+        teacher_assignments__is_active=True,
+    ).first()
+    if not student:
+        messages.error(request, '担当外の学生の削除はできません。')
+        return redirect('school_management:student_list')
+
+    classrooms = student.classroom_set.filter(teachers=request.user)
+    classroom_names = [f"{c.get_semester_display()} {c.class_name} ({c.year})" for c in classrooms]
+    
+    context = {
+        'student': student,
+        'classrooms': classroom_names,
+        'classroom_count': len(classroom_names),
+    }
+    return render(request, 'school_management/student_delete_confirm.html', context)
+
+
+@login_required
+def student_delete_execute_view(request, student_number):
+    """学生削除・担当解除実行"""
+    if not request.user.is_teacher:
+        messages.error(request, 'この機能にアクセスする権限がありません。')
+        return redirect('school_management:dashboard')
+
+    if request.method != 'POST':
+        return redirect('school_management:student_detail', student_number=student_number)
+
+    student = get_object_or_404(
+        CustomUser,
+        student_number=student_number,
+        role='student',
+        teacher_assignments__teacher=request.user,
+        teacher_assignments__is_active=True,
+    )
+    delete_type = request.POST.get('delete_type')
+
+    if delete_type == 'hard_delete' and request.user.role != 'admin':
+        messages.error(request, '完全削除は管理者のみ実行できます。')
+        return redirect('school_management:student_list')
+
+    if delete_type == 'unlink':
+        try:
+            student_name = student.full_name
+            TeacherStudentAssignment.unassign(request.user, student)
+
+            teacher_classrooms = request.user.classrooms.all()
+            ClassRoomEnrollment.bulk_unenroll(teacher_classrooms, [student])
+
+            messages.success(request, f'{student_name}さんを担当から外しました。')
+            return redirect('school_management:student_list')
+        except Exception as e:
+            messages.error(request, f'担当解除中にエラーが発生しました: {str(e)}')
+            return redirect('school_management:student_delete_confirm', student_number=student_number)
+            
+    elif delete_type == 'hard_delete':
+        try:
+            student_name = student.full_name
+            student.delete()
+            messages.success(request, f'{student_name}さんをシステムから完全に削除しました。')
+            return redirect('school_management:student_list')
+        except Exception as e:
+            messages.error(request, f'削除中にエラーが発生しました: {str(e)}')
+            return redirect('school_management:student_delete_confirm', student_number=student_number)
+            
+    else:
+        messages.error(request, '無効な操作です。')
+        return redirect('school_management:student_list')

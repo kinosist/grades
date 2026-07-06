@@ -347,11 +347,23 @@ body { background-color: #f8fafc; }
                     <div class="stat-item">
                         <div class="stat-label">平均点</div>
                         <div class="stat-value">
-                            {{ classroom.get_average_points }}
+                            {{ class_average_points }}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {% if test_mode %}
+            <div class="alert alert-warning shadow-sm border-0 mb-4 position-relative overflow-hidden">
+                <div class="d-flex align-items-center position-relative" style="z-index: 1;">
+                    <i class="fas fa-flask fa-2x text-warning me-3"></i>
+                    <div>
+                        <h5 class="alert-heading mb-1"><i class="fas fa-flask me-2"></i>テストモード（シミュレーション）中</h5>
+                        <p class="mb-0 text-muted">ピア評価の点数がシミュレーション用の値に置き換わっています。実際の成績には反映されていません。</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- アクションボタンエリア -->
             <div class="mb-3 no-print action-area">
@@ -361,6 +373,14 @@ body { background-color: #f8fafc; }
                     </a>
                     
                     <div class="right-actions">
+                        <form method="post" action="{% url 'school_management:toggle_test_mode' %}" class="d-flex align-items-center me-2">
+                            {% csrf_token %}
+                            <div class="form-check form-switch mt-1">
+                                <input class="form-check-input" type="checkbox" id="testModeSwitch" onchange="this.form.submit()" {% if test_mode %}checked{% endif %} style="transform: scale(1.2);">
+                                <label class="form-check-label ms-1" for="testModeSwitch" style="white-space: nowrap;">テストモード</label>
+                            </div>
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        </form>
                         <div class="btn-group mode-switch" role="group">
                             <a href="?mode=simple" class="btn btn-sm {% if view_mode == 'simple' %}btn-primary{% else %}btn-outline-secondary bg-white{% endif %}">
                                 <i class="fas fa-list me-1"></i>簡易
@@ -547,8 +567,13 @@ body { background-color: #f8fafc; }
                                                 {% if session_data.quiz_score > 0 %}
                                                     <div><span class="text-muted">QR:</span> {{ session_data.quiz_score }}</div>
                                                 {% endif %}
-                                                {% if session_data.peer_score > 0 %}
-                                                    <div><span class="text-muted">ピア:</span> {{ session_data.peer_score }} <span class="text-muted" style="font-size: 0.9em;">(貢献{{ session_data.peer_contrib }}/投票{{ session_data.peer_vote }})</span></div>
+                                                {% if session_data.peer_score > 0 or session_data.is_simulated %}
+                                                    <div><span class="text-muted">ピア:</span> 
+                                                        {% if session_data.is_simulated %}
+                                                            <i class="fas fa-flask text-warning" title="シミュレーション値"></i>
+                                                        {% endif %}
+                                                        {{ session_data.peer_score }} <span class="text-muted" style="font-size: 0.9em;">(貢献{{ session_data.peer_contrib }}/投票{{ session_data.peer_vote }})</span>
+                                                    </div>
                                                 {% endif %}
                                                 {% if session_data.manual_points > 0 %}
                                                     <div><span class="text-muted">他:</span> {{ session_data.manual_points }}</div>

@@ -42,13 +42,9 @@
                         <a href="{% url 'school_management:student_edit' student.student_number %}" class="btn btn-warning btn-sm text-white fw-bold">
                             <i class="fas fa-edit me-1"></i>編集
                         </a>
-                        <form method="post" style="display: inline;" onsubmit="return confirm('{{ student.full_name }}さんを削除してもよろしいですか？この操作は取り消せません。関連するすべてのデータも削除されます。');">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="delete_student">
-                            <button type="submit" class="btn btn-outline-danger btn-sm">
-                                <i class="fas fa-trash me-1"></i>削除
-                            </button>
-                        </form>
+                        <a href="{% url 'school_management:student_delete_confirm' student.student_number %}" class="btn btn-outline-danger btn-sm fw-bold">
+                            <i class="fas fa-user-minus me-1"></i>担当解除
+                        </a>
                         <a href="{% url 'school_management:student_list' %}" class="btn btn-secondary btn-sm">
                             <i class="fas fa-arrow-left me-1"></i>戻る
                         </a>
@@ -169,11 +165,31 @@
             <div class="card-header bg-white py-3">
                 <h6 class="mb-0 fw-bold"><i class="fas fa-clock me-2 text-info"></i>最近の活動</h6>
             </div>
-            <div class="card-body" style="min-height: 200px;">
-                <div class="text-center py-5 opacity-50">
+            <div class="card-body p-0">
+                {% if recent_activities %}
+                <div class="list-group list-group-flush">
+                    {% for activity in recent_activities %}
+                    <div class="list-group-item p-3 border-bottom">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">
+                                    <i class="fas {{ activity.icon }} me-2 {{ activity.color }}"></i>{{ activity.title }}
+                                </h6>
+                                <small class="text-muted">{{ activity.date|date:"Y/m/d H:i" }}</small>
+                            </div>
+                            <span class="badge bg-light text-dark border {% if activity.type == 'quiz' %}border-primary{% else %}border-success{% endif %} px-3 py-2 fs-6">
+                                {{ activity.score }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5 opacity-50" style="min-height: 200px;">
                     <i class="fas fa-history fa-3x text-muted mb-3"></i>
                     <p class="text-muted small">活動履歴はまだありません</p>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>

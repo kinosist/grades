@@ -1,11 +1,17 @@
 {% extends 'school_management/base.html' %}
 
-{% block title %}学生登録 - 学校管理システム{% endblock %}
-{% block page_title %}学生登録{% endblock %}
+{% block title %}学生{% if classroom %}追加{% else %}登録{% endif %} - 学校管理システム{% endblock %}
+{% block page_title %}学生{% if classroom %}追加{% else %}登録{% endif %}{% endblock %}
 
 {% block breadcrumbs %}
+{% if classroom %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">学生追加</li>
+{% else %}
 <li class="breadcrumb-item"><a href="{% url 'school_management:student_list' %}">学生管理</a></li>
 <li class="breadcrumb-item active" aria-current="page">学生登録</li>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -17,7 +23,7 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5><i class="fas fa-user-plus me-2"></i>学生登録</h5>
+                <h5><i class="fas fa-user-plus me-2"></i>学生{% if classroom %}追加{% else %}登録{% endif %}</h5>
                 <ul class="nav nav-tabs card-header-tabs" id="registrationTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="single-tab" data-bs-toggle="tab" data-bs-target="#single" 
@@ -39,6 +45,9 @@
                         <form method="post" action="{% url 'school_management:student_create' %}">
                             {% csrf_token %}
                             <input type="hidden" name="registration_type" value="single">
+                            {% if classroom %}
+                            <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
+                            {% endif %}
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
@@ -68,10 +77,10 @@
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label for="email" class="form-label">メールアドレス</label>
-                                        <input type="email" class="form-control" id="email" name="email" 
-                                               placeholder="例: yamada@example.com">
-                                        <div class="form-text">任意項目です</div>
+                                        <label for="email" class="form-label">メールアドレス <span class="text-danger">*</span></label>
+                                        <input type="email" class="form-control" id="email" name="email"
+                                               placeholder="例: yamada@example.com" required>
+                                        <div class="form-text">必須項目です</div>
                                     </div>
                                 </div>
                             </div>
@@ -86,7 +95,7 @@
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-save me-2"></i>学生を登録
                                 </button>
-                                <a href="{% url 'school_management:student_list' %}" class="btn btn-secondary">
+                                <a href="{% if classroom %}{% url 'school_management:class_detail' classroom.id %}{% else %}{% url 'school_management:student_list' %}{% endif %}" class="btn btn-secondary">
                                     <i class="fas fa-arrow-left me-2"></i>キャンセル
                                 </a>
                             </div>
@@ -97,6 +106,9 @@
                         <form method="post" action="{% url 'school_management:student_create' %}">
                             {% csrf_token %}
                             <input type="hidden" name="registration_type" value="bulk">
+                            {% if classroom %}
+                            <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
+                            {% endif %}
                             
                             <div class="alert alert-info mb-4">
                                 <h6><i class="fas fa-info-circle me-2"></i>一括登録の形式</h6>
@@ -112,12 +124,23 @@
                             </div>
                             
                             <div class="mb-3">
-                                <label for="bulk_student_data" class="form-label">学生データ <span class="text-danger">*</span></label>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label for="bulk_student_data" class="form-label mb-0">学生データ <span class="text-danger">*</span></label>
+                                    <div>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_upload_csv">
+                                            <i class="fas fa-file-csv me-1"></i>CSVファイルを選択
+                                        </button>
+                                        <input type="file" id="csv_file_input" accept=".csv,.txt" style="display: none;">
+                                    </div>
+                                </div>
                                 <textarea class="form-control" id="bulk_student_data" name="bulk_student_data" 
                                           rows="12" placeholder="S2025001,山田太郎,ヤマダタロウ,yamada@example.com
 S2025002,佐藤花子,サトウハナコ,sato@example.com
 S2025003,田中次郎,タナカジロウ,tanaka@example.com" required></textarea>
-                                <div class="form-text">上記の形式に従って学生情報を入力してください</div>
+                                <div id="csv_status_msg" class="alert alert-success mt-2 py-2 px-3" style="display: none; font-size: 0.875rem;">
+                                    <i class="fas fa-check-circle me-1"></i><span id="csv_status_text"></span>
+                                </div>
+                                <div class="form-text">上記の形式に従って学生情報を入力してください（CSVファイルを選択すると自動で入力欄に読み込まれます）</div>
                             </div>
                             
                             <div class="d-flex gap-2">
@@ -174,24 +197,124 @@ S2025003,田中次郎,タナカジロウ,tanaka@example.com" required></textarea
 </div>
 
 <script>
-function insertTemplate() {
-    const textarea = document.getElementById('student_data');
-    const template = `2024001,山田太郎,yamada@example.com,ヤマダタロウ
-2024002,佐藤花子,sato@example.com,サトウハナコ
-2024003,田中次郎,tanaka@example.com,タナカジロウ
-2024004,鈴木一郎,suzuki@example.com,スズキイチロウ
-2024005,高橋美香,takahashi@example.com,タカハシミカ`;
+
+const textareaElement = document.getElementById('bulk_student_data');
+if (textareaElement) {
+    textareaElement.addEventListener('paste', function(e) {
+        setTimeout(() => {
+            this.value = this.value.replace(/\t/g, ',');
+        }, 100);
+    });
+}
+
+const btnUploadCsv = document.getElementById('btn_upload_csv');
+const csvFileInput = document.getElementById('csv_file_input');
+const csvStatusMsg = document.getElementById('csv_status_msg');
+const csvStatusText = document.getElementById('csv_status_text');
+
+if (btnUploadCsv && csvFileInput) {
+    btnUploadCsv.addEventListener('click', function() {
+        csvFileInput.click();
+    });
+
+    csvFileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        
+        reader.onload = function(evt) {
+            let text = evt.target.result;
+            
+            if (text.includes('\uFFFD')) {
+                const sjisReader = new FileReader();
+                sjisReader.onload = function(sjisEvt) {
+                    processCSVText(sjisEvt.target.result, file.name);
+                };
+                sjisReader.readAsText(file, 'Shift_JIS');
+            } else {
+                processCSVText(text, file.name);
+            }
+        };
+        
+        reader.readAsText(file, 'UTF-8');
+    });
+}
+
+function processCSVText(text, filename) {
+    const lines = text.split(/\r?\n/);
+    const resultLines = [];
+    let hasHeader = false;
     
-    textarea.value = template;
+    if (lines.length > 0) {
+        const firstLine = lines[0].toLowerCase();
+        if (
+            firstLine.includes('学籍') || 
+            firstLine.includes('番号') || 
+            firstLine.includes('氏名') || 
+            firstLine.includes('名前') || 
+            firstLine.includes('フリガナ') || 
+            firstLine.includes('ふりがな') || 
+            firstLine.includes('メール') || 
+            firstLine.includes('email') || 
+            firstLine.includes('student_number') || 
+            firstLine.includes('name')
+        ) {
+            hasHeader = true;
+        }
+    }
+    
+    const startIndex = hasHeader ? 1 : 0;
+    
+    for (let i = startIndex; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const parts = line.split(',');
+        const cleanedParts = parts.map(part => {
+            let p = part.trim();
+            if (p.startsWith('"') && p.endsWith('"')) {
+                p = p.slice(1, -1);
+            } else if (p.startsWith("'") && p.endsWith("'")) {
+                p = p.slice(1, -1);
+            }
+            return p.trim();
+        });
+        
+        resultLines.push(cleanedParts.join(','));
+    }
+    
+    if (resultLines.length === 0) {
+        alert('有効なデータがCSVファイル内に見つかりませんでした。');
+        csvFileInput.value = '';
+        return;
+    }
+    
+    const textarea = document.getElementById('bulk_student_data');
+    textarea.value = resultLines.join('\n');
+    
+    csvStatusMsg.style.display = 'block';
+    csvStatusMsg.className = 'alert alert-success mt-2 py-2 px-3';
+    let msg = `ファイル「${filename}」から ${resultLines.length} 件の学生データを読み込みました。`;
+    if (hasHeader) {
+        msg += '（1行目のヘッダー行を除外しました）';
+    }
+    csvStatusText.textContent = msg;
+    
+    csvFileInput.value = '';
+    
     textarea.focus();
 }
 
-// 貼り付け時の自動フォーマット
-document.getElementById('student_data').addEventListener('paste', function(e) {
-    setTimeout(() => {
-        // タブをカンマに変換
-        this.value = this.value.replace(/\t/g, ',');
-    }, 100);
-});
+// URLのクエリパラメータをチェックして、tab=bulkがあれば一括登録タブを表示する
+const urlParams = new URLSearchParams(window.location.search);
+const tabParam = urlParams.get('tab');
+if (tabParam === 'bulk') {
+    const bulkTabBtn = document.getElementById('bulk-tab');
+    if (bulkTabBtn) {
+        const tab = new bootstrap.Tab(bulkTabBtn);
+        tab.show();
+    }
+}
 </script>
 {% endblock %}

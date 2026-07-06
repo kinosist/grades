@@ -376,7 +376,7 @@ body { background-color: #f8fafc; }
                         <form method="post" action="{% url 'school_management:toggle_test_mode' %}" class="d-flex align-items-center me-2">
                             {% csrf_token %}
                             <div class="form-check form-switch mt-1">
-                                <input class="form-check-input" type="checkbox" id="testModeSwitch" onchange="this.form.submit()" {% if test_mode %}checked{% endif %} style="transform: scale(1.2);">
+                                <input class="form-check-input" type="checkbox" id="testModeSwitch" onchange="this.disabled=true; this.form.submit()" {% if test_mode %}checked{% endif %} style="transform: scale(1.2);">
                                 <label class="form-check-label ms-1" for="testModeSwitch" style="white-space: nowrap;">テストモード</label>
                             </div>
                             <input type="hidden" name="next" value="{{ request.get_full_path }}">

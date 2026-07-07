@@ -1,2 +1,2 @@
 from .class_points import class_points_view, update_attendance_rate, update_class_settings
-from .class_evaluation import class_evaluation_view, add_custom_column_points
+from .class_evaluation import class_evaluation_view, class_evaluation_csv_export, add_custom_column_points

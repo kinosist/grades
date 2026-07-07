@@ -75,28 +75,24 @@ def _build_group_vote_point_map(session_groups, session_peer_evals, pe_settings,
     return group_point_map
 
 
-@login_required
-def class_evaluation_view(request, class_id):
+def _build_class_evaluations(request, classroom):
     """
-    クラスごとの評価一覧（成績表）を表示するビュー
-    
+    クラスごとの評価一覧（成績表）の計算ロジック
+
     QR採点、ピア評価、各種小テスト、および教員が独自に追加した
-    評価項目の点数を集計し、一覧表示します。
+    評価項目の点数を集計する。画面表示用ビューとCSV出力用ビューの
+    両方から呼び出され、計算結果が食い違わないようにする。
     """
-    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
     students = classroom.students.all().order_by('student_number')
-    
+
     # テストモードか判定
     test_mode = request.session.get('test_mode', False)
-    
+
     # セッションからシミュレーション用点数を取得
     # 辞書構造: { class_id: { session_id: { student_id: points } } }
     sim_data_class = request.session.get('peer_sim_points', {}).get(str(classroom.id), {})
     has_simulation = len(sim_data_class) > 0
-    
-    # 表示モード (simple / detail) - デフォルトは詳細モード
-    view_mode = request.GET.get('mode', 'detail')
-    
+
     # 授業回の一覧を取得
     sessions = LessonSession.objects.filter(classroom=classroom).order_by('session_number')
     session_ids = list(sessions.values_list('id', flat=True))
@@ -458,7 +454,42 @@ def class_evaluation_view(request, class_id):
             eval_data['is_below_cutoff'] = False
             eval_data['final_score_100'] = round(current_raw, 1)
 
-        
+    return {
+        'students': students,
+        'sessions': sessions,
+        'point_columns': point_columns,
+        'grading_system': grading_system,
+        'student_evaluations': student_evaluations,
+        'class_average_points': class_average_points,
+        'test_mode': test_mode,
+        'has_simulation': has_simulation,
+        'session_student_custom_map': session_student_custom_map,
+        'student_column_scores_map': student_column_scores_map,
+    }
+
+
+@login_required
+def class_evaluation_view(request, class_id):
+    """
+    クラスごとの評価一覧（成績表）を表示するビュー
+    """
+    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+
+    # 表示モード (simple / detail) - デフォルトは詳細モード
+    view_mode = request.GET.get('mode', 'detail')
+
+    data = _build_class_evaluations(request, classroom)
+    students = data['students']
+    sessions = data['sessions']
+    point_columns = data['point_columns']
+    grading_system = data['grading_system']
+    student_evaluations = data['student_evaluations']
+    class_average_points = data['class_average_points']
+    test_mode = data['test_mode']
+    has_simulation = data['has_simulation']
+    session_student_custom_map = data['session_student_custom_map']
+    student_column_scores_map = data['student_column_scores_map']
+
     total_sessions = sessions.count()
 
     # テーブルのカラム幅（colspan）を調整（独自評価項目の数を考慮）
@@ -503,6 +534,131 @@ def class_evaluation_view(request, class_id):
         'class_average_points': class_average_points,
     }
     return render(request, 'school_management/class_evaluation.html', context)
+
+
+@login_required
+def class_evaluation_csv_export(request, class_id):
+    """
+    クラスごとの評価一覧をCSVとして出力するビュー
+
+    画面表示用の評価テーブルをそのままエクスポートするのではなく、
+    AIやプログラムでの分析を想定し、完全にカンマ区切りで
+    構造化されたデータとして出力する。
+
+    - mode=simple: 1行 = 1学生（サマリーのみ）
+    - mode=detail: 1行 = 1学生。授業回ごとの内訳・独自評価項目の授業回別内訳を
+      すべて列として横に展開する（同じ学生が複数行にまたがらないようにする）
+    """
+    import csv
+    from datetime import datetime
+    from urllib.parse import quote
+    from django.http import HttpResponse
+
+    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+
+    view_mode = request.GET.get('mode', 'detail')
+    if view_mode not in ('simple', 'detail'):
+        view_mode = 'detail'
+
+    data = _build_class_evaluations(request, classroom)
+    point_columns = list(data['point_columns'])
+    student_evaluations = data['student_evaluations']
+    sessions = list(data['sessions'])
+    session_student_custom_map = data['session_student_custom_map']
+    grading_system = data['grading_system']
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    filename = f"評価一覧_{classroom.class_name}_{view_mode}_{datetime.now().strftime('%Y%m%d')}.csv"
+    response['Content-Disposition'] = (
+        f"attachment; filename*=UTF-8''{quote(filename)}"
+    )
+
+    # charset=utf-8-sigを指定すると書き込みのたびにBOMが付与されてしまうため、
+    # 先頭で一度だけBOMを書き込み、以降はcsv.writerでプレーンなutf-8として書き込む
+    response.write('﻿')
+    writer = csv.writer(response)
+
+    # 画面の評価一覧テーブルと同じ列見出しに揃える。
+    # 「最終成績(100点換算)」「足切り」は、画面でも「オリジナル(カスタマイズ)」モードの
+    # クラスにしか表示されない概念のため、そのモードの時だけ列を追加する。
+    total_headers = (
+        ['最終成績(100点換算)', '素点', '足切り'] if grading_system == 'original' else ['合計']
+    )
+    summary_headers = (
+        ['学籍番号', '氏名', 'フリガナ'] + total_headers +
+        ['出席率', '出席点', '授業点', '小テスト合計', 'ピア評価合計'] +
+        [col.column_title for col in point_columns]
+    )
+
+    def build_summary_row(evaluation):
+        student = evaluation['student']
+        custom_scores = {
+            item['column'].id: item['score'] for item in evaluation['custom_column_details']
+        }
+        if grading_system == 'original':
+            total_values = [
+                evaluation['final_score_100'],
+                evaluation['total_points'],
+                1 if evaluation['is_below_cutoff'] else 0,
+            ]
+        else:
+            total_values = [evaluation['total_points']]
+
+        return (
+            [student.student_number, student.full_name, student.furigana]
+            + total_values
+            + [
+                evaluation['attendance_rate'],
+                evaluation['attendance_points'],
+                evaluation['score_points'],
+                evaluation['total_quiz_score'],
+                evaluation['total_peer_score'],
+            ]
+            + [custom_scores.get(col.id, 0) for col in point_columns]
+        )
+
+    if view_mode == 'simple':
+        writer.writerow(summary_headers)
+        for evaluation in student_evaluations:
+            writer.writerow(build_summary_row(evaluation))
+        return response
+
+    # 詳細モード: 1行 = 1学生。授業回ごとの内訳・独自評価項目の授業回別内訳を
+    # すべて列として横に展開する。
+    session_headers = []
+    for session in sessions:
+        prefix = f'第{session.session_number}回'
+        session_headers += [
+            f'{prefix}_授業日', f'{prefix}_小テスト点',
+            f'{prefix}_ピア貢献', f'{prefix}_ピア投票', f'{prefix}_手動点',
+            f'{prefix}_合計点',
+        ]
+        for col in point_columns:
+            session_headers.append(f'{prefix}_{col.column_title}')
+
+    writer.writerow(summary_headers + session_headers)
+
+    for evaluation in student_evaluations:
+        student = evaluation['student']
+        row = build_summary_row(evaluation)
+
+        for session, session_data in zip(sessions, evaluation['session_scores']):
+            row += [
+                session.date,
+                session_data['quiz_score'],
+                session_data['peer_contrib'],
+                session_data['peer_vote'],
+                session_data['manual_points'],
+                session_data['total_score'],
+            ]
+            for col in point_columns:
+                row.append(
+                    session_student_custom_map.get(session.id, {}).get(student.id, {}).get(col.id, 0)
+                )
+
+        writer.writerow(row)
+
+    return response
 
 
 @login_required

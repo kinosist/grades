@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from school_management.models import (
     ClassRoom, StudentQRCode, StudentClassPoints,
-    PointColumn, StudentColumnScore, QRCodeScan, ClassRoomEnrollment
+    PointColumn, StudentColumnScore, QRCodeScan, ClassRoomEnrollment, LessonSession
 )
 import uuid
 
@@ -67,23 +67,26 @@ class QRAndPointsIntegrationTests(TestCase):
         })
         self.assertIn(response.status_code, [200, 302])
         col = PointColumn.objects.get(column_title='Extra Assignment')
-        
-        # ポイント更新（カスタムポイント）
-        update_score_url = reverse('school_management:update_custom_score', args=[self.classroom.id])
+
+        session = LessonSession.objects.create(classroom=self.classroom, session_number=1)
+
+        # ポイント更新（授業回を指定した手動加点。QRを使わずQRCodeScanと同じ形式で記録される）
+        add_points_url = reverse('school_management:add_custom_column_points', args=[self.classroom.id])
         import json
         response = self.client.post(
-            update_score_url,
+            add_points_url,
             data=json.dumps({
                 'student_id': self.student.id,
                 'column_id': col.id,
-                'score': 20
+                'session_id': session.id,
+                'points': 20
             }),
             content_type='application/json',
             HTTP_X_REQUESTED_WITH='XMLHttpRequest'
         )
-        
+
         self.assertEqual(response.status_code, 200)
-        
+
         # DB確認
         score_record = StudentColumnScore.objects.get(column=col, student=self.student)
         self.assertEqual(score_record.score, 20)

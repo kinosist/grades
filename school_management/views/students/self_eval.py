@@ -120,41 +120,40 @@ def self_evaluation_edit(request, class_id, student_number):
 
     if request.method == 'POST':
         self_eval, _ = SelfEvaluation.objects.get_or_create(student=student, classroom=classroom)
-        section = request.POST.get('section', 'teacher')  # 'teacher' or 'student'
-        if section == 'teacher':
-            teacher_comment = request.POST.get('teacher_comment', '').strip()
-            teacher_score_raw = request.POST.get('teacher_score', '').strip()
-            self_eval.teacher_comment = teacher_comment
-            if teacher_score_raw:
-                try:
-                    score = int(teacher_score_raw)
-                    if 0 <= score <= 100:
-                        self_eval.teacher_score = score
-                    else:
-                        messages.error(request, '点数は0〜100で入力してください。')
-                        return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))
-                except ValueError:
-                    messages.error(request, '点数は数値で入力してください。')
+
+        teacher_comment = request.POST.get('teacher_comment', '').strip()
+        teacher_score_raw = request.POST.get('teacher_score', '').strip()
+        self_eval.teacher_comment = teacher_comment
+        if teacher_score_raw:
+            try:
+                score = int(teacher_score_raw)
+                if 0 <= score <= 100:
+                    self_eval.teacher_score = score
+                else:
+                    messages.error(request, '教師評価点は0〜100で入力してください。')
                     return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))
-            else:
-                self_eval.teacher_score = None
-        elif section == 'student':
-            student_comment = request.POST.get('student_comment', '').strip()
-            student_score_raw = request.POST.get('student_score', '').strip()
-            self_eval.student_comment = student_comment
-            if student_score_raw:
-                try:
-                    score = int(student_score_raw)
-                    if 0 <= score <= 100:
-                        self_eval.student_score = score
-                    else:
-                        messages.error(request, '点数は0〜100で入力してください。')
-                        return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))
-                except ValueError:
-                    messages.error(request, '点数は数値で入力してください。')
+            except ValueError:
+                messages.error(request, '教師評価点は数値で入力してください。')
+                return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))
+        else:
+            self_eval.teacher_score = None
+
+        student_comment = request.POST.get('student_comment', '').strip()
+        student_score_raw = request.POST.get('student_score', '').strip()
+        self_eval.student_comment = student_comment
+        if student_score_raw:
+            try:
+                score = int(student_score_raw)
+                if 0 <= score <= 100:
+                    self_eval.student_score = score
+                else:
+                    messages.error(request, '自己評価点は0〜100で入力してください。')
                     return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))
-            else:
-                self_eval.student_score = None
+            except ValueError:
+                messages.error(request, '自己評価点は数値で入力してください。')
+                return HttpResponseRedirect(_student_detail_url(class_id, student_number, '#eval'))
+        else:
+            self_eval.student_score = None
 
         self_eval.save()
         messages.success(request, '評価を保存しました。')

@@ -178,7 +178,7 @@
                                 <div class="col-md-6 mb-3">
                                     <div class="card border-primary">
                                         <div class="card-header bg-primary text-white">
-                                            <strong><i class="fas fa-layer-group me-2"></i>グループ{{ group.group_number }}</strong>
+                                            <strong><i class="fas fa-layer-group me-2"></i>{{ group.display_name }}</strong>
                                         </div>
                                         <div class="card-body">
                                             {% for member in group.groupmember_set.all %}

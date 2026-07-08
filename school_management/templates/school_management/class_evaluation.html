@@ -103,11 +103,45 @@ body { background-color: #f8fafc; }
     .evaluation-table .attendance-point-col { min-width: 80px; }
     
     /* 独自評価項目の列デザイン */
-    .evaluation-table .custom-col { 
-        min-width: 90px; 
+    .evaluation-table .custom-col {
+        min-width: 90px;
         background-color: #f1fcfa; /* 少し青みがかった色で差別化 */
     }
-    
+
+    /* 独自評価項目：加点ボタン（+ アイコンのみの小さい丸ボタン） */
+    .custom-add-btn {
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        line-height: 1;
+        font-size: 0.7rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-sizing: border-box;
+    }
+    .custom-add-btn i {
+        display: block;
+        line-height: 1;
+        margin: 0;
+    }
+
+    /* 「詳細」「+」ボタンは、ホバー時に色が少し濃くなるだけにする（影や拡大は付けない） */
+    .custom-detail-btn,
+    .custom-add-btn {
+        box-shadow: none !important;
+        transform: none !important;
+        transition: background-color 0.15s ease-in-out;
+    }
+    .custom-detail-btn:hover,
+    .custom-add-btn:hover {
+        background-color: #0aa2b8;
+        border-color: #0aa2b8;
+        box-shadow: none !important;
+        transform: none !important;
+    }
+
     .evaluation-table .session-col { min-width: 80px; background-color: #fff; }
     .evaluation-table .breakdown-col { min-width: 140px; background-color: #fff; font-size: 0.85em; }
     .evaluation-table .score-col { min-width: 120px; }
@@ -358,7 +392,7 @@ body { background-color: #f8fafc; }
                 <div class="d-flex align-items-center position-relative" style="z-index: 1;">
                     <i class="fas fa-flask fa-2x text-warning me-3"></i>
                     <div>
-                        <h5 class="alert-heading mb-1"><i class="fas fa-flask me-2"></i>テストモード（シミュレーション）中</h5>
+                        <h5 class="alert-heading mb-1"><i class="fas fa-flask me-2"></i>テストモード（シミュレーション）</h5>
                         <p class="mb-0 text-muted">ピア評価の点数がシミュレーション用の値に置き換わっています。実際の成績には反映されていません。</p>
                     </div>
                 </div>
@@ -376,7 +410,7 @@ body { background-color: #f8fafc; }
                         <form method="post" action="{% url 'school_management:toggle_test_mode' %}" class="d-flex align-items-center me-2">
                             {% csrf_token %}
                             <div class="form-check form-switch mt-1">
-                                <input class="form-check-input" type="checkbox" id="testModeSwitch" onchange="this.form.submit()" {% if test_mode %}checked{% endif %} style="transform: scale(1.2);">
+                                <input class="form-check-input" type="checkbox" id="testModeSwitch" onchange="this.disabled=true; this.form.submit()" {% if test_mode %}checked{% endif %} style="transform: scale(1.2);">
                                 <label class="form-check-label ms-1" for="testModeSwitch" style="white-space: nowrap;">テストモード</label>
                             </div>
                             <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -389,9 +423,9 @@ body { background-color: #f8fafc; }
                                 <i class="fas fa-th me-1"></i>詳細
                             </a>
                         </div>
-                        <button type="button" class="btn btn-success csv-btn" onclick="showCSVPreview()">
+                        <a href="{% url 'school_management:class_evaluation_csv_export' classroom.id %}?mode={{ view_mode }}" class="btn btn-success csv-btn">
                             <i class="fas fa-file-csv me-1"></i>CSVダウンロード
-                        </button>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -444,9 +478,14 @@ body { background-color: #f8fafc; }
                             <!-- 独自評価項目のヘッダー -->
                             {% for col in point_columns %}
                                 <th class="custom-col text-center" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>
-                                    <div class="d-flex flex-column align-items-center">
+                                    <div class="d-flex flex-column align-items-center gap-1">
                                         <span class="fw-bold">{{ col.column_title }}</span>
-                                        <span class="header-sub-text text-info" style="font-size: 0.7rem;"><i class="fas fa-edit me-1"></i>入力</span>
+                                        <button type="button" class="btn btn-info btn-sm text-white py-0 px-2 custom-detail-btn"
+                                                style="font-size: 0.75rem;"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#columnDetailModal-{{ col.id }}">
+                                            詳細
+                                        </button>
                                     </div>
                                 </th>
                             {% endfor %}
@@ -537,18 +576,17 @@ body { background-color: #f8fafc; }
                                 </div>
                             </td>
                             
-                            <!-- 独自評価項目の得点入力セル -->
-                            {% for col_id, score in evaluation.custom_column_scores.items %}
+                            <!-- 独自評価項目セル（QR/ピアの内訳とは孤立させる。詳細は列見出しの「詳細」ボタンからまとめて確認） -->
+                            {% for item in evaluation.custom_column_details %}
                                 <td class="custom-col align-middle text-center">
-                                  <input type="number" 
-                                         class="form-control form-control-sm text-center mx-auto custom-score-input"
-                                         value="{{ score }}" 
-                                         min="0"
-                                         step="any"  data-student-id="{{ evaluation.student.id }}"
-                                         data-column-id="{{ col_id }}" 
-                                         onchange="saveCustomScore(this)"
-                                         placeholder="0"
-                                         style="width: 60px; font-weight: bold; color: #0dcaf0; border-color: #0dcaf0;">
+                                  <div class="d-flex align-items-center justify-content-center gap-2">
+                                    <span class="fw-bold" style="color: #0dcaf0;">{{ item.score }}<small>pt</small></span>
+                                    <button type="button" class="btn btn-info btn-sm text-white custom-add-btn"
+                                            title="授業回を指定して加点（QR不要）"
+                                            onclick="openAddCustomPointsModal({{ evaluation.student.id }}, {{ item.column.id }}, '{{ evaluation.student.full_name|escapejs }}', '{{ item.column.column_title|escapejs }}')">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                  </div>
                                 </td>
                             {% endfor %}
 
@@ -568,7 +606,7 @@ body { background-color: #f8fafc; }
                                                     <div><span class="text-muted">QR:</span> {{ session_data.quiz_score }}</div>
                                                 {% endif %}
                                                 {% if session_data.peer_score > 0 or session_data.is_simulated %}
-                                                    <div><span class="text-muted">ピア:</span> 
+                                                    <div><span class="text-muted">ピア:</span>
                                                         {% if session_data.is_simulated %}
                                                             <i class="fas fa-flask text-warning" title="シミュレーション値"></i>
                                                         {% endif %}
@@ -601,6 +639,58 @@ body { background-color: #f8fafc; }
     </div>
 </div>
 
+<!-- 独自評価項目：列ごとに「全学生 × 授業回」をまとめて確認できるモーダル -->
+{% for matrix in column_detail_matrices %}
+<div class="modal fade" id="columnDetailModal-{{ matrix.column.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title">
+                    <i class="fas fa-list-check me-2 text-info"></i>「{{ matrix.column.column_title }}」の全学生・授業回別内訳
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="min-width: 140px;">氏名</th>
+                                <th class="text-center" style="min-width: 70px; white-space: nowrap;">合計</th>
+                                {% for session in matrix.sessions %}
+                                    <th class="text-center" style="min-width: 60px; white-space: nowrap;">第{{ session.session_number }}回</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in matrix.rows %}
+                                <tr>
+                                    <td>
+                                        {{ row.student.full_name }}
+                                        <div class="text-muted" style="font-size: 0.75em;">{{ row.student.student_number }}</div>
+                                    </td>
+                                    <td class="text-center fw-bold text-success" style="white-space: nowrap;">{{ row.total }}pt</td>
+                                    {% for cell in row.cells %}
+                                        <td class="text-center" style="white-space: nowrap;">
+                                            {% if cell %}{{ cell }}pt{% else %}<span class="text-muted">-</span>{% endif %}
+                                        </td>
+                                    {% endfor %}
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="{{ matrix.sessions|length|add:2 }}" class="text-center text-muted py-3">学生がいません</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
 <!-- 設定変更モーダル -->
 <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -627,25 +717,41 @@ body { background-color: #f8fafc; }
     </div>
 </div>
 
-<!-- CSVプレビューモーダル -->
-<div class="modal fade" id="csvPreviewModal" tabindex="-1" aria-labelledby="csvPreviewModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+
+<!-- 独自評価項目 手動加点モーダル（QRコード不要） -->
+<div class="modal fade" id="addCustomPointsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title" id="csvPreviewModalLabel"><i class="fas fa-file-csv me-2 text-success"></i>CSV出力プレビュー</h5>
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus-circle me-2 text-info"></i>手動で加点</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="alert alert-info py-2 small">
-                    <i class="fas fa-info-circle me-1"></i>
-                    以下の内容でCSVファイルがダウンロードされます。必要に応じて内容を手動で編集できます。
+                <p class="mb-3">
+                    <strong id="addCustomPointsStudentName"></strong> さんの
+                    「<strong id="addCustomPointsColumnTitle"></strong>」に、授業回を指定して加点します。
+                </p>
+                <div class="mb-3">
+                    <label for="addCustomPointsSession" class="form-label">授業回</label>
+                    <select class="form-select" id="addCustomPointsSession">
+                        {% for session in sessions %}
+                            <option value="{{ session.id }}">第{{ session.session_number }}回（{{ session.date|date:"m/d" }}）</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <textarea id="csvPreviewText" class="form-control" rows="15" style="font-family: 'Courier New', Consolas, monospace; white-space: pre; overflow-wrap: normal; overflow-x: scroll;"></textarea>
+                <div class="mb-3">
+                    <label for="addCustomPointsValue" class="form-label">点数（1〜100）</label>
+                    <input type="number" class="form-control" id="addCustomPointsValue" min="1" max="100" value="1" placeholder="例: 5">
+                    <div class="form-text">
+                        加点を間違えた場合は、この画面ではなく「QRコード管理」の該当学生のスキャン履歴から取り消してください。
+                    </div>
+                </div>
+                <div id="addCustomPointsError" class="alert alert-danger py-2 small d-none"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                <button type="button" class="btn btn-success" onclick="downloadCSV()">
-                    <i class="fas fa-download me-1"></i>ダウンロード
+                <button type="button" class="btn btn-info text-white" onclick="submitAddCustomPoints()">
+                    <i class="fas fa-save me-1"></i>加点する
                 </button>
             </div>
         </div>
@@ -748,109 +854,32 @@ function getCookie(name) {
     return cookieValue;
 }
 
-// CSVプレビュー表示
-function showCSVPreview() {
-    const table = document.querySelector('.evaluation-table');
-    const rows = Array.from(table.querySelectorAll('tr'));
-    const csvMatrix = [];
-    
-    for (let i = 0; i < rows.length; i++) {
-        csvMatrix.push([]);
-    }
-    
-    rows.forEach((row, rowIndex) => {
-        if (row.style.display === 'none') return;
-        
-        const cells = Array.from(row.querySelectorAll('th, td'));
-        cells.forEach(cell => {
-            if (cell.style.display === 'none') return;
+// 独自評価項目：授業回を指定した手動加点（QRコード不要）
+let addCustomPointsStudentId = null;
+let addCustomPointsColumnId = null;
 
-            let text = "";
-            const input = cell.querySelector('input[type="number"], input[type="text"]');
-            if (input) {
-                text = input.value;
-            } else {
-                // 余分な改行をスペース2つに置換
-                text = cell.innerText.trim().replace(/\r?\n|\r/g, '  ');
-            }
-            
-            let escapedText = text;
-            if (text.includes(',') || text.includes('"') || text.includes('\n')) {
-                escapedText = '"' + text.replace(/"/g, '""') + '"';
-            }
-            
-            const colspan = parseInt(cell.getAttribute('colspan') || 1, 10);
-            const rowspan = parseInt(cell.getAttribute('rowspan') || 1, 10);
-            
-            let colIndex = 0;
-            while (csvMatrix[rowIndex][colIndex] !== undefined) {
-                colIndex++;
-            }
-            
-            for (let r = 0; r < rowspan; r++) {
-                for (let c = 0; c < colspan; c++) {
-                    if (r === 0 && c === 0) {
-                        csvMatrix[rowIndex + r][colIndex + c] = escapedText;
-                    } else {
-                        csvMatrix[rowIndex + r][colIndex + c] = "";
-                    }
-                }
-            }
-        });
-    });
-    
-    const csvContent = csvMatrix.map(row => {
-        return Array.from(row).map(item => item !== undefined ? item : "").join(',');
-    }).join('\r\n');
-    
-    document.getElementById('csvPreviewText').value = csvContent;
-    const previewModal = new bootstrap.Modal(document.getElementById('csvPreviewModal'));
-    previewModal.show();
+function openAddCustomPointsModal(studentId, columnId, studentName, columnTitle) {
+    addCustomPointsStudentId = studentId;
+    addCustomPointsColumnId = columnId;
+    document.getElementById('addCustomPointsStudentName').textContent = studentName;
+    document.getElementById('addCustomPointsColumnTitle').textContent = columnTitle;
+    document.getElementById('addCustomPointsValue').value = 1;
+    const errorBox = document.getElementById('addCustomPointsError');
+    errorBox.classList.add('d-none');
+    errorBox.textContent = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('addCustomPointsModal'));
+    modal.show();
 }
 
-// CSVダウンロード処理
-function downloadCSV() {
-    const csvContent = document.getElementById('csvPreviewText').value;
-    // BOMを付与してExcelでの文字化けを防ぐ
-    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-    const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
-    
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    
-    const className = "{{ classroom.class_name|escapejs }}";
-    const mode = "{{ view_mode }}" === "detail" ? "詳細" : "簡易";
-    const date = new Date().toISOString().slice(0, 10);
-    link.setAttribute("download", `評価一覧_${className}_${mode}_${date}.csv`);
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    const modalElement = document.getElementById('csvPreviewModal');
-    const modalInstance = bootstrap.Modal.getInstance(modalElement);
-    if (modalInstance) {
-        modalInstance.hide();
-    }
-}
+function submitAddCustomPoints() {
+    const errorBox = document.getElementById('addCustomPointsError');
+    errorBox.classList.add('d-none');
 
-// 独自評価システムのスコアの更新
-// 742行目付近：saveCustomScore 関数の中身を以下に差し替え
-function saveCustomScore(input) {
-    // 1. まずは赤い枠を一度消す（リセット）
-    input.classList.remove('is-invalid');
+    const sessionId = document.getElementById('addCustomPointsSession').value;
+    const points = document.getElementById('addCustomPointsValue').value;
 
-    let score = parseFloat(input.value);
-    const studentId = input.dataset.studentId;
-    const columnId = input.dataset.columnId;
-    
-    if (isNaN(score) || score < 0) {
-        score = 0;
-        input.value = 0;
-    }
-
-    const url = "{% url 'school_management:update_custom_score' classroom.id %}";
+    const url = "{% url 'school_management:add_custom_column_points' classroom.id %}";
 
     fetch(url, {
         method: 'POST',
@@ -859,22 +888,24 @@ function saveCustomScore(input) {
             'X-CSRFToken': getCookie('csrftoken')
         },
         body: JSON.stringify({
-            student_id: studentId,
-            column_id: columnId,
-            score: score
+            student_id: addCustomPointsStudentId,
+            column_id: addCustomPointsColumnId,
+            session_id: sessionId,
+            points: points
         })
     })
     .then(r => r.json())
     .then(d => {
-        // 2. Python側の return JsonResponse({'success': True}) と合わせる
         if (d.success) {
-            console.log('カスタムスコア保存成功');
+            window.location.reload();
         } else {
-            input.classList.add('is-invalid');
+            errorBox.textContent = d.message || '加点に失敗しました。';
+            errorBox.classList.remove('d-none');
         }
     })
     .catch(error => {
-        input.classList.add('is-invalid');
+        errorBox.textContent = '通信エラーが発生しました。';
+        errorBox.classList.remove('d-none');
     });
 }
 </script>

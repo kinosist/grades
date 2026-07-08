@@ -192,7 +192,7 @@
                 <div class="alert alert-warning shadow-sm border-warning">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h5 class="alert-heading mb-1"><i class="fas fa-flask me-2"></i>テストモード（シミュレーション）中</h5>
+                            <h5 class="alert-heading mb-1"><i class="fas fa-flask me-2"></i>テストモード（シミュレーション）</h5>
                             <p class="mb-0">現在、ピア評価のテスト用点数を用いて成績を再計算して表示しています。本番データには影響ありません。</p>
                         </div>
                     </div>
@@ -208,7 +208,7 @@
                         <form action="{% url 'school_management:toggle_test_mode' %}" method="post" class="m-0">
                             {% csrf_token %}
                             <div class="form-check form-switch fs-5 mb-0">
-                                <input class="form-check-input" type="checkbox" id="testModeSwitch" onchange="this.form.submit()" {% if test_mode %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="testModeSwitch" onchange="this.disabled=true; this.form.submit()" {% if test_mode %}checked{% endif %}>
                                 <label class="form-check-label fs-6 mt-1" for="testModeSwitch">テストモード</label>
                             </div>
                         </form>
@@ -243,7 +243,7 @@
                     </thead>
                     <tbody>
                         {% for grade in student_grades|dictsortreversed:"class_points" %}
-                        <tr>
+                        <tr class="clickable-row" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#detailModal-{{ grade.student.id }}">
                             <td class="col-rank text-center">
                                 <span class="rank-badge rank-{{ forloop.counter }}">
                                     {{ forloop.counter }}

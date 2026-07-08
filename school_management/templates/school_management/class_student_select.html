@@ -81,7 +81,7 @@
                     {% if available_students %}
                     <div class="mb-3 d-flex justify-content-between align-items-center">
                         <div>
-                            <strong>追加可能な学生: {{ available_students.count }}名</strong>
+                            <strong>追加可能な学生: {{ available_students|length }}名</strong>
                             {% if search_query %}
                             <small class="text-muted">（"{{ search_query }}" で検索）</small>
                             {% endif %}

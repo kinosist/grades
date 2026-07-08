@@ -143,44 +143,46 @@ class ModelsTestCase(TestCase):
         # Points = int((-3 * 2) + 5.0) = -6 + 5 = -1
         self.assertEqual(scp.points, -1)
 
-    def test_update_custom_score_boundary_values(self):
+    def test_add_custom_column_points_boundary_values(self):
         from school_management.models import PointColumn, StudentColumnScore
         import json
         from django.urls import reverse
         from django.test import Client
-        
+
         client = Client()
         client.force_login(self.teacher)
         column = PointColumn.objects.create(classroom=self.classroom, column_title="API Test Column")
-        url = reverse('school_management:update_custom_score', args=[self.classroom.id])
+        url = reverse('school_management:add_custom_column_points', args=[self.classroom.id])
 
-        # 1. Boundary value: 0
-        data_0 = {
-            'student_id': self.student.id,
-            'column_id': column.id,
-            'score': 0
-        }
-        response = client.post(url, data=json.dumps(data_0), content_type='application/json')
+        def post(points):
+            return client.post(url, data=json.dumps({
+                'student_id': self.student.id,
+                'column_id': column.id,
+                'session_id': self.session.id,
+                'points': points,
+            }), content_type='application/json')
+
+        # 1. 下限値: 1（許可される）
+        response = post(1)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(StudentColumnScore.objects.get(student=self.student, column=column).score, 0)
+        self.assertEqual(StudentColumnScore.objects.get(student=self.student, column=column).score, 1)
 
-        # 2. Boundary value: -1
-        data_neg = {
-            'student_id': self.student.id,
-            'column_id': column.id,
-            'score': -1
-        }
-        response = client.post(url, data=json.dumps(data_neg), content_type='application/json')
+        # 2. 上限値: 100（許可される）
+        response = post(100)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(StudentColumnScore.objects.get(student=self.student, column=column).score, -1)
+        self.assertEqual(StudentColumnScore.objects.get(student=self.student, column=column).score, 101)
 
-        # 3. Boundary value: None (null in JSON)
-        # It should return a 400 error because database field is not nullable, and be caught gracefully
-        data_none = {
-            'student_id': self.student.id,
-            'column_id': column.id,
-            'score': None
-        }
-        response = client.post(url, data=json.dumps(data_none), content_type='application/json')
+        # 3. 範囲外: 0（マイナスや0は許可されない）
+        response = post(0)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json().get('success', False))
+
+        # 4. 範囲外: 101（100を超える値は許可されない）
+        response = post(101)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json().get('success', False))
+
+        # 5. 不正な値: None
+        response = post(None)
         self.assertEqual(response.status_code, 400)
         self.assertFalse(response.json().get('success', False))

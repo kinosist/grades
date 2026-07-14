@@ -10,7 +10,7 @@ def group_management(request, session_id):
     """グループ編成"""
     lesson_session = get_object_or_404(LessonSession, id=session_id, classroom__teachers=request.user)
     classroom = lesson_session.classroom
-    students = classroom.students.all()
+    students = classroom.students.all().order_by('student_number')
     # 担当から外れた学生は非表示にする（データ自体は保持し、再度担当になれば表示が戻る）
     groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related(
         Prefetch('groupmember_set', queryset=GroupMember.objects.filter(student__in=classroom.students).select_related('student'))

@@ -48,7 +48,7 @@ def group_master_list_view(request, class_id):
 def group_master_management(request, class_id):
     """グループマスタ編集（グループ編成と同様のUI）"""
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
-    students = classroom.students.all()
+    students = classroom.students.all().order_by('student_number')
     # 担当から外れた学生は非表示にする（データ自体は保持し、再度担当になれば表示が戻る）
     group_masters = GroupMaster.objects.filter(classroom=classroom).prefetch_related(
         Prefetch('members', queryset=GroupMasterMember.objects.filter(student__in=classroom.students).select_related('student'))

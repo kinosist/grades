@@ -41,7 +41,7 @@ def class_qr_codes(request, class_id):
         messages.error(request, '権限がありません。')
         return redirect('school_management:dashboard')
     
-    students = classroom.students.all()
+    students = classroom.students.all().order_by('student_number')
     session_id = request.GET.get('session_id')
     lesson_session = None
     

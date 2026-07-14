@@ -9,7 +9,7 @@ from ...models import ClassRoom, LessonSession, PeerEvaluation, StudentClassPoin
 def class_detail_view(request, class_id):
     """クラス詳細"""
     classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
-    students = classroom.students.all()
+    students = classroom.students.all().order_by('student_number')
     
     # すべての授業回を取得
     all_sessions = LessonSession.objects.filter(classroom=classroom).order_by('-date')

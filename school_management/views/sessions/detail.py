@@ -15,7 +15,7 @@ def lesson_session_detail(request, session_id):
 
     # 担当から外れた学生は非表示にする（データ自体は保持し、再度担当になれば表示が戻る）
     groups = Group.objects.filter(lesson_session=session).prefetch_related(
-        Prefetch('groupmember_set', queryset=GroupMember.objects.filter(student__in=classroom.students).select_related('student'))
+        Prefetch('groupmember_set', queryset=GroupMember.objects.filter(student__in=classroom.students).select_related('student').order_by('student__student_number'))
     ).order_by('group_number')
 
     if request.method == 'POST' and request.POST.get('action') == 'save_reports':

@@ -15,7 +15,7 @@ from django.db import IntegrityError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
-from django.db.models import Q # Import Q for filtering
+from django.db.models import Q, Prefetch # Import Q for filtering
 from ...models import (
     LessonSession,
     Group,
@@ -287,7 +287,9 @@ def peer_evaluation_common_form(request, session_id):
             'is_closed': True,
         })
     
-    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student')
+    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related(
+        Prefetch('groupmember_set', queryset=GroupMember.objects.select_related('student').order_by('student__student_number'))
+    )
     oauth_session, student = _load_verified_oauth_session(request, lesson_session)
 
     context = {
@@ -334,6 +336,7 @@ def peer_evaluation_common_form(request, session_id):
         GroupMember.objects.filter(group=evaluator_group)
         .exclude(student=student)
         .select_related('student')
+        .order_by('student__student_number')
         .values('student__id', 'student__full_name')
     )
     evaluator_group_member_names = [m['student__full_name'] for m in evaluator_group_member_objects]
@@ -550,7 +553,9 @@ def peer_evaluation_form_preview(request, session_id):
         messages.error(request, 'ピア評価設定が完了していません。先に設定を行ってください。')
         return redirect('school_management:peer_evaluation_settings', session_id=session_id)
 
-    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related('groupmember_set__student')
+    groups = Group.objects.filter(lesson_session=lesson_session).prefetch_related(
+        Prefetch('groupmember_set', queryset=GroupMember.objects.select_related('student').order_by('student__student_number'))
+    )
     if not groups.exists():
         messages.error(request, 'グループが編成されていません。プレビューを表示できません。')
         return redirect('school_management:group_management', session_id=session_id)
@@ -943,7 +948,7 @@ def peer_evaluation_results(request, session_id):
 
     enrolled_students = Student.objects.filter(
         id__in=all_participant_ids, role='student'
-    ).order_by('full_name')
+    ).order_by('student_number')
     group_name_map = {group.id: group.display_name for group in groups}
     student_name_map = {student.id: student.full_name for student in enrolled_students}
 

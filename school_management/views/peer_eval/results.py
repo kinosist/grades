@@ -295,7 +295,7 @@ def peer_evaluation_results_view(request: HttpRequest, session_id: int) -> HttpR
     )
     all_participant_ids = active_student_ids | former_participant_ids
 
-    enrolled_students = list(Student.objects.filter(id__in=all_participant_ids, role='student').order_by('full_name'))
+    enrolled_students = list(Student.objects.filter(id__in=all_participant_ids, role='student').order_by('student_number'))
     group_name_map = {group.id: group.display_name for group in groups}
     student_name_map = {student.id: student.full_name for student in enrolled_students}
     submission_rows = []

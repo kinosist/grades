@@ -198,6 +198,26 @@ S2025003,田中次郎,タナカジロウ,tanaka@example.com" required></textarea
 
 <script>
 
+// 二重登録防止: 登録ボタンを連打しても2回目以降の送信を無視する
+// （処理完了前に連打すると、サーバー側の重複チェックをすり抜けて同じ学生が
+// 二重に登録されてしまうことがあるため、根本対策として一度送信したら
+// ボタンを無効化し、押したことが分かるようフィードバックも表示する）
+document.querySelectorAll('#registrationTabsContent form').forEach(function(form) {
+    form.addEventListener('submit', function() {
+        if (form.dataset.submitted === 'true') {
+            return;
+        }
+        form.dataset.submitted = 'true';
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>登録中...';
+        }
+    });
+});
+
 const textareaElement = document.getElementById('bulk_student_data');
 if (textareaElement) {
     textareaElement.addEventListener('paste', function(e) {

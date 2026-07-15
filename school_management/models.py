@@ -117,6 +117,11 @@ class CustomUser(AbstractUser):
                 condition=Q(role__in=['teacher', 'admin']) & ~Q(email__isnull=True),
                 name='unique_email_for_teachers_and_admins',
             ),
+            models.UniqueConstraint(
+                fields=['student_number'],
+                condition=Q(role='student') & ~Q(student_number=''),
+                name='unique_student_number_for_students',
+            ),
         ]
         indexes = [
             models.Index(fields=['student_number'], name='idx_customuser_student_number'),

@@ -771,7 +771,14 @@ def _aggregate_member_scores(lesson_session, pe_settings):
     for group in groups:
         group_members = list(GroupMember.objects.filter(group=group).select_related('student'))
         G = len(group_members)
-        if G == 0:
+        
+        # まず既存のContributionEvaluationを削除（このグループの集計分）
+        ContributionEvaluation.objects.filter(
+            peer_evaluation__lesson_session=lesson_session,
+            peer_evaluation__evaluator_group=group,
+        ).delete()
+        
+        if G <= 1:
             continue
         
         # 内部ポイント集計: G-N点 (Nは与えられた順位)
@@ -793,11 +800,6 @@ def _aggregate_member_scores(lesson_session, pe_settings):
         sorted_members = sorted(internal_points.items(), key=lambda x: x[1], reverse=True)
         
         # 同点（タイ）対応: 同じポイントのメンバーには同じ順位の点数を付与
-        # まず既存のContributionEvaluationを削除（このグループの集計分）
-        ContributionEvaluation.objects.filter(
-            peer_evaluation__lesson_session=lesson_session,
-            peer_evaluation__evaluator_group=group,
-        ).delete()
         
         # ダミーのピア評価を取得（集計結果保存用）
         aggregate_eval = group_evals.first()

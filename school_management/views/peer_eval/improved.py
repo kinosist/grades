@@ -782,10 +782,12 @@ def _aggregate_member_scores(lesson_session, pe_settings):
             continue
         
         # 内部ポイント集計: G-N点 (Nは与えられた順位)
-        internal_points = defaultdict(int)
-        for member in group_members:
-            internal_points[member.student_id] = 0
-        
+        # 現在のグループメンバーのみを対象にする（dictで固定し、途中でグループから
+        # 外れたメンバーへの投票が混入しないようにする。defaultdictだと
+        # 存在しないキー参照だけで自動的にエントリが作られてしまうため使わない）
+        internal_points = {member.student_id: 0 for member in group_members}
+        current_member_ids = set(internal_points.keys())
+
         group_evals = evals.filter(evaluator_group=group)
         for ev in group_evals:
             response = ev.response_json or {}
@@ -793,6 +795,9 @@ def _aggregate_member_scores(lesson_session, pe_settings):
                 member_id = _safe_int(entry.get('member_id'))
                 rank = _safe_int(entry.get('rank'))
                 if member_id is None or rank is None:
+                    continue
+                if member_id not in current_member_ids:
+                    # 集計時点でグループに所属していないメンバーへの投票は対象外
                     continue
                 internal_points[member_id] += (G - rank)
         

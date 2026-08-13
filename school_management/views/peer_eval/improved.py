@@ -771,14 +771,23 @@ def _aggregate_member_scores(lesson_session, pe_settings):
     for group in groups:
         group_members = list(GroupMember.objects.filter(group=group).select_related('student'))
         G = len(group_members)
-        if G == 0:
+        
+        # まず既存のContributionEvaluationを削除（このグループの集計分）
+        ContributionEvaluation.objects.filter(
+            peer_evaluation__lesson_session=lesson_session,
+            peer_evaluation__evaluator_group=group,
+        ).delete()
+        
+        if G <= 1:
             continue
         
         # 内部ポイント集計: G-N点 (Nは与えられた順位)
-        internal_points = defaultdict(int)
-        for member in group_members:
-            internal_points[member.student_id] = 0
-        
+        # 現在のグループメンバーのみを対象にする（dictで固定し、途中でグループから
+        # 外れたメンバーへの投票が混入しないようにする。defaultdictだと
+        # 存在しないキー参照だけで自動的にエントリが作られてしまうため使わない）
+        internal_points = {member.student_id: 0 for member in group_members}
+        current_member_ids = set(internal_points.keys())
+
         group_evals = evals.filter(evaluator_group=group)
         for ev in group_evals:
             response = ev.response_json or {}
@@ -787,17 +796,15 @@ def _aggregate_member_scores(lesson_session, pe_settings):
                 rank = _safe_int(entry.get('rank'))
                 if member_id is None or rank is None:
                     continue
+                if member_id not in current_member_ids:
+                    # 集計時点でグループに所属していないメンバーへの投票は対象外
+                    continue
                 internal_points[member_id] += (G - rank)
         
         # ポイント降順でソート
         sorted_members = sorted(internal_points.items(), key=lambda x: x[1], reverse=True)
         
         # 同点（タイ）対応: 同じポイントのメンバーには同じ順位の点数を付与
-        # まず既存のContributionEvaluationを削除（このグループの集計分）
-        ContributionEvaluation.objects.filter(
-            peer_evaluation__lesson_session=lesson_session,
-            peer_evaluation__evaluator_group=group,
-        ).delete()
         
         # ダミーのピア評価を取得（集計結果保存用）
         aggregate_eval = group_evals.first()

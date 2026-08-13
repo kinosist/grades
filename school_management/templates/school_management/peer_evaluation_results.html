@@ -15,8 +15,9 @@
 <style>
     /* --- Base Styles from class_evaluation.html --- */
     .table-container {
-        overflow-x: auto;
-        max-height: 80vh;
+        overflow: auto;
+        max-height: calc(100vh - 280px);
+        min-height: 350px;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         position: relative;
@@ -101,6 +102,21 @@
     .evaluation-table thead th.name-col {
         z-index: 12;
         background-color: #f8f9fa;
+    }
+
+    /* 2段ヘッダー用の調整 */
+    .evaluation-table.mode-detail thead tr:first-child th {
+        height: 50px; /* 1行目の高さ固定 */
+    }
+    .evaluation-table.mode-detail thead tr:last-child th {
+        position: sticky;
+        top: 50px; /* 1行目の高さ分下げる */
+        z-index: 9;
+        height: 30px;
+        padding: 4px;
+        font-weight: normal;
+        font-size: 0.85em;
+        background-color: #f1f3f5;
     }
 
     /* --- Dynamic detail columns --- */
@@ -412,7 +428,6 @@
                             {% if view_mode == 'simple' %}
                             <p class="m-3 text-muted small">簡易表示では提出の有無のみ確認できます。詳細な提出内容を確認するには「詳細」表示に切り替えてください。</p>
                             {% endif %}
-                            <div class="table-responsive">
                             <table class="evaluation-table mode-{{ view_mode }}">
                             <thead>
                                 <tr>
@@ -527,7 +542,6 @@
                                 {% endfor %}
                             </tbody>
                             </table>
-                        </div>
                         {% endif %}
                     {% else %}
                     <div class="text-center py-4">

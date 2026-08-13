@@ -197,8 +197,9 @@ body { background-color: #f8fafc; }
 
     /* テーブルコンテナ（スクロール用） */
     .table-container {
-        overflow-x: auto;
-        max-height: 80vh;
+        overflow: auto;
+        max-height: calc(100vh - 280px);
+        min-height: 350px;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         position: relative;
@@ -766,7 +767,7 @@ window.addEventListener('beforeprint', function() {
 });
 
 window.addEventListener('afterprint', function() {
-    document.querySelector('.table-container').style.maxHeight = '80vh';
+    document.querySelector('.table-container').style.maxHeight = 'calc(100vh - 280px)';
     document.querySelector('.table-container').style.overflow = 'auto';
 });
 

@@ -209,3 +209,27 @@ class PeerEvalAggregateLogicTests(TestCase):
         self.assertEqual(history_a2[0]['contrib'], 10)
         self.assertEqual(history_a2[0]['vote'], 5)
         self.assertEqual(history_a2[0]['total'], 15)
+
+    def test_aggregate_member_scores_one_person_group(self):
+        """1人グループの集計テスト: 他者評価が存在しないため、貢献ポイントは0点になること"""
+        # 1名のみのグループDを作成
+        group_d = Group.objects.create(lesson_session=self.session, group_number=4)
+        student_d1 = Student.objects.create(full_name="学生D1", email="d1@test.com", role="student")
+        GroupMember.objects.create(group=group_d, student=student_d1)
+        
+        # 学生D1が他グループを評価するデータを追加（フォーム送信した状態）
+        PeerEvaluation.objects.create(
+            lesson_session=self.session, student=student_d1, evaluator_group=group_d, evaluator_token=uuid.uuid4(),
+            response_json={"group_members_eval": [], "other_group_eval": []}
+        )
+        
+        self.session.peer_evaluation_status = LessonSession.PeerEvaluationStatus.CLOSED
+        self.session.save()
+        _aggregate_member_scores(self.session, self.settings)
+        
+        # 1人グループは貢献度評価オブジェクトが作成されない（＝0点）
+        evals = ContributionEvaluation.objects.filter(
+            peer_evaluation__lesson_session=self.session, 
+            evaluatee=student_d1
+        )
+        self.assertEqual(evals.count(), 0)

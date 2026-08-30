@@ -1,0 +1,43 @@
+{% extends 'school_management/base.html' %}
+
+{% block title %}授業回編集 - {{ session.classroom.class_name }}{% endblock %}
+{% block page_title %}第{{ session.session_number }}回 授業回編集{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' session.classroom.id %}">{{ session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:session_detail' session.id %}">第{{ session.session_number }}回</a></li>
+<li class="breadcrumb-item active" aria-current="page">編集</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h5><i class="fas fa-edit me-2"></i>授業回の情報を編集</h5>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label for="date" class="form-label">授業実施日</label>
+                <input type="date" class="form-control" id="date" name="date" value="{{ session.date|date:'Y-m-d'|default:'' }}">
+                <div class="form-text">日付を空にすると「未設定」として保存されます。</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="topic" class="form-label">授業テーマ・トピック</label>
+                <input type="text" class="form-control" id="topic" name="topic" value="{{ session.topic|default:'' }}" placeholder="例: データベース設計の基礎">
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-2"></i>変更を保存
+                </button>
+                <a href="{% url 'school_management:session_detail' session.id %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>キャンセル
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

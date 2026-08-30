@@ -4,6 +4,8 @@ from .views import (
     utils, auth, dashboard, classes, sessions,
     students, quizzes, groups, peer_eval, grades, attendance
 )
+from .views.auth import google_auth
+from .views.students import self_eval
 
 app_name = 'school_management'
 
@@ -15,6 +17,10 @@ urlpatterns = [
     # path('debug-login/', auth.debug_login_view, name='debug_login'), # 必要ならauth.pyに追加
     path('logout/', auth.logout_view, name='logout'),
 
+    # --- Google認証 ---
+    path('auth/google/', google_auth.google_login, name='google_login'),
+    path('auth/google/callback/', google_auth.google_auth_callback, name='google_auth_callback'),
+
     # --- ダッシュボード ---
     path('dashboard/', dashboard.dashboard_view, name='dashboard'),
     path('student-dashboard/', dashboard.student_dashboard, name='student_dashboard'),
@@ -24,25 +30,44 @@ urlpatterns = [
     path('classes/', classes.class_list_view, name='class_list'),
     path('classes/create/', classes.class_create_view, name='class_create'),
     path('classes/<int:class_id>/', classes.class_detail_view, name='class_detail'),
+    path('classes/<int:class_id>/edit/', classes.class_edit_view, name='class_edit'),
     path('classes/<int:class_id>/delete/', classes.class_delete_view, name='class_delete'),
+    
+    # 独自の評価項目（列）管理用ルーティングを追加
+    path('classes/<int:class_id>/point-columns/add/', classes.add_point_column, name='add_point_column'),
+    path('point-columns/<int:column_id>/delete/', classes.delete_point_column, name='delete_point_column'),
+    path('classes/<int:class_id>/add-custom-column-points/', grades.add_custom_column_points, name='add_custom_column_points'),
     
     # --- 成績・評価（Grades） ---
     path('classes/<int:class_id>/points/', grades.class_points_view, name='class_points'),
     path('classes/<int:class_id>/evaluation/', grades.class_evaluation_view, name='class_evaluation'),
+    path('classes/<int:class_id>/evaluation/csv/', grades.class_evaluation_csv_export, name='class_evaluation_csv_export'),
     path('classes/<int:class_id>/attendance-rate/', grades.update_attendance_rate, name='update_attendance_rate'),
+    path('classes/<int:class_id>/settings/update/', grades.update_class_settings, name='update_class_settings'),
 
     # --- クラスへの学生追加・詳細 ---
     path('classes/<int:class_id>/students/select/', students.bulk_student_add, name='class_student_select'),
-    path('classes/<int:class_id>/students/bulk-csv/', students.bulk_student_add_csv, name='bulk_student_add'),
+    path('classes/<int:class_id>/students/bulk-csv/', students.bulk_student_add_csv, name='bulk_student_add_csv'),
+    path('classes/<int:class_id>/copy-from/<int:source_class_id>/', students.copy_students_from_class, name='copy_students_from_class'),
     path('classes/<int:class_id>/students/<str:student_number>/', students.class_student_detail_view, name='class_student_detail'),
+
+    # --- 自己評価システム ---
+    path('classes/<int:class_id>/students/<str:student_number>/goal/', self_eval.student_goal_edit, name='student_goal_edit'),
+    path('classes/<int:class_id>/students/<str:student_number>/self-evaluation/', self_eval.self_evaluation_edit, name='self_evaluation_edit'),
+    path('lesson-sessions/<int:session_id>/reports/', self_eval.lesson_report_tab, name='lesson_report_tab'),
 
     # --- 授業セッション（Sessions） ---
     path('classes/<int:class_id>/sessions/', sessions.session_list_view, name='session_list'),
     path('classes/<int:class_id>/sessions/create/', sessions.session_create_view, name='session_create'),
+    path('classes/<int:class_id>/sessions/bulk-edit/', sessions.session_bulk_edit_view, name='session_bulk_edit'),
     path('sessions/<int:session_id>/', sessions.session_detail_view, name='session_detail'),
+    path('sessions/<int:session_id>/edit/', sessions.session_edit_view, name='session_edit'),
     # 新しい授業作成機能
     path('classes/<int:class_id>/lesson-sessions/create/', sessions.lesson_session_create, name='lesson_session_create'),
     path('lesson-sessions/<int:session_id>/', sessions.lesson_session_detail, name='lesson_session_detail'),
+    path('sessions/<int:session_id>/delete/', sessions.lesson_session_delete, name='session_delete'),
+    path('sessions/<int:session_id>/merge-quizzes/', sessions.merge_duplicate_quizzes, name='merge_duplicate_quizzes'),
+    path('sessions/<int:session_id>/reset-qr/', sessions.session_reset_qr, name='session_reset_qr'),
 
     # --- 小テスト（Quizzes） ---
     path('sessions/<int:session_id>/quizzes/', quizzes.quiz_list_view, name='quiz_list'),
@@ -50,13 +75,18 @@ urlpatterns = [
     path('quizzes/<int:quiz_id>/', quizzes.quiz_results_view, name='quiz_detail'),
     path('quizzes/<int:quiz_id>/grading/', quizzes.quiz_grading_view, name='quiz_grading'),
     path('quizzes/<int:quiz_id>/results/', quizzes.quiz_results_view, name='quiz_results'),
-    path('quizzes/<int:quiz_id>/questions/', quizzes.question_manage_view, name='question_manage'),
-    path('quizzes/<int:quiz_id>/questions/create/', quizzes.question_create_view, name='question_create'),
+
 
     # --- 学生管理（Students） ---
     path('students/', students.student_list_view, name='student_list'),
     path('students/create/', students.student_create_view, name='student_create'),
+    path('students/bulk-delete/confirm/', students.student_bulk_delete_confirm, name='student_bulk_delete_confirm'),
+    path('students/bulk-delete/execute/', students.student_bulk_delete_execute, name='student_bulk_delete_execute'),
+    path('students/history/', students.student_link_history_view, name='student_link_history'),
+    path('students/history/<int:student_id>/relink/', students.student_relink_view, name='student_relink'),
     path('students/<str:student_number>/', students.student_detail_view, name='student_detail'),
+    path('students/<str:student_number>/delete/confirm/', students.student_delete_confirm_view, name='student_delete_confirm'),
+    path('students/<str:student_number>/delete/execute/', students.student_delete_execute_view, name='student_delete_execute'),
     path('students/<str:student_number>/edit/', students.student_edit_view, name='student_edit'),
     path('student/<int:student_id>/update-points/', students.update_student_points, name='update_student_points'),
     path('student/<int:student_id>/remove-from-class/', students.remove_student_from_class, name='remove_student_from_class'),
@@ -64,7 +94,6 @@ urlpatterns = [
     # --- グループ管理（Groups） ---
     path('lesson-sessions/<int:session_id>/groups/', groups.group_list_view, name='group_list'),
     path('lesson-sessions/<int:session_id>/groups/create/', groups.group_management, name='group_management'),
-    path('lesson-sessions/<int:session_id>/groups/add/', groups.group_add_view, name='group_add'),
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/', groups.group_detail_view, name='group_detail'),
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/edit/', groups.group_edit_view, name='group_edit'),
     path('lesson-sessions/<int:session_id>/groups/<int:group_id>/delete/', groups.group_delete_view, name='group_delete'),
@@ -78,16 +107,21 @@ urlpatterns = [
     # 改善版（Improved）
     path('lesson-sessions/<int:session_id>/peer-evaluation-improved/create/', peer_eval.improved_peer_evaluation_create, name='improved_peer_evaluation_create'),
     path('lesson-sessions/<int:session_id>/peer-evaluation-improved/links/', peer_eval.peer_evaluation_links, name='peer_evaluation_links'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/preview/', peer_eval.peer_evaluation_form_preview, name='peer_evaluation_form_preview'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/', peer_eval.peer_evaluation_common_form, name='peer_evaluation_common'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/google/start/', peer_eval.peer_evaluation_google_start, name='peer_evaluation_google_start'),
+    path('peer-evaluation/google/callback/', peer_eval.peer_evaluation_google_callback, name='peer_evaluation_google_callback'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/close/', peer_eval.close_peer_evaluation, name='close_peer_evaluation'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/settings/', peer_eval.peer_evaluation_settings_view, name='peer_evaluation_settings'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/reopen/', peer_eval.reopen_peer_evaluation, name='reopen_peer_evaluation'),
     path('lesson-sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results, name='peer_evaluation_results'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/delete-all/', peer_eval.delete_all_peer_evaluations, name='delete_all_peer_evaluations'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/simulation/save/', peer_eval.save_peer_evaluation_simulation, name='save_peer_evaluation_simulation'),
+    path('lesson-sessions/<int:session_id>/peer-evaluation/simulation/clear/', peer_eval.clear_peer_evaluation_simulation, name='clear_peer_evaluation_simulation'),
+    path('peer-evaluation/test-mode/toggle/', peer_eval.toggle_test_mode, name='toggle_test_mode'),
     
     # 従来版（Original）
-    path('sessions/<int:session_id>/peer-evaluation/', peer_eval.peer_evaluation_list_view, name='peer_evaluation_list'),
-    path('sessions/<int:session_id>/peer-evaluation/create/', peer_eval.peer_evaluation_create_view, name='peer_evaluation_create'),
-    path('sessions/<int:session_id>/peer-evaluation/link/', peer_eval.peer_evaluation_link_view, name='peer_evaluation_link'),
-    path('sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results_view, name='peer_evaluation_results'),
+    path('sessions/<int:session_id>/peer-evaluation/results/', peer_eval.peer_evaluation_results_view, name='peer_evaluation_results_legacy'),
 
     # 回答フォーム（公開・学生用）
     path('peer-evaluation/<str:token>/', peer_eval.peer_evaluation_form_view, name='peer_evaluation_form'),
@@ -97,6 +131,8 @@ urlpatterns = [
     path('qr-codes/', attendance.qr_code_list, name='qr_code_list'),
     path('qr-codes/student/<int:student_id>/', attendance.qr_code_detail, name='qr_code_detail'),
     path('qr-codes/scan/<uuid:qr_code_id>/', attendance.qr_code_scan, name='qr_code_scan'),
+    path('qr-codes/history/<int:scan_id>/delete/', attendance.delete_qr_scan, name='delete_qr_scan'),
+    path('qr-codes/student/<int:student_id>/history/bulk-delete/', attendance.bulk_delete_qr_scans, name='bulk_delete_qr_scans'),
     path('my-qr-code/', attendance.student_qr_code_view, name='student_qr_code'),
     path('classes/<int:class_id>/qr-codes/', attendance.class_qr_codes, name='class_qr_codes'),
 ]

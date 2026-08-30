@@ -1,12 +1,13 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import (
-    CustomUser, ClassRoom, LessonSession, 
-    Group, GroupMember, Quiz, QuizScore, 
+    CustomUser, ClassRoom, LessonSession,
+    Group, GroupMember, Quiz, QuizScore,
     PeerEvaluation, ContributionEvaluation,
-    StudentQRCode, QRCodeScan, StudentLessonPoints
+    StudentQRCode, QRCodeScan, StudentLessonPoints,
+    StudentClassPoints, PeerEvaluationSettings,
+    ClassRoomEnrollment, TeacherStudentAssignment,
 )
-from .models import StudentClassPoints
 
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
@@ -36,19 +37,45 @@ class ClassRoomAdmin(admin.ModelAdmin):
     list_display = ('class_name', 'year', 'semester', 'student_count')
     list_filter = ('year', 'semester')
     search_fields = ('class_name',)
-    filter_horizontal = ('students', 'teachers')
-    
+    filter_horizontal = ('teachers',)
+
     def student_count(self, obj):
         return obj.students.count()
     student_count.short_description = '学生数'
 
+
+@admin.register(ClassRoomEnrollment)
+class ClassRoomEnrollmentAdmin(admin.ModelAdmin):
+    """クラス在籍履歴管理画面"""
+    list_display = ('classroom', 'student', 'is_active', 'linked_at', 'unlinked_at')
+    list_filter = ('is_active', 'classroom')
+    search_fields = ('student__full_name', 'student__student_number', 'classroom__class_name')
+    readonly_fields = ('linked_at',)
+
+
+@admin.register(TeacherStudentAssignment)
+class TeacherStudentAssignmentAdmin(admin.ModelAdmin):
+    """担当教員割当履歴管理画面"""
+    list_display = ('teacher', 'student', 'is_active', 'linked_at', 'unlinked_at')
+    list_filter = ('is_active',)
+    search_fields = ('teacher__full_name', 'student__full_name', 'student__student_number')
+    readonly_fields = ('linked_at',)
+
 @admin.register(LessonSession)
 class LessonSessionAdmin(admin.ModelAdmin):
     """授業回管理画面"""
-    list_display = ('classroom', 'session_number', 'date', 'topic', 'has_quiz', 'has_peer_evaluation')
-    list_filter = ('classroom', 'date', 'has_quiz', 'has_peer_evaluation')
+    list_display = ('classroom', 'session_number', 'date', 'topic', 'has_quiz', 'has_peer_evaluation', 'peer_evaluation_status')
+    list_filter = ('classroom', 'date', 'has_quiz', 'has_peer_evaluation', 'peer_evaluation_status')
     search_fields = ('topic', 'classroom__class_name')
     date_hierarchy = 'date'
+    actions = ('close_peer_evaluations',)
+
+    @admin.action(description='選択した授業回のピア評価を締め切る')
+    def close_peer_evaluations(self, request, queryset):
+        updated = queryset.exclude(
+            peer_evaluation_status=LessonSession.PeerEvaluationStatus.CLOSED
+        ).update(peer_evaluation_status=LessonSession.PeerEvaluationStatus.CLOSED)
+        self.message_user(request, f'{updated}件の授業回を締切状態に更新しました。')
 
 @admin.register(Group)
 class GroupAdmin(admin.ModelAdmin):
@@ -85,9 +112,33 @@ class QuizScoreAdmin(admin.ModelAdmin):
 @admin.register(PeerEvaluation)
 class PeerEvaluationAdmin(admin.ModelAdmin):
     """ピア評価管理画面"""
-    list_display = ('lesson_session', 'evaluator_group', 'first_place_group', 'second_place_group', 'created_at')
+    list_display = ('lesson_session', 'evaluator_group', 'created_at')
     list_filter = ('lesson_session', 'created_at')
     search_fields = ('lesson_session__topic',)
+
+@admin.register(PeerEvaluationSettings)
+class PeerEvaluationSettingsAdmin(admin.ModelAdmin):
+    """ピア評価設定管理画面"""
+    list_display = ('lesson_session', 'enable_member_evaluation', 'evaluation_method', 'enable_group_evaluation', 'group_evaluation_method')
+    list_filter = ('enable_member_evaluation', 'enable_group_evaluation', 'evaluation_method', 'group_evaluation_method')
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.lesson_session.peer_evaluation_status != LessonSession.PeerEvaluationStatus.NOT_OPEN:
+            return (
+                'lesson_session',
+                'enable_member_evaluation',
+                'member_scores',
+                'member_reason_control',
+                'evaluation_method',
+                'enable_group_evaluation',
+                'group_scores',
+                'group_reason_control',
+                'group_evaluation_method',
+                'show_points',
+                'created_at',
+                'updated_at',
+            )
+        return self.readonly_fields
 
 @admin.register(ContributionEvaluation)
 class ContributionEvaluationAdmin(admin.ModelAdmin):

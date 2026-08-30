@@ -1,181 +1,719 @@
 from django.shortcuts import render, get_object_or_404
+import logging
 from django.contrib.auth.decorators import login_required
-from django.db import models
-from ...models import ClassRoom, LessonSession, StudentLessonPoints, Quiz, QuizScore, Group, StudentClassPoints, PeerEvaluation, ContributionEvaluation 
+from collections import defaultdict
+from django.db.models import Sum
 
-@login_required
-def class_evaluation_view(request, class_id):
-    """クラスごとの評価一覧（写真のような形式）"""
-    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+import json
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+import statistics
+
+# 必要なモデルをインポート
+from ...models import (
+    ClassRoom, LessonSession, Student, StudentLessonPoints, QuizScore, Group,
+    GroupMember, StudentClassPoints, PeerEvaluation, ContributionEvaluation,
+    SelfEvaluation, PointColumn, StudentColumnScore, PeerEvaluationSettings,
+    QRCodeScan, StudentQRCode
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_group_vote_point_map(session_groups, session_peer_evals, pe_settings, peer_status):
+    group_point_map = {group_obj.id: 0 for group_obj in session_groups}
+    if not pe_settings or not pe_settings.enable_group_evaluation:
+        return group_point_map
+
+    score_points = pe_settings.group_scores or []
+    if not score_points:
+        return group_point_map
+
+    if pe_settings.group_evaluation_method == PeerEvaluationSettings.EvaluationMethod.AGGREGATE:
+        if peer_status != LessonSession.PeerEvaluationStatus.CLOSED:
+            return group_point_map
+
+        group_internal_points = {group_obj.id: 0 for group_obj in session_groups}
+        group_count = len(session_groups)
+        for pe in session_peer_evals:
+            response = pe.response_json or {}
+            for entry in response.get('other_group_eval', []):
+                gid = _safe_int(entry.get('group_id'))
+                rank = _safe_int(entry.get('rank'))
+                if gid in group_internal_points and rank and 1 <= rank <= group_count:
+                    group_internal_points[gid] += (group_count - rank)
+
+        sorted_groups = sorted(
+            group_internal_points.items(),
+            key=lambda x: x[1],
+            reverse=True,
+        )
+        current_rank = 0
+        prev_points = None
+        for idx, (gid, internal_points) in enumerate(sorted_groups):
+            if internal_points != prev_points:
+                current_rank = idx
+                prev_points = internal_points
+            if current_rank < len(score_points):
+                group_point_map[gid] = score_points[current_rank]
+        return group_point_map
+
+    for pe in session_peer_evals:
+        response = pe.response_json or {}
+        for entry in response.get('other_group_eval', []):
+            gid = _safe_int(entry.get('group_id'))
+            rank = _safe_int(entry.get('rank'))
+            if gid in group_point_map and rank and 1 <= rank <= len(score_points):
+                group_point_map[gid] += score_points[rank - 1]
+    return group_point_map
+
+
+def _build_class_evaluations(request, classroom):
+    """
+    クラスごとの評価一覧（成績表）の計算ロジック
+
+    QR採点、ピア評価、各種小テスト、および教員が独自に追加した
+    評価項目の点数を集計する。画面表示用ビューとCSV出力用ビューの
+    両方から呼び出され、計算結果が食い違わないようにする。
+    """
     students = classroom.students.all().order_by('student_number')
-    
+
+    # テストモードか判定
+    test_mode = request.session.get('test_mode', False)
+
+    # セッションからシミュレーション用点数を取得
+    # 辞書構造: { class_id: { session_id: { student_id: points } } }
+    sim_data_class = request.session.get('peer_sim_points', {}).get(str(classroom.id), {})
+    has_simulation = len(sim_data_class) > 0
+
     # 授業回の一覧を取得
     sessions = LessonSession.objects.filter(classroom=classroom).order_by('session_number')
+    session_ids = list(sessions.values_list('id', flat=True))
     
-    # 各学生の評価データを取得
+    # 教員が追加した「独自の評価項目（列）」の一覧を取得
+    point_columns = classroom.point_columns.all().order_by('created_at')
+    
+    # 評価システム（default: 通常, original: カスタマイズ, goal: 目標管理）
+    grading_system = classroom.grading_system
+
+    # N+1対策: 関連データを一括で取得
+    all_peer_evals = PeerEvaluation.objects.filter(lesson_session__in=session_ids)
+    all_groups = list(Group.objects.filter(lesson_session__in=session_ids))
+    
+    # N+1対策: StudentClassPointsを一括で取得 (select_relatedで最適化)
+    student_ids = [s.id for s in students]
+    student_class_points_map = {
+        scp.student_id: scp
+        for scp in StudentClassPoints.objects.filter(
+            student_id__in=student_ids,
+            classroom=classroom
+        )
+    }
+
+    # AGGREGATEモード用の貢献度スコアを事前集計
+    all_contrib_evals = ContributionEvaluation.objects.filter(
+        peer_evaluation__lesson_session__classroom=classroom
+    ).values(
+        'evaluatee_id', 'peer_evaluation__lesson_session_id'
+    ).annotate(
+        total_contrib=Sum('contribution_score')
+    )
+    student_session_contrib_map = defaultdict(dict)
+    for item in all_contrib_evals:
+        student_id = item['evaluatee_id']
+        session_id = item['peer_evaluation__lesson_session_id']
+        score = item['total_contrib']
+        student_session_contrib_map[student_id][session_id] = score
+
+    # セッションIDをキーにした評価データの辞書を作成
+    session_to_evals_map = defaultdict(list)
+    for pe in all_peer_evals:
+        session_to_evals_map[pe.lesson_session_id].append(pe)
+
+    # セッション単位で不変な「グループ投票ポイント」を先に計算して使い回す
+    session_group_point_maps = {}
+    session_peer_settings = {}
+    # NEW: DIRECTモード用の貢献度スコアを事前集計
+    direct_mode_contrib_scores = defaultdict(lambda: defaultdict(int))
+    for session in sessions:
+        if not session.has_peer_evaluation:
+            session_peer_settings[session.id] = None
+            continue
+        try:
+            pe_settings = session.peer_evaluation_settings
+        except PeerEvaluationSettings.DoesNotExist:
+            pe_settings = None
+        session_peer_settings[session.id] = pe_settings
+
+        # NEW: DIRECTモードのスコア計算
+        if pe_settings and pe_settings.enable_member_evaluation and pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
+            member_scores = pe_settings.member_scores or []
+            if member_scores:
+                evals_in_session = session_to_evals_map.get(session.id, [])
+                for ev in evals_in_session:
+                    response = ev.response_json or {}
+                    for entry in response.get('group_members_eval', []):
+                        member_id = _safe_int(entry.get('member_id'))
+                        rank = _safe_int(entry.get('rank'))
+                        if member_id and rank and 1 <= rank <= len(member_scores):
+                            score = member_scores[rank - 1]
+                            direct_mode_contrib_scores[session.id][member_id] += score
+
+        score_points = (
+            pe_settings.group_scores or []
+        ) if pe_settings and pe_settings.enable_group_evaluation else []
+        if score_points:
+            session_group_point_maps[session.id] = _build_group_vote_point_map(
+                # N+1対策: 事前取得したデータを利用
+                session_groups=[g for g in all_groups if g.lesson_session_id == session.id],
+                session_peer_evals=session_to_evals_map.get(session.id, []),
+                pe_settings=pe_settings,
+                peer_status=session.peer_evaluation_status,
+            )
+
+    # 独自評価項目の授業回別の内訳を一括取得（N+1対策）
+    # QRコードスキャン（カメラを使わない手動加点も含む）は授業回に紐づいているため、
+    # ここから「どの授業回で何点」を集計できる
+    custom_scan_rows = QRCodeScan.objects.filter(
+        lesson_session_id__in=session_ids,
+        point_column__isnull=False
+    ).values('lesson_session_id', 'qr_code__student_id', 'point_column_id').annotate(
+        total=Sum('points_awarded')
+    )
+    # { session_id: { student_id: { column_id: points } } }
+    session_student_custom_map = defaultdict(lambda: defaultdict(dict))
+    for row in custom_scan_rows:
+        session_student_custom_map[row['lesson_session_id']][row['qr_code__student_id']][row['point_column_id']] = row['total']
+
+    # 独自評価項目の学生ごとの合計点を一括取得（N+1対策）
+    student_column_scores_map = defaultdict(dict)
+    if point_columns:
+        for scs in StudentColumnScore.objects.filter(column__classroom=classroom):
+            student_column_scores_map[scs.student_id][scs.column_id] = scs.score
+
+    # 各学生の評価データを格納するリスト
     student_evaluations = []
-    
+
     for student in students:
-        # 各授業回のデータ（ポイント + ピア評価スコア）
+        # 各授業回のデータ（ポイント + ピア評価スコア）を格納する辞書
         session_data = {}
-        session_count = 0
-        total_qr_points = 0
         
         for session in sessions:
             session_key = f"第{session.session_number}回"
             
-            # QRコードポイントを取得
-            qr_points = 0
+            # 1. 授業内手動ポイントを取得（StudentLessonPoints）
+            manual_points = 0
             lesson_point = StudentLessonPoints.objects.filter(
                 lesson_session=session,
                 student=student
             ).first()
             if lesson_point:
-                qr_points = lesson_point.points
-                session_count += 1
-                total_qr_points += qr_points
+                manual_points = lesson_point.points
             
-            # 小テストスコアを取得
+            # 2. 小テストスコアを取得（QRアクション点もここに含まれる）
             quiz_score = 0
             has_quiz = False
             try:
-                quiz = Quiz.objects.filter(lesson_session=session).first()
-                if quiz:
-                    has_quiz = True
-                    quiz_score_obj = QuizScore.objects.filter(
-                        quiz=quiz,
-                        student=student,
-                        is_cancelled=False
-                    ).first()
-                    if quiz_score_obj:
-                        # 小テストのスコア（0-100点）をそのまま使用
-                        quiz_score = quiz_score_obj.score
-            except Exception as e:
-                print(f"小テストスコア取得エラー: {e}")
-                pass
-            
-            # ピア評価スコアを取得（1位=5点、2位=3点）
-            peer_evaluation_score = 0
-            try:
-                # この学生が所属するグループを取得
-                student_groups = Group.objects.filter(
-                    lesson_session=session,
-                    groupmember__student=student
+                # その授業回の全ての小テストスコアを合算する（重複枠対策）
+                session_quiz_scores = QuizScore.objects.filter(
+                    quiz__lesson_session=session,
+                    student=student,
+                    is_cancelled=False
                 )
-                
-                if student_groups.exists() and session.has_peer_evaluation:
-                    # この学生のグループが1位に選ばれた回数
-                    first_place_count = PeerEvaluation.objects.filter(
-                        lesson_session=session,
-                        first_place_group__in=student_groups
-                    ).count()
-                    
-                    # この学生のグループが2位に選ばれた回数
-                    second_place_count = PeerEvaluation.objects.filter(
-                        lesson_session=session,
-                        second_place_group__in=student_groups
-                    ).count()
-                    
-                    # 1位=5点、2位=3点（複数票があっても最大値のみ付与）
-                    if first_place_count > 0:
-                        peer_evaluation_score = 5
-                    elif second_place_count > 0:
-                        peer_evaluation_score = 3
-                    else:
-                        peer_evaluation_score = 0
+                if session_quiz_scores.exists():
+                    has_quiz = True
+                    # 重複対策: 同一クイズは最新のスコアのみを採用
+                    quiz_score_dict = {}
+                    for qs in session_quiz_scores:
+                        quiz_score_dict[qs.quiz.id] = qs.score
+                    quiz_score = sum(quiz_score_dict.values())
             except Exception as e:
-                print(f"ピア評価スコア取得エラー: {e}")
+                logger.error(f"小テストスコア取得エラー: {e}", exc_info=True)
                 pass
             
+            # ピア評価スコア
+            peer_evaluation_score = 0
+            real_contrib_score = 0
+            real_vote_score = 0
+            final_contrib = 0
+            final_vote = 0
+            is_simulated = False
+
+            if session.has_peer_evaluation:
+                try:
+                    pe_settings = session_peer_settings.get(session.id)
+
+                    # 3-1. 貢献度スコア (DIRECT or AGGREGATE)
+                    if pe_settings and pe_settings.enable_member_evaluation:
+                        if pe_settings.evaluation_method == PeerEvaluationSettings.EvaluationMethod.DIRECT:
+                            # DIRECTモード: 事前集計したデータを利用
+                            real_contrib_score = direct_mode_contrib_scores.get(session.id, {}).get(student.id, 0)
+                        else: # AGGREGATEモード
+                            # AGGREGATEモード: 事前集計したデータを利用
+                            real_contrib_score = student_session_contrib_map.get(student.id, {}).get(session.id, 0)
+
+                    # 3-2. 投票ポイントの計算
+                    membership = GroupMember.objects.filter(
+                        student=student,
+                        group__lesson_session=session
+                    ).first()
+                    
+                    if membership:
+                        group = membership.group
+                        score_points = (
+                            pe_settings.group_scores or []
+                        ) if pe_settings and pe_settings.enable_group_evaluation else []
+                        if score_points:
+                            group_point_map = session_group_point_maps.get(session.id, {})
+                            real_vote_score = group_point_map.get(group.id, 0)
+
+                    simulated_contrib_score = real_contrib_score
+                    simulated_vote_score = real_vote_score
+                    
+                    # シミュレーションによるテスト用スコア計算
+                    if test_mode and has_simulation:
+                        sim_data = sim_data_class.get(str(session.id), {}).get(str(student.id))
+                        if sim_data is not None:
+                            if isinstance(sim_data, dict):
+                                sess_sim_data = sim_data_class.get(str(session.id), {})
+                                point_mode = sess_sim_data.get('point_mode', 'settings')
+                                
+                                sim_contrib_score = 0
+                                if pe_settings and pe_settings.enable_member_evaluation:
+                                    if point_mode == 'settings':
+                                        if pe_settings.member_scores:
+                                            for i, points in enumerate(pe_settings.member_scores):
+                                                rank = i + 1
+                                                count = sim_data.get(f'member_rank_{rank}')
+                                                if count:
+                                                    sim_contrib_score += float(count) * points
+                                    elif point_mode == 'manual':
+                                        contrib_val = sim_data.get('contrib')
+                                        if contrib_val:
+                                            sim_contrib_score += float(contrib_val)
+                                elif not pe_settings or not pe_settings.enable_group_evaluation:
+                                    # When both are disabled, use contrib
+                                    contrib_val = sim_data.get('contrib', sim_data.get('member'))
+                                    if contrib_val:
+                                        sim_contrib_score += float(contrib_val)
+
+                                sim_vote_score = 0
+                                if pe_settings and pe_settings.enable_group_evaluation:
+                                    if point_mode == 'settings':
+                                        if pe_settings.group_scores:
+                                            for i, points in enumerate(pe_settings.group_scores):
+                                                rank = i + 1
+                                                count = sim_data.get(f'group_rank_{rank}')
+                                                if count:
+                                                    sim_vote_score += float(count) * points
+                                    elif point_mode == 'manual':
+                                        group_manual = sim_data.get('group_manual')
+                                        if group_manual:
+                                            sim_vote_score += float(group_manual)
+
+                                simulated_contrib_score = sim_contrib_score
+                                simulated_vote_score = sim_vote_score
+                                
+                                # 互換性フォールバック (member, group)
+                                if sim_contrib_score == 0 and sim_vote_score == 0 and ('member' in sim_data or 'group' in sim_data):
+                                    simulated_contrib_score = sim_data.get('member', 0)
+                                    simulated_vote_score = sim_data.get('group', 0)
+                            else:
+                                simulated_contrib_score = float(sim_data)
+                                simulated_vote_score = 0
+                            is_simulated = True
+
+                    if test_mode:
+                        peer_evaluation_score = simulated_contrib_score + simulated_vote_score
+                        final_contrib = simulated_contrib_score
+                        final_vote = simulated_vote_score
+                    else:
+                        peer_evaluation_score = real_contrib_score + real_vote_score
+                        final_contrib = real_contrib_score
+                        final_vote = real_vote_score
+                        
+                except Exception as e:
+                    logger.error(f"ピア評価スコア取得エラー: {e}", exc_info=True)
+                    pass
+
+            # セッションごとのデータを辞書に保存
+            # 独自評価項目は、内訳（QR/ピア/他）とは孤立させ、独自項目の列側にのみ表示する
             session_data[session_key] = {
-                'qr_points': qr_points,
+                'manual_points': manual_points,
                 'quiz_score': quiz_score,
                 'peer_score': peer_evaluation_score,
-                'total_score': qr_points + quiz_score + peer_evaluation_score,
+                'peer_contrib': final_contrib,
+                'peer_vote': final_vote,
+                'is_simulated': is_simulated if session.has_peer_evaluation else False,
+                'total_score': manual_points + quiz_score + peer_evaluation_score,
                 'date': session.date,
                 'has_peer_evaluation': session.has_peer_evaluation,
-                'has_quiz': has_quiz
+                'has_quiz': has_quiz,
+                'session': session
             }
+
+        # 4. 独自の評価項目（列）ごとの点数を取得（授業回別の内訳は別モーダルで表示するため保持）
+        student_custom_scores = student_column_scores_map.get(student.id, {})
+        custom_column_details = [
+            {'column': col, 'score': student_custom_scores.get(col.id, 0)}
+            for col in point_columns
+        ]
+        custom_columns_total = sum(item['score'] for item in custom_column_details)
         
-        # 出席率と平均ポイントを計算
-        total_sessions = sessions.count()
-        # データベースから保存された出席率、出席点、ポイントを取得
+        # 5. データベースから保存された出席率、出席点を取得
         attendance_rate = 0
         saved_attendance_points = 0
-        saved_class_points = 0
-        try:
-            student_class_points = StudentClassPoints.objects.get(student=student, classroom=classroom)
+        student_class_points = student_class_points_map.get(student.id)
+        if student_class_points:
             attendance_rate = student_class_points.attendance_rate
             saved_attendance_points = student_class_points.attendance_points
-            saved_class_points = student_class_points.points
-            # 旧データ互換: total値として保存されている場合は出席点を差し引く
-            if saved_class_points and saved_attendance_points and saved_class_points >= saved_attendance_points:
-                saved_class_points -= saved_attendance_points
-        except StudentClassPoints.DoesNotExist:
-            # 保存されていない場合は自動計算
-            attendance_rate = (session_count / total_sessions * 100) if total_sessions > 0 else 0
         
-        # 各種スコアの合計を計算
+        # 6. 各種スコアの合計を計算
         total_peer_score = sum(data['peer_score'] for data in session_data.values())
         total_quiz_score = sum(data.get('quiz_score', 0) for data in session_data.values())
         total_combined_score = sum(data['total_score'] for data in session_data.values())
         
-        # 小テスト以外のスコアに倍率を適用し、小テストは等倍で加算
-        session_base_score = max(total_combined_score - total_quiz_score, 0)
-        multiplier_value = 2
-        class_points_value = saved_class_points + (session_base_score * multiplier_value) + total_quiz_score
-        
-        average_points = round(total_qr_points / session_count, 1) if session_count > 0 else 0
-        
-        # 出席点を使用（保存されたものがあればそれを使う）
-        attendance_points_value = saved_attendance_points if saved_attendance_points > 0 else 0
-        
-        # 合計点は出席点 + クラスポイントの2倍
-        total_points_calculated = attendance_points_value + (class_points_value * multiplier_value)
-        
+        # 評価システム（モード）に応じた合計点数の算出
+        if grading_system == 'goal':
+            # 目標管理モード: 教師評価点 + 出席点
+            self_eval = SelfEvaluation.objects.filter(student=student, classroom=classroom).first()
+            score_points = self_eval.teacher_score if self_eval and self_eval.teacher_score is not None else 0
+            total_points_calculated = score_points + saved_attendance_points
+        else:
+            # 通常モード / オリジナルモード: 合計 = (授業点 * 2) + 出席点
+            # 独自の評価項目で獲得した点数も授業点に加算
+            score_points = total_combined_score + custom_columns_total
+            total_points_calculated = (score_points * 2) + saved_attendance_points
+
+        # セッションごとのスコアをリスト化（テンプレート表示用）
+        ordered_session_scores = []
+        for session in sessions:
+            session_key = f"第{session.session_number}回"
+            ordered_session_scores.append(session_data[session_key])
+
+        # 学生ごとの評価データをリストに追加
         student_evaluations.append({
             'student': student,
-            'total_points': total_points_calculated,  # 合計点は出席点 + 点数
+            'total_points': total_points_calculated,
+            'score_points': score_points,
             'total_peer_score': total_peer_score,
-            'total_quiz_score': total_quiz_score,  # 小テストスコアの合計
-            'total_combined_score': total_combined_score,
-            'attendance_points': attendance_points_value,  # 出席点（保存された値または0）
+            'total_quiz_score': total_quiz_score,
+            'custom_columns_total': custom_columns_total,
+            'custom_column_details': custom_column_details,
+            'attendance_points': saved_attendance_points,
             'attendance_rate': attendance_rate,
-            'multiplied_points': class_points_value,  # 倍率適用済みの点数
-            'multiplier': multiplier_value,
-            'session_data': session_data,
-            'session_count': session_count,
-            'average_points': average_points,
-            'class_points': class_points_value,  # クラスのポイント（手動加算分 + 倍率適用済み + 小テスト点）
-            'student_points': student.points,  # 学生の全体ポイント
-            'qr_points': total_qr_points,  # クラスのQRコードポイントの合計
+            'session_scores': ordered_session_scores,
         })
-    
-    session_list = [f"第{session.session_number}回" for session in sessions]
-    
-    # 各授業回のピア評価平均値を計算
-    session_peer_averages = {}
-    for session in sessions:
-        if session.has_peer_evaluation:
-            peer_scores = ContributionEvaluation.objects.filter(
-                peer_evaluation__lesson_session=session
-            ).aggregate(avg_score=models.Avg('contribution_score'))
-            
-            avg_score = round(peer_scores['avg_score'] or 0, 1)
-            session_peer_averages[session.id] = avg_score
-            print(f"Session {session.session_number}: PE average = {avg_score}")
+
+    # --- クラス全体の統計データ（中央値・最高点）の算出 ---
+    all_raw_scores = [e['total_points'] for e in student_evaluations]
+    if all_raw_scores:
+        # 中央値を取得
+        median_val = statistics.median(all_raw_scores)
+        # 中央値の半分を足切りラインに設定
+        cutoff_line = median_val / 2
+        
+        # 足切りをクリアした学生の中での最高点を取得（換算の基準値）
+        passed_scores = [s for s in all_raw_scores if s > cutoff_line]
+        max_val = max(passed_scores) if passed_scores else 0
+        
+        # 統計の平均点（シミュレーションを反映）
+        class_average_points = round(sum(all_raw_scores) / len(all_raw_scores), 1)
+    else:
+        median_val = 0
+        cutoff_line = 0
+        max_val = 0
+        class_average_points = 0.0
+
+    # --- 評価システムに応じた最終成績の処理（足切りと換算） ---
+    for eval_data in student_evaluations:
+        current_raw = eval_data['total_points']
+        
+        # クラスが「オリジナル（カスタマイズ）」モードの場合のみ、足切りと100点換算を実施
+        if grading_system == 'original':
+            # 足切り判定 (中央値の半分以下か)
+            if current_raw <= cutoff_line:
+                eval_data['is_below_cutoff'] = True
+                eval_data['final_score_100'] = 0  # 足切りライン以下の場合は0点
+            else:
+                eval_data['is_below_cutoff'] = False
+                # 換算処理: 最高得点者が100点になるように比率で計算
+                if max_val > 0:
+                    eval_data['final_score_100'] = round((current_raw / max_val) * 100, 1)
+                else:
+                    eval_data['final_score_100'] = 0
         else:
-            session_peer_averages[session.id] = None
-            print(f"Session {session.session_number}: No peer evaluation")
-    
-    print(f"Session peer averages: {session_peer_averages}")
-    
+            # 「デフォルト（通常）」や「目標管理」モードの場合は足切りを行わず、素点をそのまま利用
+            eval_data['is_below_cutoff'] = False
+            eval_data['final_score_100'] = round(current_raw, 1)
+
+    return {
+        'students': students,
+        'sessions': sessions,
+        'point_columns': point_columns,
+        'grading_system': grading_system,
+        'student_evaluations': student_evaluations,
+        'class_average_points': class_average_points,
+        'test_mode': test_mode,
+        'has_simulation': has_simulation,
+        'session_student_custom_map': session_student_custom_map,
+        'student_column_scores_map': student_column_scores_map,
+    }
+
+
+@login_required
+def class_evaluation_view(request, class_id):
+    """
+    クラスごとの評価一覧（成績表）を表示するビュー
+    """
+    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+
+    # 表示モード (simple / detail) - デフォルトは詳細モード
+    view_mode = request.GET.get('mode', 'detail')
+
+    data = _build_class_evaluations(request, classroom)
+    students = data['students']
+    sessions = data['sessions']
+    point_columns = data['point_columns']
+    grading_system = data['grading_system']
+    student_evaluations = data['student_evaluations']
+    class_average_points = data['class_average_points']
+    test_mode = data['test_mode']
+    has_simulation = data['has_simulation']
+    session_student_custom_map = data['session_student_custom_map']
+    student_column_scores_map = data['student_column_scores_map']
+
+    total_sessions = sessions.count()
+
+    # テーブルのカラム幅（colspan）を調整（独自評価項目の数を考慮）
+    base_colspan = (total_sessions * 2 + 7) if view_mode == 'detail' else 7
+    table_colspan = base_colspan + point_columns.count()
+
+    # 独自評価項目：列ごとに「全学生 × 授業回」のマトリクスを1つにまとめて作成
+    # （1人ずつ開かず、項目ボタン1つでクラス全員分をまとめて確認できるようにする）
+    ordered_sessions = list(sessions)
+    column_detail_matrices = []
+    for col in point_columns:
+        rows = []
+        for student in students:
+            cells = [
+                session_student_custom_map.get(session.id, {}).get(student.id, {}).get(col.id, 0)
+                for session in ordered_sessions
+            ]
+            rows.append({
+                'student': student,
+                'cells': cells,
+                'total': student_column_scores_map.get(student.id, {}).get(col.id, 0),
+            })
+        column_detail_matrices.append({
+            'column': col,
+            'sessions': ordered_sessions,
+            'rows': rows,
+        })
+
+    # テンプレートに渡すコンテキストデータ
     context = {
         'classroom': classroom,
         'student_evaluations': student_evaluations,
-        'session_list': session_list,
-        'sessions': sessions,  # 日付情報も渡す
-        'session_peer_averages': session_peer_averages,  # ピア評価平均値
-        'total_sessions': len(session_list),
+        'sessions': sessions,
+        'point_columns': point_columns,
+        'column_detail_matrices': column_detail_matrices,
+        'total_sessions': total_sessions,
+        'grading_system': grading_system,
+        'view_mode': view_mode,
+        'table_colspan': table_colspan,
+        'has_simulation': has_simulation,
+        'test_mode': test_mode,
+        'class_average_points': class_average_points,
     }
     return render(request, 'school_management/class_evaluation.html', context)
+
+
+@login_required
+def class_evaluation_csv_export(request, class_id):
+    """
+    クラスごとの評価一覧をCSVとして出力するビュー
+
+    画面表示用の評価テーブルをそのままエクスポートするのではなく、
+    AIやプログラムでの分析を想定し、完全にカンマ区切りで
+    構造化されたデータとして出力する。
+
+    - mode=simple: 1行 = 1学生（サマリーのみ）
+    - mode=detail: 1行 = 1学生。授業回ごとの内訳・独自評価項目の授業回別内訳を
+      すべて列として横に展開する（同じ学生が複数行にまたがらないようにする）
+    """
+    import csv
+    from datetime import datetime
+    from urllib.parse import quote
+    from django.http import HttpResponse
+
+    classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+
+    view_mode = request.GET.get('mode', 'detail')
+    if view_mode not in ('simple', 'detail'):
+        view_mode = 'detail'
+
+    data = _build_class_evaluations(request, classroom)
+    point_columns = list(data['point_columns'])
+    student_evaluations = data['student_evaluations']
+    sessions = list(data['sessions'])
+    session_student_custom_map = data['session_student_custom_map']
+    grading_system = data['grading_system']
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    filename = f"評価一覧_{classroom.class_name}_{view_mode}_{datetime.now().strftime('%Y%m%d')}.csv"
+    response['Content-Disposition'] = (
+        f"attachment; filename*=UTF-8''{quote(filename)}"
+    )
+
+    # charset=utf-8-sigを指定すると書き込みのたびにBOMが付与されてしまうため、
+    # 先頭で一度だけBOMを書き込み、以降はcsv.writerでプレーンなutf-8として書き込む
+    response.write('﻿')
+    writer = csv.writer(response)
+
+    # 画面の評価一覧テーブルと同じ列見出しに揃える。
+    # 「最終成績(100点換算)」「足切り」は、画面でも「オリジナル(カスタマイズ)」モードの
+    # クラスにしか表示されない概念のため、そのモードの時だけ列を追加する。
+    total_headers = (
+        ['最終成績(100点換算)', '素点', '足切り'] if grading_system == 'original' else ['合計']
+    )
+    summary_headers = (
+        ['学籍番号', '氏名', 'フリガナ'] + total_headers +
+        ['出席率', '出席点', '授業点', '小テスト合計', 'ピア評価合計'] +
+        [col.column_title for col in point_columns]
+    )
+
+    def build_summary_row(evaluation):
+        student = evaluation['student']
+        custom_scores = {
+            item['column'].id: item['score'] for item in evaluation['custom_column_details']
+        }
+        if grading_system == 'original':
+            total_values = [
+                evaluation['final_score_100'],
+                evaluation['total_points'],
+                1 if evaluation['is_below_cutoff'] else 0,
+            ]
+        else:
+            total_values = [evaluation['total_points']]
+
+        return (
+            [student.student_number, student.full_name, student.furigana]
+            + total_values
+            + [
+                evaluation['attendance_rate'],
+                evaluation['attendance_points'],
+                evaluation['score_points'],
+                evaluation['total_quiz_score'],
+                evaluation['total_peer_score'],
+            ]
+            + [custom_scores.get(col.id, 0) for col in point_columns]
+        )
+
+    if view_mode == 'simple':
+        writer.writerow(summary_headers)
+        for evaluation in student_evaluations:
+            writer.writerow(build_summary_row(evaluation))
+        return response
+
+    # 詳細モード: 1行 = 1学生。授業回ごとの内訳・独自評価項目の授業回別内訳を
+    # すべて列として横に展開する。
+    session_headers = []
+    for session in sessions:
+        prefix = f'第{session.session_number}回'
+        session_headers += [
+            f'{prefix}_授業日', f'{prefix}_小テスト点',
+            f'{prefix}_ピア貢献', f'{prefix}_ピア投票', f'{prefix}_手動点',
+            f'{prefix}_合計点',
+        ]
+        for col in point_columns:
+            session_headers.append(f'{prefix}_{col.column_title}')
+
+    writer.writerow(summary_headers + session_headers)
+
+    for evaluation in student_evaluations:
+        student = evaluation['student']
+        row = build_summary_row(evaluation)
+
+        for session, session_data in zip(sessions, evaluation['session_scores']):
+            row += [
+                session.date,
+                session_data['quiz_score'],
+                session_data['peer_contrib'],
+                session_data['peer_vote'],
+                session_data['manual_points'],
+                session_data['total_score'],
+            ]
+            for col in point_columns:
+                row.append(
+                    session_student_custom_map.get(session.id, {}).get(student.id, {}).get(col.id, 0)
+                )
+
+        writer.writerow(row)
+
+    return response
+
+
+@login_required
+@require_POST
+def add_custom_column_points(request, class_id):
+    """独自評価項目に、QRコードを使わず授業回を指定して手動で加点する
+
+    合計を直接上書きする方式（旧: update_custom_score）は、どの授業回の得点か
+    分からなくなり授業回別の内訳と矛盾するため廃止し、この加点方式に一本化した。
+    実体はQRスキャンと同じ QRCodeScan レコードとして保存するため、
+    評価一覧の授業回別の内訳や、QRコード管理のスキャン履歴にもそのまま反映され、
+    スキャン履歴の削除機能でそのまま取り消すこともできる。
+    """
+    try:
+        data = json.loads(request.body)
+        student_id = data.get('student_id')
+        column_id = data.get('column_id')
+        session_id = data.get('session_id')
+        points = data.get('points')
+
+        classroom = get_object_or_404(ClassRoom, id=class_id, teachers=request.user)
+        student = get_object_or_404(
+            Student,
+            id=student_id,
+            classroom_enrollments__classroom=classroom,
+            classroom_enrollments__is_active=True,
+        )
+        column = get_object_or_404(PointColumn, id=column_id, classroom=classroom)
+        session = get_object_or_404(LessonSession, id=session_id, classroom=classroom)
+
+        try:
+            points = int(points)
+        except (TypeError, ValueError):
+            return JsonResponse({'success': False, 'message': '点数は数値で入力してください。'}, status=400)
+
+        # 加点を間違えた場合は、QRコード管理のスキャン履歴からその加点を削除して取り消す。
+        if not (1 <= points <= 100):
+            return JsonResponse({'success': False, 'message': '点数は1〜100の範囲で入力してください。'}, status=400)
+
+        qr_code, _ = StudentQRCode.objects.get_or_create(student=student, defaults={'is_active': True})
+        QRCodeScan.objects.create(
+            qr_code=qr_code,
+            scanned_by=request.user,
+            lesson_session=session,
+            point_column=column,
+            points_awarded=points,
+        )
+
+        score_obj, _ = StudentColumnScore.objects.get_or_create(
+            student=student, column=column, defaults={'score': 0}
+        )
+        score_obj.score += points
+        score_obj.save()
+
+        return JsonResponse({'success': True, 'new_total': score_obj.score})
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=400)

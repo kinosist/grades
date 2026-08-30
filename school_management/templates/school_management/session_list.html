@@ -3,6 +3,12 @@
 {% block title %}授業回一覧 - {{ classroom.class_name }} - 学校管理システム{% endblock %}
 {% block page_title %}授業回一覧 - {{ classroom.class_name }}{% endblock %}
 
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' classroom.id %}">{{ classroom.class_name }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">授業回一覧</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -75,7 +81,7 @@
                                                     <i class="fas fa-list me-1"></i>小テスト管理
                                                 </a></li>
                                                 {% endif %}
-                                                <li><a class="dropdown-item" href="{% url 'school_management:peer_evaluation_create' session.id %}">
+                                                <li><a class="dropdown-item" href="{% url 'school_management:improved_peer_evaluation_create' session.id %}">
                                                     <i class="fas fa-users me-1"></i>ピア評価作成
                                                 </a></li>
                                                 <li><hr class="dropdown-divider"></li>

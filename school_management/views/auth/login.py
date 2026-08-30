@@ -1,10 +1,10 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
-from django.views.decorators.csrf import csrf_exempt
 from django.middleware.csrf import get_token
+from django.http import HttpRequest, HttpResponse
 
-def login_view(request):
+def login_view(request: HttpRequest) -> HttpResponse:
     """ログイン画面"""
     csrf_token = get_token(request)
     
@@ -34,21 +34,3 @@ def login_view(request):
             messages.error(request, 'メールアドレスまたはパスワードが正しくありません。')
     
     return render(request, 'school_management/login_temp.html', {'csrf_token': csrf_token})
-
-@csrf_exempt
-def debug_login_view(request):
-    """デバッグ用ログイン（CSRF無効）"""
-    if request.method == 'POST':
-        email = request.POST.get('email')
-        password = request.POST.get('password')
-        
-        user = authenticate(request, username=email, password=password)
-        
-        if user is not None:
-            login(request, user)
-            messages.success(request, f'ようこそ、{user.full_name}さん！')
-            return redirect('school_management:dashboard')
-        else:
-            messages.error(request, 'メールアドレスまたはパスワードが正しくありません。')
-    
-    return render(request, 'school_management/login_temp.html')

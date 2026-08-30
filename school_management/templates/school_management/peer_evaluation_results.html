@@ -1,209 +1,897 @@
+{% extends 'school_management/base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <link rel="icon" type="image/png" href="{% static 'school_management/images/favicon.png' %}">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ピア評価結果 - {{ lesson_session.classroom.class_name }}</title>
-    <link href="{% static 'school_management/css/base.css' %}" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid py-4">
-        <!-- ヘッダー -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-md-8">
-                                <h2 class="text-primary mb-2">
-                                    <i class="fas fa-chart-bar me-2"></i>ピア評価結果
-                                </h2>
-                                <p class="text-muted mb-0">
-                                    {{ lesson_session.classroom.class_name }} - 第{{ lesson_session.session_number }}回
-                                    {% if lesson_session.topic %}({{ lesson_session.topic }}){% endif %}
-                                    - {{ lesson_session.date|date:"Y年m月d日" }}
-                                </p>
-                            </div>
-                            <div class="col-md-4 text-md-end">
-                                <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}" class="btn btn-secondary">
-                                    <i class="fas fa-arrow-left me-1"></i>戻る
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- 統計情報 -->
-        <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h3 class="text-primary">{{ total_evaluations }}</h3>
-                        <p class="mb-0">提出された評価</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h3 class="text-success">{{ total_groups }}</h3>
-                        <p class="mb-0">参加グループ数</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card text-center">
-                    <div class="card-body">
-                        {% if lesson_session.peer_evaluation_closed %}
-                            <h3 class="text-danger">締切済み</h3>
-                        {% else %}
-                            <h3 class="text-success">受付中</h3>
-                        {% endif %}
-                        <p class="mb-0">評価状態</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+{% block title %}ピア評価結果 - {{ lesson_session.classroom.class_name }}{% endblock %}
+{% block page_title %}ピア評価結果{% endblock %}
 
-        <!-- グループランキング -->
-        <div class="row">
-            <div class="col-lg-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h5><i class="fas fa-trophy me-2"></i>グループランキング</h5>
-                        <small class="text-muted">1位票×2点 + 2位票×1点で計算</small>
-                    </div>
-                    <div class="card-body p-0">
-                        {% if group_stats %}
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>順位</th>
-                                        <th>グループ</th>
-                                        <th class="text-center">1位票</th>
-                                        <th class="text-center">2位票</th>
-                                        <th class="text-center">スコア</th>
-                                        <th class="text-center">評価提出</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for stat in group_stats %}
-                                    <tr class="{% if forloop.first %}table-warning{% elif forloop.counter == 2 %}table-light{% elif forloop.counter == 3 %}table-info{% endif %}">
-                                        <td>
-                                            {% if forloop.first %}
-                                                <i class="fas fa-trophy text-warning"></i> 1位
-                                            {% elif forloop.counter == 2 %}
-                                                <i class="fas fa-medal text-secondary"></i> 2位
-                                            {% elif forloop.counter == 3 %}
-                                                <i class="fas fa-medal text-warning"></i> 3位
-                                            {% else %}
-                                                {{ forloop.counter }}位
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <strong>
-                                                {% if stat.group.group_name %}
-                                                    {{ stat.group.group_name }}
-                                                {% else %}
-                                                    {{ stat.group.group_number }}グループ
-                                                {% endif %}
-                                            </strong>
-                                        </td>
-                                        <td class="text-center">
-                                            {% if stat.first_place_votes > 0 %}
-                                                <span class="badge bg-warning">{{ stat.first_place_votes }}</span>
-                                            {% else %}
-                                                <span class="text-muted">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td class="text-center">
-                                            {% if stat.second_place_votes > 0 %}
-                                                <span class="badge bg-secondary">{{ stat.second_place_votes }}</span>
-                                            {% else %}
-                                                <span class="text-muted">0</span>
-                                            {% endif %}
-                                        </td>
-                                        <td class="text-center">
-                                            <strong class="text-primary">{{ stat.score }}</strong>
-                                        </td>
-                                        <td class="text-center">
-                                            {% if stat.evaluations_given > 0 %}
-                                                <i class="fas fa-check text-success"></i>
-                                            {% else %}
-                                                <i class="fas fa-times text-danger"></i>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                        {% else %}
-                        <div class="text-center py-4">
-                            <p class="text-muted">まだ評価データがありません。</p>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_list' %}">クラス管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:class_detail' lesson_session.classroom.id %}">{{ lesson_session.classroom.class_name }}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}?active_tab=peer">第{{ lesson_session.session_number }}回</a></li>
+<li class="breadcrumb-item active" aria-current="page">ピア評価結果</li>
+{% endblock %}
 
-            <!-- 詳細コメント -->
-            <div class="col-lg-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h6><i class="fas fa-comments me-2"></i>評価コメント</h6>
-                    </div>
-                    <div class="card-body" style="max-height: 600px; overflow-y: auto;">
-                        {% for evaluation in evaluations %}
-                            {% if evaluation.first_place_reason or evaluation.second_place_reason or evaluation.general_comment %}
-                            <div class="mb-3 border-bottom pb-2">
-                                <small class="text-muted">
-                                    評価者: 
-                                    {% if evaluation.evaluator_group.group_name %}
-                                        {{ evaluation.evaluator_group.group_name }}
-                                    {% else %}
-                                        {{ evaluation.evaluator_group.group_number }}グループ
-                                    {% endif %}
-                                </small>
-                                
-                                {% if evaluation.first_place_reason %}
-                                <div class="mt-1">
-                                    <strong class="text-warning">1位理由:</strong>
-                                    <p class="small mb-1">{{ evaluation.first_place_reason }}</p>
-                                </div>
-                                {% endif %}
-                                
-                                {% if evaluation.second_place_reason %}
-                                <div class="mt-1">
-                                    <strong class="text-secondary">2位理由:</strong>
-                                    <p class="small mb-1">{{ evaluation.second_place_reason }}</p>
-                                </div>
-                                {% endif %}
-                                
-                                {% if evaluation.general_comment %}
-                                <div class="mt-1">
-                                    <strong class="text-info">全体コメント:</strong>
-                                    <p class="small mb-1">{{ evaluation.general_comment }}</p>
-                                </div>
-                                {% endif %}
-                            </div>
+{% block extra_css %}
+<style>
+    /* --- Base Styles from class_evaluation.html --- */
+    .table-container {
+        overflow: auto;
+        max-height: calc(100vh - 280px);
+        min-height: 350px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        position: relative;
+    }
+
+    .evaluation-table {
+        font-size: 14px;
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+        margin-top: 0;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .evaluation-table th,
+    .evaluation-table td {
+        border-bottom: 1px solid #dee2e6;
+        border-right: 1px solid #dee2e6;
+        padding: 12px 8px;
+        text-align: center;
+        vertical-align: middle;
+        background-color: #fff;
+    }
+
+    .evaluation-table th:last-child,
+    .evaluation-table td:last-child {
+        border-right: none;
+    }
+
+    .evaluation-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .evaluation-table th {
+        background-color: #f8f9fa;
+        color: #495057;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    /* --- Sticky Columns --- */
+    .evaluation-table .name-col {
+        width: 160px;
+        min-width: 160px;
+        font-weight: 600;
+        color: #212529;
+        background-color: #fff;
+        position: sticky;
+        left: 0;
+        z-index: 11;
+        border-right: 2px solid #dee2e6;
+        box-shadow: 4px 0 5px -2px rgba(0,0,0,0.1);
+    }
+    .evaluation-table .email-col {
+        width: 200px;
+        min-width: 200px;
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    .evaluation-table td.name-col,
+    .evaluation-table td.email-col {
+        /* データセルは左揃えにする */
+        text-align: left;
+    }
+
+    .evaluation-table .submission-time-col {
+        width: 120px;
+        min-width: 120px;
+    }
+
+    .evaluation-table .submission-status-col {
+        width: 80px;
+        min-width: 80px;
+    }
+
+    /* --- Header Adjustments --- */
+    .evaluation-table thead th.name-col {
+        z-index: 12;
+        background-color: #f8f9fa;
+    }
+
+    /* 2段ヘッダー用の調整 */
+    .evaluation-table.mode-detail thead tr:first-child th {
+        height: 50px; /* 1行目の高さ固定 */
+    }
+    .evaluation-table.mode-detail thead tr:last-child th {
+        position: sticky;
+        top: 50px; /* 1行目の高さ分下げる */
+        z-index: 9;
+        height: 30px;
+        padding: 4px;
+        font-weight: normal;
+        font-size: 0.85em;
+        background-color: #f1f3f5;
+    }
+
+    /* --- Dynamic detail columns --- */
+    .detail-col {
+        min-width: 120px;
+        font-size: 0.9em;
+    }
+    .detail-col-reason {
+        min-width: 200px;
+        font-size: 0.9em;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .comment-section-divider {
+        /* 評価項目とコメント欄を区切るための、少し太い左境界線 */
+        border-left: 2px solid #dee2e6 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <!-- ヘッダー -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="text-primary mb-2">
+                                <i class="fas fa-chart-bar me-2"></i>{{ lesson_session.classroom.class_name }} - 第{{ lesson_session.session_number }}回
+                            </h5>
+                            <p class="text-muted mb-0">
+                                {% if lesson_session.topic %}{{ lesson_session.topic }} - {% endif %}
+                                {{ lesson_session.date|date:"Y年m月d日" }}
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            {% if lesson_session.peer_evaluation_status == 'CLOSED' %}
+                            <span class="btn btn-outline-danger me-2 disabled" aria-disabled="true" title="締切後は全削除できません">
+                                <i class="fas fa-lock me-1"></i>全削除
+                            </span>
+                            {% else %}
+                            <form action="{% url 'school_management:delete_all_peer_evaluations' lesson_session.id %}" method="post" class="d-inline" onsubmit="return confirm('本当に全ての評価データを削除しますか？\nこの操作は取り消せません。\n\n※ポイントも自動的に減算されます。');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger me-2">
+                                    <i class="fas fa-trash-alt me-1"></i>全削除
+                                </button>
+                            </form>
                             {% endif %}
-                        {% empty %}
-                            <p class="text-muted">コメントがありません。</p>
-                        {% endfor %}
+                            <a href="{% url 'school_management:lesson_session_detail' lesson_session.id %}?active_tab=peer" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>戻る
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    {% if lesson_session.peer_evaluation_status == 'CLOSED' %}
+    <div class="alert alert-warning" role="alert">
+        <i class="fas fa-info-circle me-1"></i>ピア評価の締切後は回答データの全削除はできません。
+    </div>
+    {% endif %}
+
+    {% if test_mode %}
+    <div class="alert alert-warning shadow-sm border-0 mb-4 position-relative overflow-hidden">
+        <div class="d-flex align-items-center position-relative" style="z-index: 1;">
+            <i class="fas fa-flask fa-2x text-warning me-3"></i>
+            <div>
+                <h5 class="alert-heading mb-1"><i class="fas fa-flask me-2"></i>テストモード（シミュレーション）</h5>
+                <p class="mb-0 text-muted">ピア評価の点数がシミュレーション用の値に置き換わっています。実際の成績には反映されていません。</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 統計情報 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-primary">{{ total_evaluations }}</h3>
+                    <p class="mb-0">提出された評価</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-success">{{ total_groups }}</h3>
+                    <p class="mb-0">参加グループ数</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-info">{{ submission_rate }}%</h3>
+                    <p class="mb-0">提出率 ({{ submitted_count }}/{{ total_students }})</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    {% if lesson_session.peer_evaluation_status == 'CLOSED' %}
+                        <h3 class="text-danger">締切済み</h3>
+                    {% elif lesson_session.peer_evaluation_status == 'OPEN' %}
+                        <h3 class="text-success">受付中</h3>
+                    {% else %}
+                        <h3 class="text-secondary">受付前</h3>
+                    {% endif %}
+                    <p class="mb-0">評価状態</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Submission Status Table -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 gap-md-2">
+                    <h5 class="mb-0">
+                        {% if test_mode %}
+                        <i class="fas fa-flask me-2 text-warning"></i><span class="d-none d-sm-inline">テストモード（シミュレーション用点数入力）</span><span class="d-inline d-sm-none">シミュレーション点数</span>
+                        {% else %}
+                        <i class="fas fa-user-check me-2"></i>提出状況
+                        {% endif %}
+                    </h5>
+                    <div class="d-flex gap-2 align-items-center flex-wrap">
+                        <form action="{% url 'school_management:toggle_test_mode' %}" method="post" class="m-0 me-md-2">
+                            {% csrf_token %}
+                            <div class="form-check form-switch fs-5 mb-0">
+                                <input class="form-check-input" type="checkbox" id="testModeSwitch" onchange="this.disabled=true; this.form.submit()" {% if test_mode %}checked{% endif %}>
+                                <label class="form-check-label fs-6 mt-1 text-nowrap" for="testModeSwitch">テストモード</label>
+                            </div>
+                        </form>
+                        
+                        {% if test_mode %}
+
+                        {% else %}
+                            <div class="btn-group ms-md-2" role="group" aria-label="View mode toggle">
+                                <a href="?mode=simple" class="btn btn-sm {% if view_mode == 'simple' %}btn-primary{% else %}btn-outline-secondary bg-white{% endif %}">
+                                    簡易
+                                </a>
+                                <a href="?mode=detail" class="btn btn-sm {% if view_mode == 'detail' %}btn-primary{% else %}btn-outline-secondary bg-white{% endif %}">
+                                    詳細
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if submission_rows %}
+                    <div class="table-container">
+                        {% if test_mode %}
+                            {% if pe_settings and pe_settings.enable_member_evaluation or pe_settings.enable_group_evaluation %}
+                                <form action="{% url 'school_management:save_peer_evaluation_simulation' lesson_session.id %}" method="post" id="simulationForm">
+                                    {% csrf_token %}
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3 bg-white p-3 rounded shadow-sm border">
+                                        <div class="btn-group" role="group" aria-label="Point Mode">
+                                            <input type="radio" class="btn-check point-mode-toggle" name="sim_point_mode" id="mode_settings" value="settings" {% if sim_point_mode != 'manual' %}checked{% endif %} onchange="togglePointMode()">
+                                            <label class="btn btn-outline-primary fw-medium" for="mode_settings"><i class="fas fa-magic me-1"></i>設定点の自動反映</label>
+
+                                            <input type="radio" class="btn-check point-mode-toggle" name="sim_point_mode" id="mode_manual" value="manual" {% if sim_point_mode == 'manual' %}checked{% endif %} onchange="togglePointMode()">
+                                            <label class="btn btn-outline-primary fw-medium" for="mode_manual"><i class="fas fa-keyboard me-1"></i>点数の直接入力</label>
+                                        </div>
+                                        <div>
+                                            <button type="button" class="btn btn-outline-secondary me-2" onclick="clearAllSimulations()">
+                                                <i class="fas fa-eraser me-1"></i>全クリア
+                                            </button>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-save me-1"></i>シミュレーション保存
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    {% regroup submission_rows by student_group as grouped_rows %}
+
+                                    {% if pe_settings.enable_group_evaluation %}
+                                    <div class="card mb-4 border-info shadow-sm" style="overflow: visible !important; z-index: 1040; position: relative;">
+                                        <div class="card-header bg-info bg-opacity-10 text-info-emphasis py-2">
+                                            <h6 class="mb-0 fw-bold"><i class="fas fa-trophy me-2"></i>グループ順位の選択 (テスト用)</h6>
+                                        </div>
+                                        <div class="card-body py-3 d-flex flex-wrap gap-4 align-items-center" style="overflow: visible !important;">
+                                            {% with first_row=submission_rows.0 %}
+                                            {% for g in first_row.group_sim_inputs %}
+                                            <div class="d-flex align-items-center gap-2">
+                                                <label class="fw-bold mb-0 text-nowrap" style="font-size: 1.1rem;">{{ g.rank }}位</label>
+                                                <div class="dropdown-wrapper">
+                                                    <select class="form-select group-rank-select" data-rank="{{ g.rank }}" id="select_rank_{{ g.rank }}" onchange="updateGroupRankFromSelect(this.value, {{ g.rank }})" style="min-width: 150px;">
+                                                        <option value="">選択してください</option>
+                                                        {% for group_data in grouped_rows %}
+                                                        {% if group_data.grouper %}
+                                                        <option value="{{ group_data.grouper.id }}">{{ group_data.grouper.display_name }}</option>
+                                                        {% endif %}
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="manual-input-col ms-1" style="display: none;">
+                                                    <div class="input-group input-group-sm" style="width: 120px;">
+                                                        <input type="number" min="1" max="100" class="form-control group-rank-manual-input" data-rank="{{ g.rank }}" id="manual_rank_{{ g.rank }}" placeholder="任意点数" oninput="syncGroupManualPoints({{ g.rank }})" disabled>
+                                                        <span class="input-group-text">点</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                            {% endwith %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="row">
+                                    {% for group_data in grouped_rows %}
+                                        <div class="col-12 mb-4">
+                                            <div class="card shadow-sm border-0">
+                                                <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                                    <h6 class="mb-0 fw-bold">
+                                                        {% if group_data.grouper %}
+                                                            <i class="fas fa-users me-2 text-primary"></i>{{ group_data.grouper.display_name }}
+                                                        {% else %}
+                                                            <i class="fas fa-user-slash me-2 text-secondary"></i>グループ未所属
+                                                        {% endif %}
+                                                    </h6>
+                                                </div>
+                                                
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover mb-0" style="min-width: 600px;">
+                                                        <thead class="table-light">
+                                                            <tr>
+                                                                <th style="width: 20%;">学生名</th>
+                                                                <th style="width: 30%;">メール</th>
+                                                                {% if pe_settings.enable_member_evaluation %}
+                                                                <th class="text-center" style="width: 50%;">メンバー評価</th>
+                                                                {% endif %}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for row in group_data.list %}
+                                                            <tr class="student-row" data-group-id="{{ group_data.grouper.id|default:'' }}">
+                                                                <td class="align-middle fw-medium">{{ row.student.full_name }}</td>
+                                                                <td class="align-middle text-muted small">{{ row.email|default:'-' }}</td>
+                                                                
+                                                                {% if pe_settings.enable_member_evaluation %}
+                                                                <td class="align-middle text-center">
+                                                                    {% if group_data.grouper %}
+                                                                    <div class="d-flex flex-wrap justify-content-center align-items-center gap-2">
+                                                                        <div class="d-inline-flex align-items-center bg-light p-1 px-2 rounded border">
+                                                                            {% for m in row.member_sim_inputs %}
+                                                                            <div class="form-check form-check-inline mb-0 me-2">
+                                                                                <input class="form-check-input member-rank-checkbox" type="checkbox"
+                                                                                    id="m_rank_{{ row.student.id }}_{{ m.rank }}"
+                                                                                    data-student-id="{{ row.student.id }}"
+                                                                                    data-rank="{{ m.rank }}"
+                                                                                    {% if m.val == "1" or m.val == 1 %}checked{% endif %}
+                                                                                    onchange="applyMemberRank(this, {{ row.student.id }}, {{ m.rank }})">
+                                                                                <label class="form-check-label text-nowrap" style="font-size: 0.85rem;" for="m_rank_{{ row.student.id }}_{{ m.rank }}">{{ m.rank }}位</label>
+                                                                            </div>
+                                                                            <input type="hidden" id="hidden_m_rank_{{ row.student.id }}_{{ m.rank }}" name="sim_member_rank_{{ m.rank }}_{{ row.student.id }}" value="{{ m.val|default_if_none:'' }}">
+                                                                            {% empty %}
+                                                                            <span class="small text-muted">配点未設定</span>
+                                                                            {% endfor %}
+                                                                        </div>
+                                                                        <div class="manual-input-col" style="display: none;">
+                                                                            <div class="input-group input-group-sm" style="width: 110px;">
+                                                                                <input type="number" step="1" min="1" max="100" name="sim_contrib_{{ row.student.id }}" id="sim_contrib_{{ row.student.id }}" value="{{ row.sim_contrib|default_if_none:'' }}" class="form-control sim-manual-input" data-student-id="{{ row.student.id }}" placeholder="任意">
+                                                                                <span class="input-group-text">点</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    {% else %}
+                                                                    <div class="text-muted small">
+                                                                        <i class="fas fa-exclamation-triangle me-1 text-warning"></i>グループ未所属のため評価できません。<br>対象学生をグループに追加してください。
+                                                                    </div>
+                                                                    {% endif %}
+                                                                </td>
+                                                                {% endif %}
+                                                                
+                                                                <td class="d-none">
+                                                                    {% if pe_settings.enable_group_evaluation %}
+                                                                    {% for g in row.group_sim_inputs %}
+                                                                    <input type="hidden" class="hidden-group-rank-input" data-student-id="{{ row.student.id }}" data-group-id="{{ group_data.grouper.id|default:'' }}" data-rank="{{ g.rank }}" id="hidden_g_rank_{{ row.student.id }}_{{ g.rank }}" name="sim_group_rank_{{ g.rank }}_{{ row.student.id }}" value="{{ g.val|default_if_none:'' }}">
+                                                                    {% endfor %}
+                                                                    <input type="hidden" id="sim_group_manual_{{ row.student.id }}" name="sim_group_manual_{{ row.student.id }}" value="{{ row.sim_group_manual|default_if_none:'' }}">
+                                                                    {% endif %}
+                                                                </td>
+                                                            </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                    </div>
+                                </form>
+                            {% else %}
+                                <div class="alert alert-info d-flex align-items-center m-4">
+                                    <i class="fas fa-info-circle fa-lg me-3"></i>
+                                    <div>
+                                        ピア評価設定が有効になっていないため、テストモードでのシミュレーション機能は利用できません。
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            {% if view_mode == 'simple' %}
+                            <p class="m-3 text-muted small">簡易表示では提出の有無のみ確認できます。詳細な提出内容を確認するには「詳細」表示に切り替えてください。</p>
+                            {% endif %}
+                            <table class="evaluation-table mode-{{ view_mode }}">
+                            <thead>
+                                <tr>
+                                    <th class="name-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>学生名</th>
+                                    <th class="email-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>メール</th>
+                                    <th class="submission-time-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>提出日時</th>
+                                    <th class="text-center submission-status-col" {% if view_mode == 'detail' %}rowspan="2"{% endif %}>提出</th>
+                                    {% if view_mode == 'detail' %}
+                                        {% if pe_settings and pe_settings.enable_member_evaluation %}
+                                            {% for rank_item in member_ranking_list %}
+                                                <th colspan="2" class="text-center">メンバー{{ rank_item.rank }}位</th>
+                                            {% endfor %}
+                                        {% endif %}
+                                        {% if pe_settings and pe_settings.enable_group_evaluation %}
+                                            {% for rank_item in group_ranking_list %}
+                                                <th colspan="2" class="text-center">グループ{{ rank_item.rank }}位</th>
+                                            {% endfor %}
+                                        {% endif %}
+                                        {% if lesson_session.enable_comments %}
+                                            <th rowspan="2" class="detail-col-reason comment-section-divider">グループワークコメント</th>
+                                        {% endif %}
+                                        {% if lesson_session.enable_feedback %}
+                                            <th rowspan="2" class="detail-col-reason comment-section-divider">授業の感想</th>
+                                        {% endif %}
+                                    {% endif %}
+                                </tr>
+                                {% if view_mode == 'detail' %}
+                                <tr>
+                                    {% if pe_settings and pe_settings.enable_member_evaluation %}{% for rank_item in member_ranking_list %}
+                                        <th class="detail-col">対象者</th><th class="detail-col-reason">理由</th>
+                                    {% endfor %}{% endif %}
+                                    {% if pe_settings and pe_settings.enable_group_evaluation %}{% for rank_item in group_ranking_list %}
+                                        <th class="detail-col">対象グループ</th><th class="detail-col-reason">理由</th>
+                                    {% endfor %}{% endif %}
+                                </tr>
+                                {% endif %}
+                            </thead>
+                            <tbody>
+                                {% for row in submission_rows %}
+                                <tr>
+                                    <td class="name-col">
+                                        {% if row.submitted %}
+                                            <span class="text-primary fw-semibold">
+                                                {{ row.student.full_name }}
+                                            </span>
+                                        {% else %}
+                                            {{ row.student.full_name }}
+                                        {% endif %}
+                                        {% if row.is_unlinked %}
+                                            <span class="badge bg-secondary ms-1">担当から外れた学生</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="email-col">{{ row.email|default:'-' }}</td>
+                                    <td class="submission-time-col">
+                                        {% if row.submitted_at %}
+                                            {{ row.submitted_at|date:"Y-m-d H:i" }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center submission-status-col">
+                                        {% if row.submitted %}
+                                            <i class="fas fa-check text-success"></i>
+                                        {% else %}
+                                            <i class="fas fa-times text-danger"></i>
+                                        {% endif %}
+                                    </td>
+                                    {% if view_mode == 'detail' %}
+                                        {% if row.submitted %}
+                                            {% if pe_settings and pe_settings.enable_member_evaluation %}{% for eval_data in row.member_eval_by_rank %}
+                                                <td class="detail-col">
+                                                    {% if eval_data.is_deleted %}
+                                                        <span class="text-danger">{{ eval_data.target_name|default:"-" }}</span>
+                                                    {% elif eval_data.is_unlinked %}
+                                                        {{ eval_data.target_name|default:"-" }}
+                                                        <span class="badge bg-secondary">担当外</span>
+                                                    {% else %}
+                                                        {{ eval_data.target_name|default:"-" }}
+                                                    {% endif %}
+                                                </td>
+                                                <td class="detail-col-reason">{{ eval_data.reason|default:"-" }}</td>
+                                            {% endfor %}{% endif %}
+                                            {% if pe_settings and pe_settings.enable_group_evaluation %}{% for eval_data in row.group_eval_by_rank %}
+                                                <td class="detail-col">{{ eval_data.target_name|default:"-" }}</td>
+                                                <td class="detail-col-reason">{{ eval_data.reason|default:"-" }}</td>
+                                            {% endfor %}{% endif %}
+                                            {% if lesson_session.enable_comments %}
+                                                <td class="detail-col-reason comment-section-divider">{{ row.submission_detail.general_comment|default:"-" }}</td>
+                                            {% endif %}
+                                            {% if lesson_session.enable_feedback %}
+                                                <td class="detail-col-reason comment-section-divider">{{ row.submission_detail.class_comment|default:"-" }}</td>
+                                            {% endif %}
+                                        {% else %}
+                                            {# Render empty cells to maintain table structure #}
+                                            {% if pe_settings and pe_settings.enable_member_evaluation %}{% for rank_item in member_ranking_list %}
+                                                <td>-</td>
+                                                <td>-</td>
+                                            {% endfor %}{% endif %}
+                                            {% if pe_settings and pe_settings.enable_group_evaluation %}{% for rank_item in group_ranking_list %}
+                                                <td>-</td>
+                                                <td>-</td>
+                                            {% endfor %}{% endif %}
+                                            {% if lesson_session.enable_comments %}
+                                                <td class="comment-section-divider">-</td>
+                                            {% endif %}
+                                            {% if lesson_session.enable_feedback %}
+                                                <td class="comment-section-divider">-</td>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            </table>
+                        {% endif %}
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">履修学生がいません。</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- グループランキング (remains as a separate section) -->
+    <div class="row mt-4">
+        <div class="col-lg-8 mb-4 mb-lg-0">
+                <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-trophy me-2"></i>グループランキング</h5>
+                    {% if group_rank_headers %}
+                    <small class="text-muted">
+                        {% for item in group_rank_headers %}
+                            {{ item.rank }}位票×{{ item.points }}点{% if not forloop.last %} + {% endif %}
+                        {% endfor %}
+                    </small>
+                    {% endif %}
+                </div>
+                <div class="card-body p-0">
+                    {% if group_stats %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>順位</th>
+                                    <th>グループ</th>
+                                    {% for item in group_rank_headers %}
+                                    <th class="text-center">{{ item.rank }}位票</th>
+                                    {% endfor %}
+                                    <th class="text-center">スコア</th>
+                                    <th class="text-center">評価提出</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in group_stats %}
+                                <tr class="{% if forloop.first %}table-warning{% elif forloop.counter == 2 %}table-light{% elif forloop.counter == 3 %}table-info{% endif %}">
+                                    <td>
+                                        {% if forloop.first %}
+                                            <i class="fas fa-trophy text-warning"></i> 1位
+                                        {% elif forloop.counter == 2 %}
+                                            <i class="fas fa-medal text-secondary"></i> 2位
+                                        {% elif forloop.counter == 3 %}
+                                            <i class="fas fa-medal text-warning"></i> 3位
+                                        {% else %}
+                                            {{ forloop.counter }}位
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>
+                                            {% if stat.group.group_name %}
+                                                {{ stat.group.group_name }}
+                                            {% else %}
+                                                {{ stat.group.group_number }}グループ
+                                            {% endif %}
+                                        </strong>
+                                    </td>
+                                    {% for vote_count in stat.votes_by_rank_list %}
+                                    <td class="text-center">
+                                        {% if vote_count > 0 %}
+                                            <span class="badge bg-primary">{{ vote_count }}</span>
+                                        {% else %}
+                                            <span class="text-muted">0</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                    <td class="text-center">
+                                        <strong class="text-primary">{{ stat.score }}</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if stat.evaluations_given > 0 %}
+                                            <i class="fas fa-check text-success"></i>
+                                        {% else %}
+                                            <i class="fas fa-times text-danger"></i>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">まだ評価データがありません。</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 詳細コメント (This section was previously in a separate tab, now it's a separate card below the main table) -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-comments me-2"></i>評価コメント</h6>
+                </div>
+                <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                    {% for row in comment_rows %}
+                        {% with evaluation=row.evaluation %}
+                        <div class="mb-3 border-bottom pb-2">
+                            <small class="text-muted">
+                                評価者: 
+                                {% if evaluation.evaluator_group.group_name %}
+                                    {{ evaluation.evaluator_group.group_name }}
+                                {% else %}
+                                    {{ evaluation.evaluator_group.group_number }}グループ
+                                {% endif %}
+                            </small>
+                            
+                            {% for item in row.group_reasons %}
+                            <div class="mt-1">
+                                <strong class="text-warning">{{ item.rank }}位グループ理由 (対象: {{ item.target_name }}):</strong>
+                                <p class="small mb-1" style="white-space: pre-wrap;">{{ item.reason }}</p>
+                            </div>
+                            {% endfor %}
+
+                            {% for item in row.member_reasons %}
+                            <div class="mt-1">
+                                <strong class="text-success">{{ item.rank }}位メンバー理由 (対象:
+                                    {% if item.is_deleted %}
+                                        <span class="text-danger">{{ item.target_name }}</span>
+                                    {% elif item.is_unlinked %}
+                                        {{ item.target_name }}<span class="badge bg-secondary">担当外</span>
+                                    {% else %}
+                                        {{ item.target_name }}
+                                    {% endif %}
+                                ):</strong>
+                                <p class="small mb-1" style="white-space: pre-wrap;">{{ item.reason }}</p>
+                            </div>
+                            {% endfor %}
+                            
+                            {% if row.general_comment %}
+                            <div class="mt-1">
+                                <strong class="text-info">全体コメント:</strong>
+                                <p class="small mb-1" style="white-space: pre-wrap;">{{ row.general_comment }}</p>
+                            </div>
+                            {% endif %}
+                            {% if row.class_comment %}
+                            <div class="mt-1">
+                                <strong class="text-secondary">授業の感想:</strong>
+                                <p class="small mb-1" style="white-space: pre-wrap;">{{ row.class_comment }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endwith %}
+                    {% empty %}
+                        <p class="text-muted">コメントがありません。</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function togglePointMode() {
+        const checkedMode = document.querySelector('input[name="sim_point_mode"]:checked');
+        if (!checkedMode) return;
+        
+        const mode = checkedMode.value;
+        const manualCols = document.querySelectorAll('.manual-input-col');
+        
+        if (mode === 'settings') {
+            manualCols.forEach(col => {
+                col.style.display = 'none';
+            });
+        } else {
+            manualCols.forEach(col => {
+                col.style.display = 'block';
+            });
+        }
+    }
+
+    // メンバー順位のチェックボックス処理
+    function applyMemberRank(checkbox, studentId, rank) {
+        if (checkbox.checked) {
+            document.querySelectorAll(`.member-rank-checkbox[data-student-id="${studentId}"]`).forEach(cb => {
+                if (cb !== checkbox) cb.checked = false;
+            });
+        }
+        
+        document.querySelectorAll(`input[id^="hidden_m_rank_${studentId}_"]`).forEach(hidden => {
+            hidden.value = '';
+        });
+        
+        if (checkbox.checked) {
+            const hidden = document.getElementById(`hidden_m_rank_${studentId}_${rank}`);
+            if (hidden) hidden.value = '1';
+        }
+        
+        updateMemberInputState(studentId);
+    }
+
+    // グループ順位のドロップダウン処理 (ネイティブSelect)
+    function updateGroupRankFromSelect(groupId, rank) {
+        // 全グループの hidden input をクリアして、今回の選択を適用する
+        document.querySelectorAll(`.hidden-group-rank-input[data-rank="${rank}"]`).forEach(hidden => {
+            hidden.value = '';
+            updateGroupInputState(hidden.dataset.studentId);
+        });
+        
+        const manualInput = document.getElementById(`manual_rank_${rank}`);
+        
+        if (groupId) {
+            // 新しく選択されたグループに順位をセット
+            document.querySelectorAll(`.hidden-group-rank-input[data-group-id="${groupId}"][data-rank="${rank}"]`).forEach(hidden => {
+                hidden.value = '1';
+                updateGroupInputState(hidden.dataset.studentId);
+            });
+            if (manualInput) manualInput.disabled = false;
+        } else {
+            if (manualInput) {
+                manualInput.disabled = true;
+                manualInput.value = '';
+            }
+        }
+        
+        // 選択されたグループを他のドロップダウンから隠す
+        updateDropdownOptionsVisibility();
+        
+        // マニュアルポイントの再同期
+        syncGroupManualPoints(rank);
+    }
+
+    function updateDropdownOptionsVisibility() {
+        // 全てのoptionを一旦表示 (disabled解除)
+        document.querySelectorAll('.group-rank-select option').forEach(opt => {
+            if (opt.value !== "") opt.disabled = false;
+        });
+        
+        // 各selectで選ばれているvalueを他のselectでdisabledにする
+        document.querySelectorAll('.group-rank-select').forEach(sel => {
+            const selectedVal = sel.value;
+            if (selectedVal) {
+                document.querySelectorAll('.group-rank-select').forEach(otherSel => {
+                    if (otherSel !== sel) {
+                        const opt = otherSel.querySelector(`option[value="${selectedVal}"]`);
+                        if (opt) opt.disabled = true;
+                    }
+                });
+            }
+        });
+    }
+
+    function syncGroupManualPoints(rank) {
+        const input = document.getElementById(`manual_rank_${rank}`);
+        if (!input) return;
+        const val = input.value;
+        document.querySelectorAll(`.hidden-group-rank-input[data-rank="${rank}"]`).forEach(hidden => {
+            if (parseFloat(hidden.value) === 1) {
+                const sId = hidden.dataset.studentId;
+                const mInput = document.getElementById(`sim_group_manual_${sId}`);
+                if (mInput) mInput.value = val;
+            }
+        });
+    }
+
+    function updateMemberInputState(studentId) {
+        const input = document.getElementById(`sim_contrib_${studentId}`);
+        if (!input) return;
+        const isAnyChecked = Array.from(document.querySelectorAll(`.member-rank-checkbox[data-student-id="${studentId}"]`)).some(cb => cb.checked);
+        input.disabled = !isAnyChecked;
+        if (!isAnyChecked) input.value = '';
+    }
+
+    function updateGroupInputState(studentId) {
+        const mInput = document.getElementById(`sim_group_manual_${studentId}`);
+        if (!mInput) return;
+        const rankedHidden = Array.from(document.querySelectorAll(`.hidden-group-rank-input[data-student-id="${studentId}"]`)).find(hidden => parseFloat(hidden.value) === 1);
+        if (rankedHidden) {
+            const rank = rankedHidden.dataset.rank;
+            const rankInput = document.querySelector(`.group-rank-manual-input[data-rank="${rank}"]`);
+            mInput.value = rankInput ? rankInput.value : '';
+        } else {
+            mInput.value = '';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        togglePointMode();
+        
+        // 初期状態でのグレーアウト適用
+        document.querySelectorAll('.student-row').forEach(row => {
+            const mCbs = row.querySelectorAll('.member-rank-checkbox');
+            if (mCbs.length > 0) {
+                const sId = mCbs[0].dataset.studentId;
+                updateMemberInputState(sId);
+            }
+            
+            const gHiddens = row.querySelectorAll('.hidden-group-rank-input');
+            if (gHiddens.length > 0) {
+                const sId = gHiddens[0].dataset.studentId;
+                updateGroupInputState(sId);
+            }
+        });
+        
+        // グループドロップダウン(Select)の初期化
+        document.querySelectorAll('.hidden-group-rank-input').forEach(hidden => {
+            if (parseFloat(hidden.value) === 1 && hidden.dataset.groupId) {
+                const sel = document.getElementById(`select_rank_${hidden.dataset.rank}`);
+                if (sel) {
+                    sel.value = hidden.dataset.groupId;
+                    const manualInput = document.getElementById(`manual_rank_${hidden.dataset.rank}`);
+                    if (manualInput) manualInput.disabled = false;
+                }
+            }
+        });
+        updateDropdownOptionsVisibility();
+        
+        // グループマニュアル入力の初期化
+        document.querySelectorAll('.group-rank-manual-input').forEach(input => {
+            const rank = input.dataset.rank;
+            const studentWithRank = Array.from(document.querySelectorAll(`.hidden-group-rank-input[data-rank="${rank}"]`)).find(h => parseFloat(h.value) === 1);
+            if (studentWithRank) {
+                const sId = studentWithRank.dataset.studentId;
+                const mInput = document.getElementById(`sim_group_manual_${sId}`);
+                if (mInput && mInput.value) {
+                    input.value = mInput.value;
+                }
+            }
+        });
+    });
+
+    function clearAllSimulations() {
+        if (!confirm('入力されたシミュレーションデータを全てクリアしますか？')) return;
+        
+        document.querySelectorAll('.member-rank-checkbox').forEach(cb => cb.checked = false);
+        document.querySelectorAll('.group-rank-select').forEach(sel => sel.value = '');
+        document.querySelectorAll('input[type="hidden"][name^="sim_member_rank_"], input[type="hidden"][name^="sim_group_rank_"]').forEach(h => h.value = '');
+        
+        updateDropdownOptionsVisibility();
+        document.querySelectorAll('.sim-manual-input, .group-rank-manual-input, input[name^="sim_group_manual_"]').forEach(input => {
+            input.value = '';
+        });
+        document.querySelectorAll('.group-rank-manual-input').forEach(input => input.disabled = true);
+        
+        // メンバー個別のグレーアウトをすべて更新
+        document.querySelectorAll('.member-rank-checkbox').forEach(cb => {
+            updateMemberInputState(cb.dataset.studentId);
+        });
+        document.querySelectorAll('.hidden-group-rank-input').forEach(hidden => {
+            updateGroupInputState(hidden.dataset.studentId);
+        });
+    }
+</script>
+{% endblock %}

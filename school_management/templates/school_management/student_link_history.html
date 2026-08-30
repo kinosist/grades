@@ -1,0 +1,101 @@
+{% extends 'school_management/base.html' %}
+
+{% block title %}担当解除履歴 - 学校管理システム{% endblock %}
+{% block page_title %}担当解除履歴{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'school_management:student_list' %}">学生管理</a></li>
+<li class="breadcrumb-item active" aria-current="page">担当解除履歴</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    body { background-color: #f8fafc; }
+    .modern-card {
+        border: none !important;
+        border-radius: 20px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        background-color: #ffffff;
+    }
+    .history-row {
+        border-bottom: 1px solid #f1f5f9;
+        padding: 1.25rem 0;
+    }
+    .history-row:last-child {
+        border-bottom: none;
+    }
+    .classroom-history-badge {
+        display: inline-block;
+        background-color: #f1f5f9;
+        color: #475569;
+        border-radius: 50px;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.8rem;
+        margin: 0.15rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card modern-card">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-bold m-0 text-dark">
+                        <i class="fas fa-history me-2 text-primary"></i>担当解除履歴
+                    </h5>
+                    <a href="{% url 'school_management:student_list' %}" class="btn btn-light rounded-pill px-4 fw-bold">
+                        <i class="fas fa-arrow-left me-2"></i>学生一覧へ戻る
+                    </a>
+                </div>
+
+                <p class="text-muted small mb-4">
+                    担当から外した学生の情報は削除されず、ここに履歴として残ります。
+                    「再度担当にする」を押すと、以前の成績・出席・ピア評価などのデータをそのまま引き継いで再度担当に戻せます。
+                </p>
+
+                {% if history_rows %}
+                    {% for row in history_rows %}
+                    <div class="history-row">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                            <div>
+                                <div class="fw-bold text-dark">
+                                    {{ row.student.full_name }}
+                                    <span class="text-muted fw-normal">（学籍番号: {{ row.student.student_number }}）</span>
+                                </div>
+                                <div class="text-muted small mt-1">
+                                    担当解除日時: {{ row.unlinked_at|date:"Y年n月j日 H:i" }}
+                                </div>
+                                <div class="mt-2">
+                                    {% for enrollment in row.classroom_history %}
+                                        <span class="classroom-history-badge">
+                                            <i class="fas fa-chalkboard me-1"></i>{{ enrollment.classroom.class_name }}
+                                            ({{ enrollment.classroom.year }}年 {{ enrollment.classroom.get_semester_display }})
+                                            {% if not enrollment.is_active %}<span class="text-danger">・除籍済み</span>{% endif %}
+                                        </span>
+                                    {% empty %}
+                                        <span class="text-muted small">所属クラスの記録はありません</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <form method="post" action="{% url 'school_management:student_relink' student_id=row.student.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-primary rounded-pill px-4 fw-bold">
+                                    <i class="fas fa-user-plus me-2"></i>再度担当にする
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-check-circle fa-2x text-muted mb-3"></i>
+                        <p class="text-muted mb-0">担当解除の履歴はありません。</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

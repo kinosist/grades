@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 from dotenv import load_dotenv
 import dj_database_url
 
@@ -50,6 +51,17 @@ else:
             ALLOWED_HOSTS.append(railway_static_url)
         # Add Railway wildcard domains
         ALLOWED_HOSTS.extend(['.railway.app', '.up.railway.app'])
+
+# Railway（および多くのPaaS）はプロキシでSSLを終端し、アプリにはhttpで転送する。
+# これを設定しないと request.is_secure() が常にFalseになり、
+# build_absolute_uri() が https:// ではなく http:// のURLを生成してしまう
+# （Google OAuthのredirect_uri_mismatchの原因になる）。
+# 信頼できるプロキシ（Railway）配下で動作している場合のみ有効化する。
+# DEBUG時や直接アクセス時に有効化すると、X-Forwarded-* ヘッダの偽装により
+# is_secure() やホスト判定が汚染されるおそれがあるため、条件を絞る。
+if not DEBUG and 'RAILWAY_ENVIRONMENT' in os.environ:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST = True
 
 # CSRF trusted origins for Railway
 CSRF_TRUSTED_ORIGINS = [
@@ -118,6 +130,16 @@ TEMPLATES = [
         },
     },
 ]
+
+AUTHENTICATION_BACKENDS = [
+    'school_management.backends.EmailAuthBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+SILENCED_SYSTEM_CHECKS = ['auth.E003'] if os.environ.get('SILENCE_AUTH_E003') == '1' else []
+
+# デバッグ画面を有効化するフラグ（本番環境では環境変数等で切り替えるかFalseにする）
+ENABLE_DEBUG_VIEWS = os.environ.get('ENABLE_DEBUG_VIEWS') == '1'
 
 WSGI_APPLICATION = 'school_project.wsgi.application'
 
@@ -226,3 +248,14 @@ AUTH_USER_MODEL = 'school_management.CustomUser'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+# Peer evaluation Google OAuth settings
+ALLOWED_GMAIL_DOMAINS = tuple(
+    domain.strip().lower()
+    for domain in os.environ.get('ALLOWED_GMAIL_DOMAINS', '').split(',')
+    if domain.strip()
+)
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '').strip()
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '').strip()
+PEER_EVAL_SESSION_COOKIE_NAME = 'peer_eval_session_id'
+PEER_EVAL_SESSION_TTL_HOURS = int(os.environ.get('PEER_EVAL_SESSION_TTL_HOURS', '24'))

@@ -1,9 +1,13 @@
 from datetime import date
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
-from ...models import ClassRoom, StudentQRCode, QRCodeScan, LessonSession, StudentLessonPoints, StudentClassPoints
+from django.http import JsonResponse
+from ...models import ClassRoom, StudentQRCode, QRCodeScan, LessonSession, PointColumn, StudentColumnScore, Quiz, QuizScore
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def qr_code_scan(request, qr_code_id):
@@ -15,71 +19,125 @@ def qr_code_scan(request, qr_code_id):
             messages.error(request, 'QRコードのスキャンは先生のみ可能です。')
             return redirect('school_management:student_dashboard')
         
-        class_id = request.GET.get('class_id')
+        # 1. セッションIDやクラスIDを取得
+        session_id = request.GET.get('session_id') or request.POST.get('session_id')
+        class_id = request.GET.get('class_id') or request.POST.get('class_id')
+        
+        current_session = None
         target_classroom = None
-        if class_id:
+        
+        if session_id:
+            try:
+                current_session = LessonSession.objects.get(id=session_id, classroom__teachers=request.user)
+                target_classroom = current_session.classroom
+            except LessonSession.DoesNotExist:
+                pass
+        
+        if not target_classroom and class_id:
             try:
                 target_classroom = ClassRoom.objects.get(id=class_id, teachers=request.user)
             except ClassRoom.DoesNotExist:
                 pass
-        
-        today = date.today()
-        current_session = None
-        
-        if target_classroom:
-            teacher_sessions = LessonSession.objects.filter(classroom=target_classroom, date=today).order_by('-created_at')
-        else:
-            teacher_sessions = LessonSession.objects.filter(classroom__teachers=request.user, date=today).order_by('-created_at')
-        
-        if teacher_sessions.exists():
-            current_session = teacher_sessions.first()
-        
-        QRCodeScan.objects.create(
-            qr_code=qr_code, scanned_by=request.user,
-            lesson_session=current_session, points_awarded=1
-        )
-        
-        update_classroom = current_session.classroom if current_session else target_classroom
-        if update_classroom:
-            if current_session:
-                slp, _ = StudentLessonPoints.objects.get_or_create(
-                    student=qr_code.student, lesson_session=current_session, defaults={'points': 0}
-                )
-                slp.points += 1
-                slp.save()
 
+        teacher_classrooms = ClassRoom.objects.filter(
+            enrollments__student=qr_code.student,
+            enrollments__is_active=True,
+            teachers=request.user,
+        )
+
+        # 2. セッション・クラス指定がない場合、学生の所属クラスから探す（1つの場合のみ自動選択）
+        if not target_classroom:
+            if teacher_classrooms.count() == 1:
+                target_classroom = teacher_classrooms.first()
+            
+        if target_classroom and not current_session:
+            today = timezone.now().date()
+            current_session = LessonSession.objects.filter(classroom=target_classroom, date=today).order_by('-created_at').first()
+
+        if request.method == 'POST':
+            point_type = request.POST.get('point_type', 'qr_action')
             try:
-                scp, _ = StudentClassPoints.objects.get_or_create(
-                    student=qr_code.student, classroom=update_classroom, defaults={'points': 0}
+                points_to_add = int(request.POST.get('points', 1))
+            except ValueError:
+                points_to_add = 1
+
+            posted_session_id = request.POST.get('session_id')
+            if not posted_session_id:
+                messages.error(request, '対象の授業回を選択してください。')
+                return redirect('school_management:qr_code_scan', qr_code_id=qr_code_id)
+                
+            selected_session = LessonSession.objects.filter(id=posted_session_id, classroom=target_classroom).first()
+            if not selected_session:
+                messages.error(request, '無効な授業回です。')
+                return redirect('school_management:qr_code_scan', qr_code_id=qr_code_id)
+
+            added_target = ""
+
+            if point_type == 'qr_action':
+                scan = QRCodeScan.objects.create(
+                    qr_code=qr_code, 
+                    scanned_by=request.user,
+                    lesson_session=selected_session
                 )
-                scp.points += 1
-                scp.save()
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).error(f'クラスポイント更新エラー: {str(e)}')
+                if scan.points_awarded != points_to_add:
+                    scan.points_awarded = points_to_add
+                    scan.save(update_fields=['points_awarded'])
+                
+                added_target = "小テスト"
+                messages.success(request, f'{qr_code.student.full_name}さんの「小テスト」に{points_to_add}ptを追加しました。')
+            elif point_type.startswith('custom_'):
+                column_id = point_type.split('_')[1]
+                column = get_object_or_404(PointColumn, id=column_id, classroom=target_classroom)
+                
+                # 独自評価項目へのポイント付与もスキャン履歴として保存する
+                scan = QRCodeScan.objects.create(
+                    qr_code=qr_code, 
+                    scanned_by=request.user,
+                    lesson_session=selected_session,
+                    point_column=column,
+                    points_awarded=points_to_add
+                )
+                
+                score_obj, created = StudentColumnScore.objects.get_or_create(
+                    student=qr_code.student,
+                    column=column,
+                    defaults={'score': 0}
+                )
+                score_obj.score += points_to_add
+                score_obj.save()
+                added_target = f"独自項目: {column.column_title}"
+                messages.success(request, f'{qr_code.student.full_name}さんの「{column.column_title}」に{points_to_add}ptを追加しました。')
+                
+            qr_code.last_used_at = timezone.now()
+            qr_code.save()
+
+            context = {
+                'success': True,
+                'qr_code': qr_code,
+                'target_classroom': target_classroom,
+                'selected_session': selected_session,
+                'added_target': added_target,
+                'points_added': points_to_add,
+            }
+            return render(request, 'school_management/qr_code_scan.html', context)
         
-        qr_code.last_used_at = timezone.now()
-        qr_code.save()
-        
-        user_scan_count = QRCodeScan.objects.filter(scanned_by=request.user).count()
-        student_class_points = 0
-        if update_classroom:
-            try:
-                student_class_points = StudentClassPoints.objects.get(student=qr_code.student, classroom=update_classroom).points
-            except StudentClassPoints.DoesNotExist:
-                pass
-        
+        # GET: 設定画面表示
+        default_points = target_classroom.qr_point_value if target_classroom else 1
+        custom_columns = target_classroom.point_columns.all() if target_classroom else []
+        sessions = LessonSession.objects.filter(classroom=target_classroom).order_by('-session_number') if target_classroom else []
+
         context = {
             'qr_code': qr_code,
-            'lesson_session': current_session,
-            'scan_time': timezone.now().strftime('%Y年%m月%d日 %H:%M'),
-            'user_scan_count': user_scan_count,
-            'classroom': update_classroom,
-            'student_class_points': student_class_points,
-            'points_added': bool(update_classroom),
+            'target_classroom': target_classroom,
+            'teacher_classrooms': teacher_classrooms,
+            'current_session': current_session,
+            'sessions': sessions,
+            'custom_columns': custom_columns,
+            'default_points': default_points,
         }
         return render(request, 'school_management/qr_code_scan.html', context)
         
     except Exception as e:
+        logger.error(f"QRコードスキャンエラー: {e}", exc_info=True)
         context = {'qr_code': None, 'error_message': f'QRコードのスキャンに失敗しました: {str(e)}'}
         return render(request, 'school_management/qr_code_scan.html', context)

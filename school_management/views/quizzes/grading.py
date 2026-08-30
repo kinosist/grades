@@ -7,7 +7,7 @@ from ...models import Quiz, QuizScore
 def quiz_grading_view(request, quiz_id):
     """小テスト採点"""
     quiz = get_object_or_404(Quiz, id=quiz_id, lesson_session__classroom__teachers=request.user)
-    students = quiz.lesson_session.classroom.students.all()
+    students = quiz.lesson_session.classroom.students.all().order_by('student_number')
     
     # 採点結果を学生IDをキーにして辞書作成
     score_objects = QuizScore.objects.filter(quiz=quiz, is_cancelled=False).select_related('student')

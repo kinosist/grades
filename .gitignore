@@ -83,3 +83,6 @@ dmypy.json
 *.bak
 *.tmp
 *~
+
+# local files
+docs/
